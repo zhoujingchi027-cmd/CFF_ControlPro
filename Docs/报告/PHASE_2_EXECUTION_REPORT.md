@@ -140,4 +140,8 @@ Build后`CFFwelding.tmc`和System Project上下文由XAE更新。没有把XML解
 
 ## Git状态
 
-本报告在Phase 2主Commit前生成。Commit、Push和远端Hash将在完成后补录。
+- Phase 2主Commit：`8780363b820c4a14da16664ad4b043d2307deebd`
+- Commit消息：`feat(architecture): add Phase 2 task and program skeletons`
+- Push：已成功推送至`origin/codex/cffwelding-greenfield-v3.3`。
+- 远端复核：`refs/heads/codex/cffwelding-greenfield-v3.3`与上述主Commit完全一致。
+- 本段Git证据由后续报告Commit补录，不改写主Commit。
