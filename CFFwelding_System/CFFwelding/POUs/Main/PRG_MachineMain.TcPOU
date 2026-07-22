@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_MachineMain" Id="{A2000000-0000-4000-8000-000000000017}"><Declaration><![CDATA[PROGRAM PRG_MachineMain
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：整机主状态和各子系统结果汇总。
+   所属任务：Task_CffMain，调用顺序13。
+   唯一Owner：PRG_MachineMain。
+   当前阶段：硬件绑定未完成，Production Ready保持FALSE。
+   后续实现：Entry、Action、Success、Timeout和Fault出口。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

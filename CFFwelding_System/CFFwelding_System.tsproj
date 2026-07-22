@@ -4,28 +4,54 @@
 		<System>
 			<Tasks>
 				<Task Id="3" Priority="20" CycleTime="100000" AmsPort="350" AdtTasks="true">
-					<Name>PlcTask</Name>
+					<Name>Task_CffMain</Name>
+				</Task>
+				<Task Id="4" Priority="10" CycleTime="100000" AmsPort="351" AdtTasks="true">
+					<Name>Task_CffFast</Name>
+				</Task>
+				<Task Id="5" Priority="30" CycleTime="500000" AmsPort="352" AdtTasks="true">
+					<Name>Task_CffSlow</Name>
 				</Task>
 			</Tasks>
 		</System>
 		<Plc>
 			<Project GUID="{3B1364E2-6C34-4CB9-BD73-174C89442C9B}" Name="CFFwelding" PrjFilePath="CFFwelding\CFFwelding.plcproj" TmcFilePath="CFFwelding\CFFwelding.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{83244F45-D58C-7A68-D190-38943B1AC94E}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{78C40D33-DB4F-7BD5-D2FA-84521DA3A9AC}">
 					<Name>CFFwelding Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Contexts>
 						<Context>
 							<Id>0</Id>
-							<Name>PlcTask</Name>
+							<Name>Task_CffFast</Name>
+							<ManualConfig>
+								<OTCID>#x02010040</OTCID>
+							</ManualConfig>
+							<Priority>10</Priority>
+							<CycleTime>10000000</CycleTime>
+						</Context>
+						<Context>
+							<Id>1</Id>
+							<Name>Task_CffMain</Name>
 							<ManualConfig>
 								<OTCID>#x02010030</OTCID>
 							</ManualConfig>
 							<Priority>20</Priority>
 							<CycleTime>10000000</CycleTime>
 						</Context>
+						<Context>
+							<Id>2</Id>
+							<Name>Task_CffSlow</Name>
+							<ManualConfig>
+								<OTCID>#x02010050</OTCID>
+							</ManualConfig>
+							<Priority>30</Priority>
+							<CycleTime>50000000</CycleTime>
+						</Context>
 					</Contexts>
 					<TaskPouOids>
+						<TaskPouOid Prio="10" OTCID="#x08502002"/>
 						<TaskPouOid Prio="20" OTCID="#x08502001"/>
+						<TaskPouOid Prio="30" OTCID="#x08502003"/>
 					</TaskPouOids>
 				</Instance>
 			</Project>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_StepCriterionOutput" Id="{D2000000-0000-4000-8000-000000000012}"><Declaration><![CDATA[TYPE ST_StepCriterionOutput :
+STRUCT
+    (* Force Decline已达到ArmForce并进入可确认窗口。 *)
+    bArmed : BOOL;
+    (* 第一准则已经满足。 *)
+    bPrimaryMet : BOOL;
+    (* Secondary S_rel限制已经触发。 *)
+    bSecondaryLimitReached : BOOL;
+    (* 当前步骤结束已经防抖确认。 *)
+    bEndConfirmed : BOOL;
+    (* 结束原因数值，后续由显式枚举替换。 *)
+    nEndCause : UDINT;
+    (* 结束确认时锁存的压向力，单位kN。 *)
+    rLatchedForce_kN : LREAL;
+    (* 结束确认时锁存的S_rel，单位mm。 *)
+    rLatchedRelativePosition_mm : LREAL;
+    (* 结束确认时锁存的步骤时间，单位s。 *)
+    rLatchedStepTime_s : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

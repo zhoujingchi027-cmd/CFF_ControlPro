@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastAxisControl" Id="{A2000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[PROGRAM PRG_FastAxisControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：Z/R轴命令Owner仲裁、力控制和轴Adapter调用。
+   所属任务：Task_CffFast，调用顺序3。
+   唯一Owner：PRG_FastAxisControl。
+   当前阶段：不声明AXIS_REF实例，不发出任何运动命令。
+   后续实现：标准NC与External Setpoint生命周期。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

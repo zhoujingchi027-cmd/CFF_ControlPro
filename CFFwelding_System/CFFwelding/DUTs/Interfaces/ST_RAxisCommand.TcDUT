@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_RAxisCommand" Id="{D2000000-0000-4000-8000-000000000007}"><Declaration><![CDATA[TYPE ST_RAxisCommand :
+STRUCT
+    (* 请求使能R轴。 *)
+    bEnable : BOOL;
+    (* 请求复位R轴错误。 *)
+    bReset : BOOL;
+    (* 请求受控停止R轴。 *)
+    bStop : BOOL;
+    (* 请求速度运行。 *)
+    bMoveVelocity : BOOL;
+    (* 摩擦主轴速度目标，单位rpm。 *)
+    rVelocity_rpm : LREAL;
+    (* 速度斜坡加速度，单位rpm/s。 *)
+    rAcceleration_rpm_s : LREAL;
+    (* 速度斜坡减速度，单位rpm/s。 *)
+    rDeceleration_rpm_s : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_StepCriterionInput" Id="{D2000000-0000-4000-8000-000000000011}"><Declaration><![CDATA[TYPE ST_StepCriterionInput :
+STRUCT
+    (* 当前步骤准则使能请求。 *)
+    bEnable : BOOL;
+    (* 当前步骤准则锁存复位请求。 *)
+    bReset : BOOL;
+    (* 第一准则数值，后续由显式枚举替换。 *)
+    nPrimaryCriterion : UDINT;
+    (* 从Contact起累计的工艺相对位移，单位mm。 *)
+    rRelativePosition_mm : LREAL;
+    (* Relative Distance第一准则目标，单位mm。 *)
+    rRelativeDistanceTarget_mm : LREAL;
+    (* 当前步骤累计时间，单位s。 *)
+    rStepTime_s : LREAL;
+    (* Step Time第一准则目标，单位s。 *)
+    rStepTimeTarget_s : LREAL;
+    (* 当前步骤实际压向力，单位kN。 *)
+    rForceActual_kN : LREAL;
+    (* Force Decline结束阈值，单位kN。 *)
+    rDeclineTo_kN : LREAL;
+    (* Force Decline预装配阈值，单位kN。 *)
+    rArmForce_kN : LREAL;
+    (* 力变化率，下降为负，单位kN/s。 *)
+    rForceDerivative_kN_s : LREAL;
+    (* 非位移第一准则使用的Secondary S_rel硬限制，单位mm。 *)
+    rSecondaryDistanceLimit_mm : LREAL;
+    (* RPM、S_rel和采样窗口均有效。 *)
+    bWindowValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

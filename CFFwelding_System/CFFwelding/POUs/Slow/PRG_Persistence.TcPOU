@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_Persistence" Id="{A2000000-0000-4000-8000-000000000023}"><Declaration><![CDATA[PROGRAM PRG_Persistence
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：持久参数版本、校验和保存请求管理。
+   所属任务：Task_CffSlow，调用顺序4。
+   唯一Owner：PRG_Persistence。
+   当前阶段：不写持久区，不声明参数有效。
+   后续实现：版本迁移、CRC、提交和失败回滚。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

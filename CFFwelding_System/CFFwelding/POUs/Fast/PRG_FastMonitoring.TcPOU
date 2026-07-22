@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastMonitoring" Id="{A2000000-0000-4000-8000-000000000004}"><Declaration><![CDATA[PROGRAM PRG_FastMonitoring
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：快速过程统计、功率能量、窗口和曲线采样。
+   所属任务：Task_CffFast，调用顺序4。
+   唯一Owner：PRG_FastMonitoring。
+   当前阶段：不记录生产结果，不执行字符串或文件操作。
+   后续实现：只发布类型化监控结果和报警请求。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

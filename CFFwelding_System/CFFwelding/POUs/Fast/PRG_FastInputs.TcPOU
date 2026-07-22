@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastInputs" Id="{A2000000-0000-4000-8000-000000000001}"><Declaration><![CDATA[PROGRAM PRG_FastInputs
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：快速输入采集与工程量换算。
+   所属任务：Task_CffFast，调用顺序1。
+   唯一Owner：PRG_FastInputs。
+   当前阶段：不读取物理IO，不生成传感器有效假值。
+   后续实现：轴状态、力、位移、相对位移和有效性。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

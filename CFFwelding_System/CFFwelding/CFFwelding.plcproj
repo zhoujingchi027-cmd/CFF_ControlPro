@@ -18,18 +18,63 @@
     <LibraryReferences>{fc200c71-b8df-4849-bdb6-5e90d0737ae2}</LibraryReferences>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="PlcTask.TcTTO">
+    <Compile Include="Tasks\Task_CffFast.TcTTO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\MAIN.TcPOU">
+    <Compile Include="Tasks\Task_CffMain.TcTTO">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Tasks\Task_CffSlow.TcTTO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZForceControlInput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZForceControlOutput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointCommand.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZAxisCommand.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZAxisStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_RAxisCommand.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_RAxisStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ContactDetectInput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ContactDetectOutput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_StepCriterionInput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_StepCriterionOutput.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_CffSequenceCommand.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_CffSequenceStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Fast\PRG_CffSequence.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Fast\PRG_FastAxisControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Fast\PRG_FastMonitoring.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_ModeControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_RobotInterface.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_CommandDispatcher.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_ProgramManager.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_InitializeControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_ServiceCalibration.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_MaintenanceControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_ManualControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_AutoControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_FastenerControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_FeederControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_ClampControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_MachineMain.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_AlarmControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Main\PRG_TowerLightControl.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Slow\PRG_HmiAdsInterface.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Slow\PRG_ResultTraceability.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Slow\PRG_Statistics.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\Slow\PRG_Persistence.TcPOU"><SubType>Code</SubType></Compile>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="DUTs" />
     <Folder Include="GVLs" />
     <Folder Include="VISUs" />
     <Folder Include="POUs" />
+    <Folder Include="DUTs\Interfaces" />
+    <Folder Include="POUs\Fast" />
+    <Folder Include="POUs\Main" />
+    <Folder Include="POUs\Slow" />
+    <Folder Include="Tasks" />
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="Tc2_Standard">

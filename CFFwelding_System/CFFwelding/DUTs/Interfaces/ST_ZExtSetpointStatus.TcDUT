@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZExtSetpointStatus" Id="{D2000000-0000-4000-8000-000000000004}"><Declaration><![CDATA[TYPE ST_ZExtSetpointStatus :
+STRUCT
+    (* External Setpoint已成功使能。 *)
+    bEnabled : BOOL;
+    (* Adapter正在执行Enable、Feed或Disable阶段。 *)
+    bBusy : BOOL;
+    (* 本次生命周期正常完成。 *)
+    bDone : BOOL;
+    (* MC接口或生命周期诊断报告错误。 *)
+    bError : BOOL;
+    (* MC错误编号，0表示无错误。 *)
+    nErrorId : UDINT;
+    (* 生命周期状态数值，后续由显式枚举替换。 *)
+    nState : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

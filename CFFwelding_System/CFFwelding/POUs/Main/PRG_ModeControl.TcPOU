@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_ModeControl" Id="{A2000000-0000-4000-8000-000000000005}"><Declaration><![CDATA[PROGRAM PRG_ModeControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：硬件模式与控制源权威输入仲裁。
+   所属任务：Task_CffMain，调用顺序1。
+   唯一Owner：PRG_ModeControl。
+   当前阶段：不写入实际模式，不提供WPF旁路。
+   后续实现：只允许冻结的三种Mode/Source组合。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

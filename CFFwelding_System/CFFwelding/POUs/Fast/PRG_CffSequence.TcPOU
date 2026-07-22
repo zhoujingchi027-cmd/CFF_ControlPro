@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_CffSequence" Id="{A2000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[PROGRAM PRG_CffSequence
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：CFF Contact、四步骤、制动压缩过渡与返回流程。
+   所属任务：Task_CffFast，调用顺序2。
+   唯一Owner：PRG_CffSequence。
+   当前阶段：不调用MC功能块，不执行任何流程转换。
+   后续实现：Primary、Secondary、Force Decline和EndCause。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

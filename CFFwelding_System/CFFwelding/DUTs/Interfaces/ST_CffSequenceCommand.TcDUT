@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffSequenceCommand" Id="{D2000000-0000-4000-8000-000000000013}"><Declaration><![CDATA[TYPE ST_CffSequenceCommand :
+STRUCT
+    (* 启动一次CFF循环的一次性内部脉冲。 *)
+    bStartPulse : BOOL;
+    (* 请求受控停止的一次性内部脉冲。 *)
+    bStopPulse : BOOL;
+    (* 请求立即退出流程的一次性内部脉冲。 *)
+    bAbortPulse : BOOL;
+    (* 请求复位流程锁存状态的一次性内部脉冲。 *)
+    bResetPulse : BOOL;
+    (* 已由命令仲裁接受的事务编号。 *)
+    nCommandId : UDINT;
+    (* 选择的焊接程序编号。 *)
+    nProgramId : UDINT;
+    (* 选择的Joining Point编号。 *)
+    nJoiningPointId : UDINT;
+    (* 生产硬件、模式和权限前置条件均有效。 *)
+    bProductionPermission : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

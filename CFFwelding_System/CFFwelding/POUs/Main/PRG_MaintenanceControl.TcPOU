@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_MaintenanceControl" Id="{A2000000-0000-4000-8000-000000000011}"><Declaration><![CDATA[PROGRAM PRG_MaintenanceControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：Maintenance功能选择、Hold-to-Run和诊断权限。
+   所属任务：Task_CffMain，调用顺序7。
+   唯一Owner：PRG_MaintenanceControl。
+   当前阶段：不输出点动、不绕过硬件绑定状态。
+   后续实现：Heartbeat、SessionId和功能状态机。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

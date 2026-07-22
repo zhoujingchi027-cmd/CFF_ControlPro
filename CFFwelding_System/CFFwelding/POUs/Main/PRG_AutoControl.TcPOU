@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_AutoControl" Id="{A2000000-0000-4000-8000-000000000013}"><Declaration><![CDATA[PROGRAM PRG_AutoControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：Automatic+Robot生产循环编排。
+   所属任务：Task_CffMain，调用顺序9。
+   唯一Owner：PRG_AutoControl。
+   当前阶段：生产硬件未绑定，Start权限保持关闭。
+   后续实现：循环请求、完成握手和异常退出。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

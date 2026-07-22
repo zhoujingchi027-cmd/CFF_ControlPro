@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_ProgramManager" Id="{A2000000-0000-4000-8000-000000000008}"><Declaration><![CDATA[PROGRAM PRG_ProgramManager
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：焊接Program、版本、激活快照与Joining Point管理。
+   所属任务：Task_CffMain，调用顺序4。
+   唯一Owner：PRG_ProgramManager。
+   当前阶段：不创建工艺参数，不激活任何Program。
+   后续实现：Draft校验、Active快照和Revision。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

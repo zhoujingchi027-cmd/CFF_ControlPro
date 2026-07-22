@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <!-- 慢速接口与追溯任务。Phase 2按架构建议范围配置为50000 us。 -->
+  <Task Name="Task_CffSlow" Id="{C2000000-0000-4000-8000-000000000003}">
+    <CycleTime>50000</CycleTime>
+    <Priority>30</Priority>
+    <PouCall><Name>PRG_HmiAdsInterface</Name></PouCall>
+    <PouCall><Name>PRG_ResultTraceability</Name></PouCall>
+    <PouCall><Name>PRG_Statistics</Name></PouCall>
+    <PouCall><Name>PRG_Persistence</Name></PouCall>
+    <TaskFBGuid>{C2000000-0000-4000-8000-000000000301}</TaskFBGuid>
+    <Fb_init>{C2000000-0000-4000-8000-000000000302}</Fb_init>
+    <Fb_exit>{C2000000-0000-4000-8000-000000000303}</Fb_exit>
+    <CycleUpdate>{C2000000-0000-4000-8000-000000000304}</CycleUpdate>
+    <PostCycleUpdate>{C2000000-0000-4000-8000-000000000305}</PostCycleUpdate>
+    <ObjectProperties />
+  </Task>
+</TcPlcObject>

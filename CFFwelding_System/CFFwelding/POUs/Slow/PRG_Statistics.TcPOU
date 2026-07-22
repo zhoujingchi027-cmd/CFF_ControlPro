@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_Statistics" Id="{A2000000-0000-4000-8000-000000000022}"><Declaration><![CDATA[PROGRAM PRG_Statistics
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：循环计数、NOK分类和过程统计发布。
+   所属任务：Task_CffSlow，调用顺序3。
+   唯一Owner：PRG_Statistics。
+   当前阶段：无生产结果输入，不累加任何计数。
+   后续实现：单一写入、复位权限和溢出处理。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

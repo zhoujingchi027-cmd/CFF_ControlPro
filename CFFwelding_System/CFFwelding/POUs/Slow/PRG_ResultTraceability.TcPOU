@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_ResultTraceability" Id="{A2000000-0000-4000-8000-000000000021}"><Declaration><![CDATA[PROGRAM PRG_ResultTraceability
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：循环结果、WeldId、Program和Point追溯队列。
+   所属任务：Task_CffSlow，调用顺序2。
+   唯一Owner：PRG_ResultTraceability。
+   当前阶段：不写文件或数据库，不生成虚假生产记录。
+   后续实现：类型化快照、确认和溢出诊断。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

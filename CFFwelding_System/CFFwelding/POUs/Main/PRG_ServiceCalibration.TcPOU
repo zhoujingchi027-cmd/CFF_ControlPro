@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_ServiceCalibration" Id="{A2000000-0000-4000-8000-000000000010}"><Declaration><![CDATA[PROGRAM PRG_ServiceCalibration
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：力、位移、碰撞参考和轴调试标定编排。
+   所属任务：Task_CffMain，调用顺序6。
+   唯一Owner：PRG_ServiceCalibration。
+   当前阶段：无硬件映射时禁止实际标定与运动。
+   后续实现：标定状态、验收、回滚和结果原因。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_FeederControl" Id="{A2000000-0000-4000-8000-000000000015}"><Declaration><![CDATA[PROGRAM PRG_FeederControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：送料设备命令、状态和超时管理。
+   所属任务：Task_CffMain，调用顺序11。
+   唯一Owner：PRG_FeederControl。
+   当前阶段：不绑定送料IO，不输出动作命令。
+   后续实现：请求、完成、故障和恢复流程。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

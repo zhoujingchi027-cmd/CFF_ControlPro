@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZForceControlOutput" Id="{D2000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[TYPE ST_ZForceControlOutput :
+STRUCT
+    (* 导纳控制输出的Z轴速度命令，向下为正，单位mm/s。 *)
+    rVelocityCommand_mm_s : LREAL;
+    (* PI积分分量，单位mm/s，用于诊断Anti-windup。 *)
+    rIntegralTerm_mm_s : LREAL;
+    (* 算法已使能并正在计算输出。 *)
+    bActive : BOOL;
+    (* 输出受到速度、位移、加速度或硬边界限制。 *)
+    bLimited : BOOL;
+    (* 算法输入无效或内部诊断失败。 *)
+    bFault : BOOL;
+    (* 算法故障编号，0表示无故障。 *)
+    nFaultId : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

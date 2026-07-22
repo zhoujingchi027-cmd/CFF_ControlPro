@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_RAxisStatus" Id="{D2000000-0000-4000-8000-000000000008}"><Declaration><![CDATA[TYPE ST_RAxisStatus :
+STRUCT
+    (* R轴程序接口已具备接收命令的内部条件。 *)
+    bReady : BOOL;
+    (* R轴已使能。 *)
+    bEnabled : BOOL;
+    (* R轴正在速度运行。 *)
+    bMoving : BOOL;
+    (* R轴处于静止状态。 *)
+    bStandstill : BOOL;
+    (* R轴Adapter报告错误。 *)
+    bError : BOOL;
+    (* R轴或MC错误编号，0表示无错误。 *)
+    nErrorId : UDINT;
+    (* R轴实际速度，单位rpm。 *)
+    rActualVelocity_rpm : LREAL;
+    (* R轴实际转矩，仅用于监控，单位Nm。 *)
+    rActualTorque_Nm : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ContactDetectOutput" Id="{D2000000-0000-4000-8000-000000000010}"><Declaration><![CDATA[TYPE ST_ContactDetectOutput :
+STRUCT
+    (* Contact已经防抖确认。 *)
+    bDetected : BOOL;
+    (* Contact确认时锁存的压向力，单位kN。 *)
+    rDetectedForce_kN : LREAL;
+    (* Contact确认时锁存的Z轴位置，单位mm。 *)
+    rDetectedPosition_mm : LREAL;
+    (* Contact确认后S_rel只允许清零一次。 *)
+    bRelativePositionResetRequest : BOOL;
+    (* 输入无效或检测窗口异常。 *)
+    bFault : BOOL;
+    (* Contact故障编号，0表示无故障。 *)
+    nFaultId : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

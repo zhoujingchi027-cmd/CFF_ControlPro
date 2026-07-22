@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_AlarmControl" Id="{A2000000-0000-4000-8000-000000000018}"><Declaration><![CDATA[PROGRAM PRG_AlarmControl
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：报警请求聚合、锁存、确认和复位。
+   所属任务：Task_CffMain，调用顺序14。
+   唯一Owner：PRG_AlarmControl。
+   当前阶段：不生成安全合格声明，不替代人员安全系统。
+   后续实现：AlarmCode、AlarmTextId、等级和时间戳。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

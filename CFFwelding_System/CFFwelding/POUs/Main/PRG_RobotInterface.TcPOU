@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="PRG_RobotInterface" Id="{A2000000-0000-4000-8000-000000000006}"><Declaration><![CDATA[PROGRAM PRG_RobotInterface
+VAR
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   程序骨架：机器人命令邮箱与状态握手。
+   所属任务：Task_CffMain，调用顺序2。
+   唯一Owner：PRG_RobotInterface。
+   当前阶段：不绑定机器人PDO，不接受生产Start。
+   后续实现：事务编号、权限、超时和拒绝原因。
+   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <!-- 主控制任务。Phase 2按架构建议配置为10000 us，后续仍须结合实际负载和抖动复核。 -->
+  <Task Name="Task_CffMain" Id="{C2000000-0000-4000-8000-000000000002}">
+    <CycleTime>10000</CycleTime>
+    <Priority>20</Priority>
+    <PouCall><Name>PRG_ModeControl</Name></PouCall>
+    <PouCall><Name>PRG_RobotInterface</Name></PouCall>
+    <PouCall><Name>PRG_CommandDispatcher</Name></PouCall>
+    <PouCall><Name>PRG_ProgramManager</Name></PouCall>
+    <PouCall><Name>PRG_InitializeControl</Name></PouCall>
+    <PouCall><Name>PRG_ServiceCalibration</Name></PouCall>
+    <PouCall><Name>PRG_MaintenanceControl</Name></PouCall>
+    <PouCall><Name>PRG_ManualControl</Name></PouCall>
+    <PouCall><Name>PRG_AutoControl</Name></PouCall>
+    <PouCall><Name>PRG_FastenerControl</Name></PouCall>
+    <PouCall><Name>PRG_FeederControl</Name></PouCall>
+    <PouCall><Name>PRG_ClampControl</Name></PouCall>
+    <PouCall><Name>PRG_MachineMain</Name></PouCall>
+    <PouCall><Name>PRG_AlarmControl</Name></PouCall>
+    <PouCall><Name>PRG_TowerLightControl</Name></PouCall>
+    <TaskFBGuid>{C2000000-0000-4000-8000-000000000201}</TaskFBGuid>
+    <Fb_init>{C2000000-0000-4000-8000-000000000202}</Fb_init>
+    <Fb_exit>{C2000000-0000-4000-8000-000000000203}</Fb_exit>
+    <CycleUpdate>{C2000000-0000-4000-8000-000000000204}</CycleUpdate>
+    <PostCycleUpdate>{C2000000-0000-4000-8000-000000000205}</PostCycleUpdate>
+    <ObjectProperties />
+  </Task>
+</TcPlcObject>

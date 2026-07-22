@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffSequenceStatus" Id="{D2000000-0000-4000-8000-000000000014}"><Declaration><![CDATA[TYPE ST_CffSequenceStatus :
+STRUCT
+    (* 最近接受并开始处理的事务编号。 *)
+    nAcceptedCommandId : UDINT;
+    (* CFF循环正在执行。 *)
+    bBusy : BOOL;
+    (* CFF循环正常完成并等待上层确认。 *)
+    bDone : BOOL;
+    (* CFF循环已按Stop或Abort退出。 *)
+    bAborted : BOOL;
+    (* CFF流程报告NOK或Fault。 *)
+    bError : BOOL;
+    (* 流程错误编号，0表示无错误。 *)
+    nErrorId : UDINT;
+    (* CFF主状态数值，后续由显式枚举替换。 *)
+    nState : UDINT;
+    (* 当前正式步骤数值，后续由显式枚举替换。 *)
+    nStep : UDINT;
+    (* 当前步骤子阶段数值，后续由显式枚举替换。 *)
+    nSubPhase : UDINT;
+    (* 最近步骤结束原因数值，后续由显式枚举替换。 *)
+    nEndCause : UDINT;
+    (* 当前流程目标压向力，单位kN。 *)
+    rForceSet_kN : LREAL;
+    (* 当前流程目标主轴速度，单位rpm。 *)
+    rSpeedSet_rpm : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

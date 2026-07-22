@@ -78,7 +78,7 @@ try {
         throw "TwinCAT XAE build failed; LastBuildInfo reports $failedProjectCount failed project(s)."
     }
 
-    Write-Host 'Phase 1 XAE build: PASSED'
+    Write-Host 'CFFwelding XAE build: PASSED'
     Write-Host "Configuration: $Configuration"
     Write-Host "LastBuildInfo: $failedProjectCount"
 }
