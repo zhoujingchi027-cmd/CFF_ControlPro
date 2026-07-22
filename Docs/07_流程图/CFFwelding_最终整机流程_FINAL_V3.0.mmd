@@ -1,0 +1,103 @@
+flowchart TD
+    PWR([PLC上电]) --> BOOT[BOOT<br/>EtherCAT/NC/IO-Link/ADS基础检查]
+    BOOT --> STOPPED[STOPPED]
+    STOPPED --> MODE{硬件Mode+Source合法?}
+    MODE -- 否 --> MF[Mode Conflict<br/>禁止Start]
+    MODE -- Maintenance+Local --> MREADY[Maintenance Ready]
+    MODE -- Manual+Local --> LREADY[Manual Ready]
+    MODE -- Automatic+Robot --> AREADY[Automatic Ready]
+
+    MREADY --> MCMD{HMI命令}
+    MCMD -- Initialize --> INIT[INITIALIZING]
+    MCMD -- Execute Maintenance --> MAINT[MAINTENANCE_ACTIVE]
+    LREADY --> LCMD{HMI CommandId/Ack}
+    LCMD -- Initialize --> INIT
+    LCMD -- Start --> START
+    AREADY --> RCMD{Robot Sequence/Ack}
+    RCMD -- Initialize可配置 --> INIT
+    RCMD -- Start+Point --> START
+
+    INIT --> ICHK[轴/传感器/标定/Program/外围检查与回位]
+    ICHK --> IOK{成功?}
+    IOK -- 否 --> FAULT[FAULT]
+    IOK -- 是 --> READY[READY]
+
+    READY --> START[STARTING<br/>解析JoiningPoint/Program<br/>生成Cycle Snapshot]
+    START --> PRE{PRECHECK}
+    PRE -- 否 --> REJ[Reject/Fault]
+    PRE -- 是 --> FASTENER[侦钉]
+    FASTENER --> FS{无钉/单钉/多钉}
+    FS -- 多钉 --> FAULT
+    FS -- 无钉 --> FEED[弹夹/直吹送料]
+    FEED --> FASTENER
+    FS -- 单钉 --> APP[标准NC Approach]
+
+    APP --> EXT[External预Feed+Enable]
+    EXT --> CONTACT[低速Contact Search]
+    CONTACT --> COK{ForceOn候选<br/>回差+去抖+位置窗口}
+    COK -- 否/超时 --> CFAULT[Contact Fault/NOK]
+    COK -- 是 --> CLATCH[锁存Contact<br/>SRelSensor=0<br/>PI无扰接管]
+
+    CLATCH --> S1[STEP1<br/>RPM/Force/Z并行Ramp]
+    S1 --> Q1[Primary/Secondary/StepMax<br/>EndCause]
+    Q1 --> S2[STEP2 清理/激活]
+    S2 --> Q2[Primary/Secondary/StepMax]
+    Q2 --> S3[STEP3 焊接]
+    S3 --> Q3[Primary/Secondary/StepMax]
+    Q3 --> BR[BRAKE_AND_COMPRESSION_RAMP<br/>RPM→0 Force→Step4]
+    BR --> H4[STEP4_VALID_FORCE_HOLD<br/>RpmStopped+ForceInBand计时]
+    H4 --> UL[受控卸力<br/>Z速度归零]
+    UL --> DIS[Direction握手+Disable External]
+    DIS --> RET[标准NC Return]
+    RET --> EVAL[Evaluate<br/>Force/Torque/Energy/Curve/EndCause]
+    EVAL --> RESULT{OK/NOK/Fault}
+    RESULT --> SAVE[保存WeldId/Point/Program/Result/Curve]
+    SAVE --> READY
+
+    subgraph FAST["Task_CffFast = NC SAF"]
+        FI[Force Raw/Criterion/Control/Display]
+        SI[SRelSensor主值<br/>SRelAxis诊断<br/>CollisionDelta]
+        PI[导纳PI+Anti-windup+SRel制动]
+        ET[External P/V/A/Direction]
+        RR[R轴RPM/Torque/Power/Energy]
+        PM[Criterion/Window/Observer/Curve]
+        FI --> PI
+        SI --> PI
+        PI --> ET
+        RR --> PM
+    end
+
+    Q1 -.-> FAST
+    Q2 -.-> FAST
+    Q3 -.-> FAST
+
+    subgraph CMD["命令接口"]
+        HMI[WPF CommandId/Ack<br/>Start/Stop/Init/Reset]
+        ROB[Robot Sequence/Ack]
+        DISP[PRG_CommandDispatcher]
+        PULSE[PLC内部单扫描Pulse]
+        HMI --> DISP
+        ROB --> DISP
+        DISP --> PULSE
+    end
+
+    subgraph CRIT["步骤准则"]
+        RD[Primary=Relative Distance<br/>无Secondary]
+        TM[Primary=Step Time<br/>Secondary累计S_rel]
+        FD[Primary=Force Decline<br/>先Arm，PI继续跟随<br/>确认后切换<br/>Secondary累计S_rel]
+    end
+
+    Q1 -.-> CRIT
+    Q2 -.-> CRIT
+    Q3 -.-> CRIT
+
+    READY -->|Stop| CSTOP[CONTROLLED_STOPPING]
+    MAINT -->|Stop/Heartbeat失效| CSTOP
+    S1 -->|Stop| CSTOP
+    S2 -->|Stop| CSTOP
+    S3 -->|Stop| CSTOP
+    H4 -->|Stop| CSTOP
+    CSTOP --> STOPPED
+
+    FAULT -->|Reset且源消失| RESET[RESETTING]
+    RESET --> STOPPED

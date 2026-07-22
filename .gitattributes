@@ -1,0 +1,28 @@
+
+# TwinCAT XML and Visual Studio files use Windows line endings.
+*.TcPOU text eol=crlf
+*.TcDUT text eol=crlf
+*.TcGVL text eol=crlf
+*.plcproj text eol=crlf
+*.tsproj text eol=crlf
+*.sln text eol=crlf
+*.tmc text eol=crlf
+*.xti text eol=crlf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Specifications and machine-readable reports use LF.
+*.md text eol=lf
+*.mmd text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Do not transform binary engineering artifacts.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary

@@ -1,0 +1,88 @@
+Task ID: CFFWELDING-GREENFIELD-FINAL-V3.3
+
+不要修改任何旧工程。
+
+目标：
+在“倍福CFF控制”目录中从零创建TwinCAT 3工程：
+- Solution: CFFwelding.sln
+- System Project: CFFwelding_System
+- PLC Project: CFFwelding
+
+请完整读取：
+1. AGENTS.md
+2. FINAL_DECISION_REGISTER.md
+3. README.md
+4. Docs/00_总规范/01_最终项目总规范_FINAL_V3.0.md
+5. Docs/00_总规范/02_事实依据与工程判断边界_FINAL_V3.0.md
+6. Docs/01_架构/03_软件架构对象目录与任务模型_FINAL_V3.0.md
+7. Docs/01_架构/04_数据所有权与命令邮箱_FINAL_V3.0.md
+8. Docs/01_架构/05_内部实例接口与无外部硬件绑定规则_FINAL_V3.1.md
+18. Docs/02_核心工艺/05_CFF流程与推进准则_FINAL_V3.0.md
+18. Docs/02_核心工艺/06_Z轴导纳力控与ExternalSetpoint_FINAL_V3.0.md
+18. Docs/02_核心工艺/07_R轴扭矩能量与过程观察_FINAL_V3.0.md
+18. Docs/03_主控与外围/08_主状态机模式按钮与维修_FINAL_V3.0.md
+18. Docs/03_主控与外围/09_Program连接点送料机器人报警_FINAL_V3.0.md
+18. Docs/04_标定与联调/10_整机标定联调与工艺资格_FINAL_V3.0.md
+18. Docs/05_ADS与追溯/11_PLC_ADS契约与WPF预布置_FINAL_V3.0.md
+18. Docs/06_Codex实施/12_分阶段实施计划_FINAL_V3.3.md
+18. Docs/06_Codex实施/13_CODEX直接执行总任务_FINAL_V3.3.md
+18. Docs/06_Codex实施/14_最终验收与代码审查_FINAL_V3.3.md
+19. Docs/06_Codex实施/15_GitHub仓库与提交推送策略_FINAL_V3.3.md
+
+执行原则：
+- 所有关键变量、FB输入输出、实例声明、状态和关键算法必须使用中文独立行注释。
+- 每个关键FB实例必须有唯一Owner和明确Input/Output接口，不得跨对象访问内部变量。
+- 本轮不要扫描或关联任何外部硬件。
+- 不得执行Scan Devices、Scan Boxes、Scan Motors。
+- 不得添加或链接真实EP3174、IO-Link、AX5000、编码器、机器人或送料PDO。
+- GVL_IO只保留AT %I* / AT %Q*或普通变量占位。
+- 可以建立PLC AXIS_REF与未绑定实际驱动的NC轴对象之间的内部关联；不得关联NC轴与真实驱动/编码器。
+- 未完成硬件人工映射时，生产Ready和硬件有效状态必须保持FALSE。
+- 必须生成实例所有权、内部接口目录和人工硬件绑定清单。
+- 新工程唯一写入；旧工程只读。
+- 流程和可调试状态机放PROGRAM POU。
+- 算法、可复用有状态逻辑和轴/硬件适配放FB。
+- 无状态纯计算放FC。
+- 标识符英文ASCII；关键变量、状态、算法使用中文独立行注释。
+- 保持TwinCAT XML UTF-8。
+- 不创建TwinSAFE、仿真、虚拟轴、假IO、模糊控制、MPC、WPF或数据库。
+- Kistler 4574A→4709A→EP3174为Z轴真实力反馈。
+- 12 mm外部位移为累计SRelSensor主反馈。
+- Z轴采用导纳力PI输出速度并通过External Setpoint执行。
+- R轴采用RPM控制。
+- Primary只允许Relative Distance、Step Time、Decline of Force To。
+- Time/Decline必须配置Secondary累计S_rel。
+- Force Decline确认前PI继续跟随；确认后无扰切换下一Profile。
+- Step1 RPM/Force/Z并行Ramp。
+- Step3后Brake和Compression Force Ramp允许重叠。
+- Step4有效保持仅在RpmStopped+ForceInBand累计。
+- 模式为Maintenance/Manual/Automatic，控制源为Local/Robot。
+- Test Mode合并到Maintenance。
+- WPF Start/Stop/Initialize/Reset采用CommandId/Ack。
+- 维修点动采用Hold-to-Run+Heartbeat。
+- WPF只访问GVL_HMI。
+- 曲线使用PLC双缓冲和分页。
+
+GitHub固定信息：
+- Web: https://github.com/zhoujingchi027-cmd/CFF_ControlPro
+- Clone URL: https://github.com/zhoujingchi027-cmd/CFF_ControlPro.git
+- Remote: origin
+- Default Branch: main
+- Work Branch: codex/cffwelding-greenfield-final-v3.3
+- 该仓库在任务包生成时已验证为Public、空仓库，并具有Admin/Push权限。
+- 本机仍需执行git ls-remote复核。
+- 首次push如果需要认证，暂停并让用户人工完成GCM/浏览器/PAT认证。
+- GitHub账户密码不能用于HTTPS Git；Password提示应输入PAT。
+- 不得读取、记录、回显或保存PAT/密码。
+
+开始前先输出：
+1. 当前工作目录；
+2. 唯一写入目录；
+3. 只读参考目录；
+4. 文件冲突；
+5. XAE、Tc2_MC2和NC SAF检测计划；
+6. 分阶段实施计划；
+7. 关键阻塞项；
+8. Git身份、Remote访问状态、远程默认分支和计划工作分支。
+
+每个Phase后执行Build、审查和Git提交。无XAE时生成完整可导入源码，不得声称编译通过。
