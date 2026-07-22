@@ -42,8 +42,7 @@
 | Phase | Commit Hash | Commit Message | Build/检查 | Push状态 |
 |---|---|---|---|---|
 | Repository bootstrap | `0a417c5ba951d299b387231fd9eacfad2295f236` | `docs: add final CFFwelding project specification` | 文档范围、`git diff --cached --check`、凭据模式检查 | 已Push到`main` |
-
-Phase 0执行Commit尚未创建，因为本报告是该Commit的交付内容之一；创建并Push后通过后续证据Commit补记其Hash。
+| Phase 0 | `1cf77561cc09d95e28dabeb531cebee61763b9df` | `chore(repo): initialize CFFwelding greenfield repository` | 环境检测、UTF-8、凭据模式、Git差异、旧工程源文件摘要 | 已Push到工作分支 |
 
 ## 保护检查
 
@@ -57,10 +56,11 @@ Phase 0执行Commit尚未创建，因为本报告是该Commit的交付内容之�
 - [x] 未提交TwinCAT缓存或构建输出。
 - [x] 旧工程只读。
 
-## Phase 0报告编写时状态
+## Phase 0主提交后的状态
 
 ```text
 Branch: codex/cffwelding-greenfield-v3.3
 Upstream: origin/codex/cffwelding-greenfield-v3.3
-HEAD before Phase 0 report commit: 0a417c5ba951d299b387231fd9eacfad2295f236
+Phase 0 primary commit: 1cf77561cc09d95e28dabeb531cebee61763b9df
+Remote primary commit: 1cf77561cc09d95e28dabeb531cebee61763b9df
 ```
