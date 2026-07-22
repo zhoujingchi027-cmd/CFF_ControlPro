@@ -128,4 +128,8 @@ LastBuildInfo: 0
 
 ## Git状态
 
-本报告在Phase 1主Commit前生成。Commit、Push和远端Hash将在完成后补录。
+- Phase 1主Commit：`717737001cd31e960c9f6e618458830fafd722d1`
+- Commit消息：`feat(project): create empty CFFwelding TwinCAT solution`
+- Push：已成功推送至`origin/codex/cffwelding-greenfield-v3.3`。
+- 远端复核：`refs/heads/codex/cffwelding-greenfield-v3.3`与上述主Commit完全一致。
+- 本段Git证据由后续报告Commit补录，不改写主Commit。

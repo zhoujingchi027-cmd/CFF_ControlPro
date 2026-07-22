@@ -43,6 +43,7 @@
 |---|---|---|---|---|
 | Repository bootstrap | `0a417c5ba951d299b387231fd9eacfad2295f236` | `docs: add final CFFwelding project specification` | 文档范围、`git diff --cached --check`、凭据模式检查 | 已Push到`main` |
 | Phase 0 | `1cf77561cc09d95e28dabeb531cebee61763b9df` | `chore(repo): initialize CFFwelding greenfield repository` | 环境检测、UTF-8、凭据模式、Git差异、旧工程源文件摘要 | 已Push到工作分支 |
+| Phase 1 | `717737001cd31e960c9f6e618458830fafd722d1` | `feat(project): create empty CFFwelding TwinCAT solution` | Phase 1验收、真实XAE Build、`LastBuildInfo=0`、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
 
 ## 保护检查
 
@@ -53,7 +54,7 @@
 - [x] 未使用`--allow-unrelated-histories`。
 - [x] 未执行rebase或commit amend。
 - [x] 未自动Merge、Tag、Release或删除远程分支。
-- [x] 未提交TwinCAT缓存或构建输出。
+- [x] 未提交`_Boot`、`_CompileInfo`、`.bak`等瞬态缓存；Phase 1有意提交可复现工程所需的TMC和XAE归档库。
 - [x] 旧工程只读。
 
 ## Phase 0主提交后的状态
@@ -63,4 +64,14 @@ Branch: codex/cffwelding-greenfield-v3.3
 Upstream: origin/codex/cffwelding-greenfield-v3.3
 Phase 0 primary commit: 1cf77561cc09d95e28dabeb531cebee61763b9df
 Remote primary commit: 1cf77561cc09d95e28dabeb531cebee61763b9df
+```
+
+## Phase 1主提交后的状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Upstream: origin/codex/cffwelding-greenfield-v3.3
+Phase 1 primary commit: 717737001cd31e960c9f6e618458830fafd722d1
+Remote primary commit: 717737001cd31e960c9f6e618458830fafd722d1
+XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
 ```
