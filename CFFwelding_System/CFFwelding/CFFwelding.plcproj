@@ -86,6 +86,7 @@
     <Compile Include="DUTs\Structures\ST_FastStatus.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Structures\ST_CurveSample.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Structures\ST_HardwareBindingStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Structures\ST_SensorProcessingConfig.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_Const.TcGVL"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_IO.TcGVL"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_Config.TcGVL"><SubType>Code</SubType></Compile>
@@ -113,6 +114,7 @@
     <Compile Include="DUTs\Interfaces\ST_StepCriterionOutput.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Interfaces\ST_CffSequenceCommand.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Interfaces\ST_CffSequenceStatus.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Interfaces\ST_ProcessReferenceCommand.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Functions\FC_ClampLReal.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Functions\FC_ScaleLinear.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Functions\FC_LimitRate.TcPOU"><SubType>Code</SubType></Compile>

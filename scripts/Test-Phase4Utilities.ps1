@@ -70,6 +70,9 @@ function Test-PouFile([string]$Name, [string]$Kind) {
     if (($declaration + $implementation) -notmatch '[\u4e00-\u9fff]') {
         Fail "$Name is missing Chinese interface or algorithm documentation."
     }
+    if ($implementation.TrimEnd() -notmatch '(;|END_IF|END_CASE)$') {
+        Fail "$Name ends with an unterminated ST statement."
+    }
     if ($plcProjectText -notmatch [regex]::Escape($files[0].Name)) {
         Fail "PLC project does not compile $($files[0].Name)."
     }

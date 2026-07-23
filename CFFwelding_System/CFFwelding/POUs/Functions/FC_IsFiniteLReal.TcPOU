@@ -11,4 +11,4 @@ END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* NaN不等于自身；正负无穷也会超出工程有限上界。 *)
 FC_IsFiniteLReal := (rValue = rValue)
     AND (rValue <= c_rEngineeringFiniteLimit)
-    AND (rValue >= -c_rEngineeringFiniteLimit)]]></ST></Implementation></POU></TcPlcObject>
+    AND (rValue >= -c_rEngineeringFiniteLimit);]]></ST></Implementation></POU></TcPlcObject>

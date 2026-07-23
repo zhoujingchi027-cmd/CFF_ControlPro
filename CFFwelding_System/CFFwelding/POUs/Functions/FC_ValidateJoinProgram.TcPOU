@@ -61,4 +61,4 @@ FOR nStepIndex := 1 TO 4 DO
     END_CASE
 END_FOR
 
-FC_ValidateJoinProgram := TRUE]]></ST></Implementation></POU></TcPlcObject>
+FC_ValidateJoinProgram := TRUE;]]></ST></Implementation></POU></TcPlcObject>

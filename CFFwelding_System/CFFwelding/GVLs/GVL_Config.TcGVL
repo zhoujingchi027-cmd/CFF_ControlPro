@@ -9,5 +9,7 @@ VAR_GLOBAL
     stZForceControl : ST_ZForceControlProfile;
     (* 当前 R 轴参数。 *)
     stRAxis : ST_RAxisProfile;
+    (* 当前快速传感器滤波、范围和诊断参数。 *)
+    stSensorProcessing : ST_SensorProcessingConfig;
 END_VAR
 ]]></Declaration></GVL></TcPlcObject>

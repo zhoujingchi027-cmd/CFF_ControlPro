@@ -51,9 +51,9 @@
 
 ## 6. 传感器与外围 I/O
 
-- [ ] 将 `nForceChannelRaw` 映射到唯一的力传感器原始输入，并核对数据类型、量程、过量程诊断和断线诊断。
-- [ ] 将 `nDisplacementChannelRaw` 映射到唯一的位移传感器输入，并核对方向、量程和诊断。
-- [ ] 将 `bCollisionDetected` 映射到经风险评估确认的碰撞检测信号，并核对常态电平与断线安全行为。
+- [ ] 将 `nForceChannelRaw` 映射到唯一的EP3174力输入，并分别映射`bForceChannelError`、`bForceChannelOverrange`和`bForceChannelUnderrange`；核对数据类型、量程、Extended/Legacy Range和断线诊断。
+- [ ] 将 `nDisplacementChannelRaw` 映射到唯一的位移传感器输入，并分别映射Error/Overrange/Underrange诊断，核对方向和量程。
+- [ ] 将 `bCollisionReferenceSensor` 映射到经风险评估确认的Collision Reference Sensor，并核对常态电平、去抖时间与断线安全行为；旧占位`bCollisionDetected`不得替代该标定输入。
 - [ ] 完成紧固件、供料器、夹具、机器人许可等输入映射，并逐点验证。
 - [ ] 完成供料、夹紧、机器人就绪和塔灯输出映射；第一次输出测试必须在执行机构隔离条件下进行。
 - [ ] 对所有输入执行强制断开、短接或模拟量边界测试，并保留结果。

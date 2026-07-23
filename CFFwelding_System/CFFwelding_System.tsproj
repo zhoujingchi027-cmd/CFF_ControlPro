@@ -1767,7 +1767,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{3B1364E2-6C34-4CB9-BD73-174C89442C9B}" Name="CFFwelding" PrjFilePath="CFFwelding\CFFwelding.plcproj" TmcFilePath="CFFwelding\CFFwelding.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{F9B6CB0A-3F1E-9997-2A1E-915398C27244}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{579F6696-9A91-2E43-A979-05E52229D0A1}">
 					<Name>CFFwelding Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -1786,9 +1786,44 @@ External Setpoint Generation:
 							<Type>INT</Type>
 						</Var>
 						<Var>
+							<Name>GVL_IO.bForceChannelError</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道错误状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bForceChannelOverrange</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道上溢状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bForceChannelUnderrange</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道下溢状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bDisplacementChannelError</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道错误状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
 							<Name>GVL_IO.nDisplacementChannelRaw</Name>
 							<Comment><![CDATA[ TODO_HW_MAP：位移传感器原始输入通道，当前未映射。 ]]></Comment>
 							<Type>INT</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bDisplacementChannelOverrange</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道上溢状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bDisplacementChannelUnderrange</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道下溢状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bCollisionReferenceSensor</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：Collision Reference Sensor输入，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
 						</Var>
 						<Var>
 							<Name>GVL_IO.bCollisionDetected</Name>
@@ -1860,15 +1895,15 @@ External Setpoint Generation:
 					<Vars VarGrpType="8" ContextId="2" AreaNo="36">
 						<Name>Task_CffSlow Retains</Name>
 						<Var>
-							<Name>GVL_Persistent.nSchemaRevision</Name>
-							<Comment><![CDATA[ 持久化数据架构修订号。 ]]></Comment>
-							<Type>UDINT</Type>
-							<InOut>7</InOut>
-						</Var>
-						<Var>
 							<Name>GVL_Persistent.nNextWeldId</Name>
 							<Comment><![CDATA[ 下一个焊接结果编号。 ]]></Comment>
 							<Type>ULINT</Type>
+							<InOut>7</InOut>
+						</Var>
+						<Var>
+							<Name>GVL_Persistent.nSchemaRevision</Name>
+							<Comment><![CDATA[ 持久化数据架构修订号。 ]]></Comment>
+							<Type>UDINT</Type>
 							<InOut>7</InOut>
 						</Var>
 						<Var>

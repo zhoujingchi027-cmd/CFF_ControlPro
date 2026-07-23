@@ -32,4 +32,4 @@ IF bAbsolutePower THEN
 END_IF
 
 (* 瓦乘秒得到本周期焦耳增量。 *)
-FC_CalcEnergyIncrement := rPower_W * rCycleTime_s]]></ST></Implementation></POU></TcPlcObject>
+FC_CalcEnergyIncrement := rPower_W * rCycleTime_s;]]></ST></Implementation></POU></TcPlcObject>

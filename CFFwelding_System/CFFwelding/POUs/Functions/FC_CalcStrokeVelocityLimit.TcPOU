@@ -24,4 +24,4 @@ END_VAR
 END_IF
 
 rUsableStroke_mm := rRemainingStroke_mm - rBrakeMargin_mm;
-FC_CalcStrokeVelocityLimit := SQRT(2.0 * rMaximumDeceleration_mm_s2 * rUsableStroke_mm)]]></ST></Implementation></POU></TcPlcObject>
+FC_CalcStrokeVelocityLimit := SQRT(2.0 * rMaximumDeceleration_mm_s2 * rUsableStroke_mm);]]></ST></Implementation></POU></TcPlcObject>

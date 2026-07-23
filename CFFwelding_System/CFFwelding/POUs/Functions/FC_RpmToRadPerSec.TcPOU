@@ -9,4 +9,4 @@ VAR CONSTANT
     c_rPi : LREAL := 3.14159265358979323846;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* rpm乘以二派并除以六十，结果单位为弧度每秒。 *)
-FC_RpmToRadPerSec := rRpm * (2.0 * c_rPi / 60.0)]]></ST></Implementation></POU></TcPlcObject>
+FC_RpmToRadPerSec := rRpm * (2.0 * c_rPi / 60.0);]]></ST></Implementation></POU></TcPlcObject>

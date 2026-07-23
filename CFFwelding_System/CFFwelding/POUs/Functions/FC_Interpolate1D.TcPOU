@@ -39,4 +39,4 @@ ELSE
     rQueryX := rX;
 END_IF
 
-FC_Interpolate1D := rY0 + ((rQueryX - rX0) / (rX1 - rX0)) * (rY1 - rY0)]]></ST></Implementation></POU></TcPlcObject>
+FC_Interpolate1D := rY0 + ((rQueryX - rX0) / (rX1 - rX0)) * (rY1 - rY0);]]></ST></Implementation></POU></TcPlcObject>

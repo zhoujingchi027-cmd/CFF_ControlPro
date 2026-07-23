@@ -98,8 +98,8 @@ foreach ($programName in @($fastPrograms + $mainPrograms + $slowPrograms)) {
     if ($programText -notmatch "PROGRAM\s+$([regex]::Escape($programName))") {
         Add-Failure "$programName is not declared as a PROGRAM."
     }
-    if ($programText -notmatch '程序骨架') {
-        Add-Failure "$programName does not contain the required Chinese skeleton block comment."
+    if ($programText -notmatch '[\u4e00-\u9fff]' -or $programText -notmatch '(程序骨架|唯一Owner)') {
+        Add-Failure "$programName does not contain the required Chinese skeleton/implementation block comment."
     }
     if ($plcProjectText -notmatch [regex]::Escape($programFile.Name)) {
         Add-Failure "PLC project does not compile $($programFile.Name)."

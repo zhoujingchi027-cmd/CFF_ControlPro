@@ -60,4 +60,4 @@ ELSIF bOutput AND NOT bInput AND ((tOffDelay <= T#0s) OR fbOffTimer.Q) THEN
     bOutput := FALSE;
     bFallingEdge := TRUE;
 END_IF
-bValid := TRUE]]></ST></Implementation></POU></TcPlcObject>
+bValid := TRUE;]]></ST></Implementation></POU></TcPlcObject>

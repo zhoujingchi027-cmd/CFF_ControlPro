@@ -8,10 +8,26 @@
     fForceControlN : LREAL;
     (* HMI 显示使用的滤波力，单位牛顿。 *)
     fForceDisplayN : LREAL;
+    (* 经标定与滤波的外部位移绝对值，单位毫米。 *)
+    fExternalDisplacementMm : LREAL;
+    (* Contact后由外部位移传感器累计的主工艺相对位移，向下为正，单位毫米。 *)
+    fSRelSensorMm : LREAL;
+    (* Contact后由NC位置累计的诊断相对位移，向下为正，单位毫米。 *)
+    fSRelAxisMm : LREAL;
+    (* NC相对位移减外部传感器相对位移，单位毫米。 *)
+    fAxisSensorDeltaMm : LREAL;
+    (* 当前NC位置相对Collision标定基准的差值，单位毫米。 *)
+    fCollisionDeltaMm : LREAL;
+    (* Contact锁存的外部位移绝对值，单位毫米。 *)
+    fContactSensorPositionMm : LREAL;
+    (* Contact锁存的NC轴绝对位置，单位毫米。 *)
+    fContactAxisPositionMm : LREAL;
     (* 接触点后的相对位移，单位毫米。 *)
     fRelativeDistanceMm : LREAL;
     (* 碰撞基准相对量，单位毫米。 *)
     fCollisionReferenceMm : LREAL;
+    (* 已接受处理的Contact参考点请求编号。 *)
+    udiContactReferenceAcceptedId : UDINT;
     (* R 轴实际转速，单位转每分钟。 *)
     fSpeedRpm : LREAL;
     (* R 轴实际扭矩，单位牛米。 *)
@@ -20,6 +36,18 @@
     fPowerW : LREAL;
     (* 周期累计能量，单位焦耳。 *)
     fEnergyJ : LREAL;
+    (* EP3174诊断、映射和力标定均有效。 *)
+    bForceValid : BOOL;
+    (* 外部位移诊断、映射和标定均有效。 *)
+    bDisplacementValid : BOOL;
+    (* Collision输入、标定和NC位置均有效。 *)
+    bCollisionValid : BOOL;
+    (* 本周期Collision Reference Sensor去抖状态。 *)
+    bCollisionSensorActive : BOOL;
+    (* Contact参考点已由有效力、位移和NC位置锁存。 *)
+    bContactReferenceValid : BOOL;
+    (* NC相对位移与外部传感器相对位移差值在配置范围内。 *)
+    bAxisSensorAgreement : BOOL;
     (* 过程测量链是否有效。 *)
     bValid : BOOL;
 END_STRUCT

@@ -142,9 +142,32 @@
 
 这些对象不访问GVL、PROGRAM局部变量、`AXIS_REF`或`MC_*`；实际实例仍按实例所有权矩阵在对应后续Phase由唯一Owner声明。
 
+## Phase 5传感器与参考点契约
+
+### `ST_SensorProcessingConfig`
+
+发布四路Force滤波时间常数、Force/Displacement有效范围与延时、Collision去抖时间和Axis/Sensor差值限值。`bValid=FALSE`时全部传感器处理实例撤销有效状态。
+
+### `ST_ProcessReferenceCommand`
+
+`PRG_CffSequence`后续通过`udiContactReferenceRequestId`事务请求锁存或清除Contact参考点；`PRG_FastInputs`只在编号变化时处理一次。步骤切换不得递增清除请求，因此四个CFF步骤共享同一Contact零点。
+
+### `ST_ProcessActual`
+
+同时发布：
+
+- `ForceRaw / ForceCriterion / ForceControl / ForceDisplay`；
+- 外部位移绝对值和主反馈`SRelSensor`；
+- NC诊断`SRelAxis`及`AxisSensorDelta`；
+- `CollisionDelta`和去抖后的参考传感器状态；
+- 力、位移、Collision、Contact Reference及Axis/Sensor一致性有效位。
+
+外部位移无效时不自动降级为`SRelAxis`。所有有效位同时依赖人工映射状态和标定Revision；本阶段没有代码写入任何`Mapped`字段或Production Ready。
+
 ## 分阶段状态
 
 - 14个接口DUT已经加入PLC工程，并在Phase 3完成枚举类型化。
 - Phase 4加入14个纯计算FC和6个通用FB；当前只定义可复用类型，不提前声明业务实例。
+- Phase 5加入传感器处理与Contact参考点契约，并由`PRG_FastInputs`唯一写入快速过程实际值。
 - 所有接口只定义数据契约，不读写硬件、不生成命令、不改变Ready。
 - PROGRAM骨架没有跨PROGRAM局部变量访问。

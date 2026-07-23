@@ -20,8 +20,11 @@
 | 变量 | 类型 | 预期信号 | 当前状态 | 人工映射与验证 TODO |
 |---|---|---|---|---|
 | `nForceChannelRaw` | `INT AT %I*` | 力传感器原始量 | 未映射 | 核对模块/通道、量程、符号、断线和过量程；完成多点标定 |
+| `bForceChannelError/Overrange/Underrange` | `BOOL AT %I*` | EP3174通道诊断 | 未映射 | 按实际PDO逐项映射，验证断线、上溢、下溢和滤波配置 |
 | `nDisplacementChannelRaw` | `INT AT %I*` | 位移传感器原始量 | 未映射 | 核对模块/通道、方向、量程和诊断；完成位移标定 |
-| `bCollisionDetected` | `BOOL AT %I*` | 碰撞检测 | 未映射 | 核对安全含义、常态电平、断线行为和机械触发点 |
+| `bDisplacementChannelError/Overrange/Underrange` | `BOOL AT %I*` | 位移通道诊断 | 未映射 | 按实际传感器接口映射并验证边界与断线行为 |
+| `bCollisionReferenceSensor` | `BOOL AT %I*` | Collision Reference Sensor | 未映射 | 核对常态电平、断线行为、机械触发点和去抖时间；用于标定与运行诊断 |
+| `bCollisionDetected` | `BOOL AT %I*` | 早期保留占位 | 未映射/不使用 | 后续电气接口冻结时删除或重新定义，不得替代Collision Reference Sensor |
 | `bFastenerPresent` | `BOOL AT %I*` | 紧固件在位 | 未映射 | 核对传感器极性、抖动、卡料和空料场景 |
 | `bFeederReady` | `BOOL AT %I*` | 供料器就绪 | 未映射 | 核对通信/电气接口、故障时状态和超时行为 |
 | `bClampClosed` | `BOOL AT %I*` | 夹紧到位 | 未映射 | 核对两位置信号一致性、失压和机械不到位场景 |

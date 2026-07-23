@@ -18,6 +18,7 @@
 | `fbDisplacementFilter` | `FB_LowPassFilter` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | 外部位移原始值、实际周期 | 工艺位移滤波值 | Reset或标定切换时复位 |
 | `fbForceSignalValidity` | `FB_SignalValidity` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | 四通道工程量与诊断 | 力测量有效状态 | Reset或诊断恢复后重建窗口 |
 | `fbDisplacementSignalValidity` | `FB_SignalValidity` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | 位移工程量与诊断 | 位移有效状态 | Reset或诊断恢复后重建窗口 |
+| `fbCollisionDebounce` | `FB_Debounce` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | Collision Reference Sensor占位输入与人工映射状态 | 稳定Collision传感器诊断 | 输入未映射或Reset时复位 |
 | `fbContactDetect` | `FB_ContactDetect` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | `ST_ContactDetectInput` | `ST_ContactDetectOutput` | 新循环或Reset复位；Contact只确认一次 |
 | `fbContactDebounce` | `FB_Debounce` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | Contact候选条件 | Contact确认条件 | 新循环或Reset复位 |
 | `fbStepCriterion` | `FB_StepProceedingCriterion` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | `ST_StepCriterionInput` | `ST_StepCriterionOutput` | 每步骤进入时复位 |
@@ -56,9 +57,9 @@
 
 `PRG_HmiAdsInterface`、`PRG_ResultTraceability`、`PRG_Statistics`和`PRG_Persistence`在Phase 2不声明FB实例。后续若引入队列、握手或持久化FB，必须先在本矩阵中分配唯一Owner，且不得把字符串、文件、数据库或ADS大数组搬运放入`Task_CffFast`。
 
-## Phase 4核对
+## Phase 5核对
 
-- 当前PROGRAM的`VAR`区均为空，因此不存在重复FB实例。
+- `PRG_FastInputs`已按本矩阵唯一声明力滤波数组、力/位移有效性、位移滤波和Collision去抖实例；其他PROGRAM没有重复声明。
 - 当前不存在`GVL_Instance`。
-- 通用FB类型已经可编译；当前所有计划实例仍处于“已分配Owner、尚未声明”状态。
+- 其余计划实例仍处于“已分配Owner、尚未声明”状态。
 - 轴Adapter是未来唯一允许使用`VAR_IN_OUT AXIS_REF`的FB；算法FB不得访问`AXIS_REF`。

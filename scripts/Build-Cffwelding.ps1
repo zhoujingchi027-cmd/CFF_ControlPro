@@ -65,6 +65,7 @@ try {
     # SolutionBuild.SolutionConfigurations. Wait for that second asynchronous
     # load boundary as well, otherwise larger PLC projects can fail before Build.
     $availableConfigurations = @()
+    $configurationLoadError = $null
     for ($attempt = 1; $attempt -le 90 -and $availableConfigurations.Count -eq 0; $attempt++) {
         try {
             $availableConfigurations = @(
@@ -72,17 +73,19 @@ try {
                     "$($solutionConfiguration.Name)|$($solutionConfiguration.PlatformName)"
                 }
             )
+            $configurationLoadError = $null
         }
-        catch [System.Runtime.InteropServices.COMException] {
-            $errorCode = '0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffffL)
-            if ($errorCode -notin @('0x80010001', '0x8001010A')) {
-                throw
-            }
+        catch {
+            # During asynchronous XAE solution loading the automation proxy can
+            # briefly omit SolutionConfigurations or reject the COM call.
+            $configurationLoadError = $_.Exception
+            $availableConfigurations = @()
         }
 
         if ($availableConfigurations.Count -eq 0) {
             if ($attempt -eq 90) {
-                throw 'TwinCAT solution configurations did not finish loading before the build timeout.'
+                $detail = if ($null -eq $configurationLoadError) { 'no configuration was exposed' } else { $configurationLoadError.Message }
+                throw "TwinCAT solution configurations did not finish loading before the build timeout: $detail"
             }
             Start-Sleep -Milliseconds 500
         }

@@ -10,4 +10,4 @@ END_VAR
 FC_CheckModeSourceMatrix :=
     ((eOperationMode = OP_MODE_MAINTENANCE) AND (eControlSource = CONTROL_SOURCE_LOCAL))
     OR ((eOperationMode = OP_MODE_MANUAL) AND (eControlSource = CONTROL_SOURCE_LOCAL))
-    OR ((eOperationMode = OP_MODE_AUTOMATIC) AND (eControlSource = CONTROL_SOURCE_ROBOT))]]></ST></Implementation></POU></TcPlcObject>
+    OR ((eOperationMode = OP_MODE_AUTOMATIC) AND (eControlSource = CONTROL_SOURCE_ROBOT));]]></ST></Implementation></POU></TcPlcObject>

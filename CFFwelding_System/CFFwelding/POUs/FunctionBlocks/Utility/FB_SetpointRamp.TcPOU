@@ -68,4 +68,4 @@ rOutput := FC_LimitRate(
     rCycleTime_s := rCycleTime_s);
 rAbsoluteTolerance := ABS(rTolerance);
 bReached := ABS(rTarget - rOutput) <= rAbsoluteTolerance;
-bBusy := NOT bReached]]></ST></Implementation></POU></TcPlcObject>
+bBusy := NOT bReached;]]></ST></Implementation></POU></TcPlcObject>

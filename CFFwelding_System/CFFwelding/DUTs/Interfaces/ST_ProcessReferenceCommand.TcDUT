@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ProcessReferenceCommand" Id="{D5000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[TYPE ST_ProcessReferenceCommand : STRUCT
+    (* Contact参考点请求编号；写入者最后递增该字段。 *)
+    udiContactReferenceRequestId : UDINT;
+    (* TRUE时在新请求编号到达后锁存当前外部位移与NC位置。 *)
+    bLatchContactReference : BOOL;
+    (* TRUE时在新请求编号到达后清除Contact参考点。 *)
+    bResetContactReference : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -5,6 +5,8 @@ VAR_GLOBAL
     stMailbox : ST_CommandMailbox;
     (* 当前命令权限计算结果。 *)
     stPermission : ST_CommandPermission;
+    (* CFF流程发布给快速输入层的Contact参考点事务。 *)
+    stProcessReference : ST_ProcessReferenceCommand;
     (* 主任务发布给快速任务的命令。 *)
     stFast : ST_FastCommand;
     (* 机器人接口命令。 *)

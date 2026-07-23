@@ -42,4 +42,4 @@ END_IF
 
 FC_ScaleLinear := rOutputMinimum
     + ((rScaledInput - rInputMinimum) / (rInputMaximum - rInputMinimum))
-    * (rOutputMaximum - rOutputMinimum)]]></ST></Implementation></POU></TcPlcObject>
+    * (rOutputMaximum - rOutputMinimum);]]></ST></Implementation></POU></TcPlcObject>

@@ -67,17 +67,28 @@ if ($solutionExists) {
 if ($systemProjectExists) {
     $systemProjectText = Read-Utf8Strict -Path $systemProjectPath
     if ($null -ne $systemProjectText) {
+        $systemProjectXml = $null
         try {
-            [void][xml]$systemProjectText
+            [xml]$systemProjectXml = $systemProjectText
         }
         catch {
             Add-Failure "TwinCAT system project is not valid XML: $systemProjectPath"
         }
 
-        $forbiddenHardware = @('EP3174', 'AX5000', 'TwinSAFE', 'IO-Link')
-        foreach ($token in $forbiddenHardware) {
-            if ($systemProjectText -match [regex]::Escape($token)) {
-                Add-Failure "Phase 1 system project contains forbidden hardware token: $token"
+        if ($null -ne $systemProjectXml) {
+            $ioNode = $systemProjectXml.SelectSingleNode('/TcSmProject/Project/Io')
+            $motionNode = $systemProjectXml.SelectSingleNode('/TcSmProject/Project/Motion')
+            $ioText = if ($null -eq $ioNode) { '' } else { $ioNode.OuterXml }
+            $motionText = if ($null -eq $motionNode) { '' } else { $motionNode.OuterXml }
+            foreach ($token in @('EP3174', 'TwinSAFE', 'IO-Link', 'EtherCAT')) {
+                if ($ioText -match [regex]::Escape($token)) {
+                    Add-Failure "Phase 1 system project contains configured I/O/Safety token: $token"
+                }
+            }
+            foreach ($token in @('AX5000', 'SimulationDrive')) {
+                if ($motionText -match [regex]::Escape($token)) {
+                    Add-Failure "Phase 1 system project contains configured drive/simulation token: $token"
+                }
             }
         }
     }

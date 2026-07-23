@@ -60,4 +60,4 @@ ELSE
     rAlpha := FC_ClampLReal(rValue := rAlpha, rMinimum := 0.0, rMaximum := 1.0);
     rOutput := rOutput + rAlpha * (rInput - rOutput);
 END_IF
-bValid := TRUE]]></ST></Implementation></POU></TcPlcObject>
+bValid := TRUE;]]></ST></Implementation></POU></TcPlcObject>

@@ -1,11 +1,256 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastInputs" Id="{A2000000-0000-4000-8000-000000000001}"><Declaration><![CDATA[PROGRAM PRG_FastInputs
 VAR
+    (* ---------------------------------------------------------
+       四个力信号通道的一阶滤波实例数组。
+       所属任务：Task_CffFast。
+       唯一Owner：PRG_FastInputs。
+       输入：同一EP3174工程力与四组时间常数。
+       输出：ForceRaw、ForceCriterion、ForceControl、ForceDisplay。
+       复位：硬件未映射、标定无效或处理参数无效时复位。
+       --------------------------------------------------------- *)
+    aFbForceChannelFilter : ARRAY[1..4] OF FB_LowPassFilter;
+    (* ---------------------------------------------------------
+       力测量链有效性实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastInputs。
+       输入：EP3174诊断、映射状态、标定和工程力范围。
+       输出：正式力有效位；Reset：链路未配置时复位。
+       --------------------------------------------------------- *)
+    fbForceSignalValidity : FB_SignalValidity;
+    (* ---------------------------------------------------------
+       外部位移一阶滤波实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastInputs。
+       输入：经标定外部位移；输出：工艺位移绝对值。
+       Reset：硬件未映射、标定或处理参数无效时复位。
+       --------------------------------------------------------- *)
+    fbDisplacementFilter : FB_LowPassFilter;
+    (* ---------------------------------------------------------
+       外部位移有效性实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastInputs。
+       输入：位移诊断、映射、标定和范围；输出：正式有效位。
+       Reset：位移链路未配置时复位。
+       --------------------------------------------------------- *)
+    fbDisplacementSignalValidity : FB_SignalValidity;
+    (* ---------------------------------------------------------
+       Collision Reference Sensor输入去抖实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastInputs。
+       输入：未绑定数字输入占位；输出：稳定诊断状态。
+       Reset：Collision输入未人工映射时复位。
+       --------------------------------------------------------- *)
+    fbCollisionDebounce : FB_Debounce;
+
+    (* 实际快速任务配置周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+    (* EP3174通道诊断是否无错误、无上溢且无下溢。 *)
+    bForceDiagnosticOk : BOOL;
+    (* 力标定结构是否通过基础版本、增益和方向检查。 *)
+    bForceCalibrationValid : BOOL;
+    (* 力测量链是否具备处理条件；未人工映射时保持FALSE。 *)
+    bForcePathConfigured : BOOL;
+    (* 经标定但尚未滤波的工程力，单位牛顿。 *)
+    rConvertedForceN : LREAL;
+    (* 位移输入诊断是否无错误、无上溢且无下溢。 *)
+    bDisplacementDiagnosticOk : BOOL;
+    (* 位移标定结构是否通过基础版本、增益和方向检查。 *)
+    bDisplacementCalibrationValid : BOOL;
+    (* 位移测量链是否具备处理条件；未人工映射时保持FALSE。 *)
+    bDisplacementPathConfigured : BOOL;
+    (* 经标定但尚未滤波的外部位移，单位毫米。 *)
+    rConvertedDisplacementMm : LREAL;
+    (* Collision标定结构是否有效。 *)
+    bCollisionCalibrationValid : BOOL;
+    (* Z轴真实驱动与轴状态是否允许使用NC位置诊断。 *)
+    bAxisPositionValid : BOOL;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
-   程序骨架：快速输入采集与工程量换算。
-   所属任务：Task_CffFast，调用顺序1。
-   唯一Owner：PRG_FastInputs。
-   当前阶段：不读取物理IO，不生成传感器有效假值。
-   后续实现：轴状态、力、位移、相对位移和有效性。
-   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>
+   快速输入处理状态。
+   目的：把未绑定过程映像占位转换为四路Force、外部位移、
+         累计S_rel和Collision诊断契约。
+   进入条件：每个Task_CffFast扫描调用。
+   周期动作：检查映射/标定/诊断，滤波并发布类型化状态。
+   正常出口：仅在用户完成映射且全部有效条件成立时发布有效位。
+   超时：由各SignalValidity和Debounce实例按配置处理。
+   NOK/Fault：任何输入无效即撤销对应有效位，不生成替代假值。
+   --------------------------------------------------------- *)
+rCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+
+(* 力测量链：EP3174诊断、人工映射和受控标定必须同时有效。 *)
+bForceDiagnosticOk := NOT GVL_IO.bForceChannelError
+    AND NOT GVL_IO.bForceChannelOverrange
+    AND NOT GVL_IO.bForceChannelUnderrange;
+bForceCalibrationValid := FC_ValidateCalibration(
+    bCalibrationValid := GVL_Calibration.stForce.bValid,
+    udiRevision := GVL_Calibration.stForce.nRevision,
+    rGain := GVL_Calibration.stForce.fGain,
+    nDirection := GVL_Calibration.stForce.nDirection);
+bForcePathConfigured := GVL_Status.stHardwareBinding.bForceInputMapped
+    AND GVL_Config.stSensorProcessing.bValid
+    AND bForceCalibrationValid;
+
+IF bForceCalibrationValid THEN
+    rConvertedForceN := ((INT_TO_LREAL(GVL_IO.nForceChannelRaw) - GVL_Calibration.stForce.fRawZero)
+        * GVL_Calibration.stForce.fGain + GVL_Calibration.stForce.fOffsetN)
+        * DINT_TO_LREAL(GVL_Calibration.stForce.nDirection);
+ELSE
+    rConvertedForceN := 0.0;
+END_IF
+
+fbForceSignalValidity(
+    bEnable := GVL_Config.stSensorProcessing.bValid,
+    bReset := NOT bForcePathConfigured,
+    bRawValid := bForcePathConfigured AND bForceDiagnosticOk,
+    rValue := rConvertedForceN,
+    rMinimum := GVL_Config.stSensorProcessing.rForceMinimumN,
+    rMaximum := GVL_Config.stSensorProcessing.rForceMaximumN,
+    tInvalidDelay := GVL_Config.stSensorProcessing.tForceInvalidDelay);
+
+(* 四个信号来自同一实际力，只允许滤波带宽不同，禁止ForceDisplay参与控制。 *)
+aFbForceChannelFilter[1](bEnable := bForcePathConfigured, bReset := NOT bForcePathConfigured,
+    bInputValid := fbForceSignalValidity.bValid, rInput := rConvertedForceN,
+    rCycleTime_s := rCycleTime_s,
+    rTimeConstant_s := GVL_Config.stSensorProcessing.arForceFilterTimeConstants_s[1]);
+aFbForceChannelFilter[2](bEnable := bForcePathConfigured, bReset := NOT bForcePathConfigured,
+    bInputValid := fbForceSignalValidity.bValid, rInput := rConvertedForceN,
+    rCycleTime_s := rCycleTime_s,
+    rTimeConstant_s := GVL_Config.stSensorProcessing.arForceFilterTimeConstants_s[2]);
+aFbForceChannelFilter[3](bEnable := bForcePathConfigured, bReset := NOT bForcePathConfigured,
+    bInputValid := fbForceSignalValidity.bValid, rInput := rConvertedForceN,
+    rCycleTime_s := rCycleTime_s,
+    rTimeConstant_s := GVL_Config.stSensorProcessing.arForceFilterTimeConstants_s[3]);
+aFbForceChannelFilter[4](bEnable := bForcePathConfigured, bReset := NOT bForcePathConfigured,
+    bInputValid := fbForceSignalValidity.bValid, rInput := rConvertedForceN,
+    rCycleTime_s := rCycleTime_s,
+    rTimeConstant_s := GVL_Config.stSensorProcessing.arForceFilterTimeConstants_s[4]);
+
+GVL_Process.stActual.fForceRawN := aFbForceChannelFilter[1].rOutput;
+GVL_Process.stActual.fForceCriterionN := aFbForceChannelFilter[2].rOutput;
+GVL_Process.stActual.fForceControlN := aFbForceChannelFilter[3].rOutput;
+GVL_Process.stActual.fForceDisplayN := aFbForceChannelFilter[4].rOutput;
+GVL_Process.stActual.bForceValid := fbForceSignalValidity.bValid
+    AND aFbForceChannelFilter[1].bValid AND aFbForceChannelFilter[2].bValid
+    AND aFbForceChannelFilter[3].bValid AND aFbForceChannelFilter[4].bValid;
+
+(* 外部位移链：该信号是正式SRelSensor主反馈，禁止自动降级为NC位置。 *)
+bDisplacementDiagnosticOk := NOT GVL_IO.bDisplacementChannelError
+    AND NOT GVL_IO.bDisplacementChannelOverrange
+    AND NOT GVL_IO.bDisplacementChannelUnderrange;
+bDisplacementCalibrationValid := FC_ValidateCalibration(
+    bCalibrationValid := GVL_Calibration.stDisplacement.bValid,
+    udiRevision := GVL_Calibration.stDisplacement.nRevision,
+    rGain := GVL_Calibration.stDisplacement.fGainMmPerCount,
+    nDirection := GVL_Calibration.stDisplacement.nDirection);
+bDisplacementPathConfigured := GVL_Status.stHardwareBinding.bDisplacementInputMapped
+    AND GVL_Config.stSensorProcessing.bValid
+    AND bDisplacementCalibrationValid;
+
+IF bDisplacementCalibrationValid THEN
+    rConvertedDisplacementMm := ((INT_TO_LREAL(GVL_IO.nDisplacementChannelRaw)
+        - GVL_Calibration.stDisplacement.fRawZero)
+        * GVL_Calibration.stDisplacement.fGainMmPerCount
+        + GVL_Calibration.stDisplacement.fOffsetMm)
+        * DINT_TO_LREAL(GVL_Calibration.stDisplacement.nDirection);
+ELSE
+    rConvertedDisplacementMm := 0.0;
+END_IF
+
+fbDisplacementSignalValidity(
+    bEnable := GVL_Config.stSensorProcessing.bValid,
+    bReset := NOT bDisplacementPathConfigured,
+    bRawValid := bDisplacementPathConfigured AND bDisplacementDiagnosticOk,
+    rValue := rConvertedDisplacementMm,
+    rMinimum := GVL_Config.stSensorProcessing.rDisplacementMinimumMm,
+    rMaximum := GVL_Config.stSensorProcessing.rDisplacementMaximumMm,
+    tInvalidDelay := GVL_Config.stSensorProcessing.tDisplacementInvalidDelay);
+fbDisplacementFilter(
+    bEnable := bDisplacementPathConfigured,
+    bReset := NOT bDisplacementPathConfigured,
+    bInputValid := fbDisplacementSignalValidity.bValid,
+    rInput := rConvertedDisplacementMm,
+    rCycleTime_s := rCycleTime_s,
+    rTimeConstant_s := GVL_Config.stSensorProcessing.rDisplacementTimeConstant_s);
+
+GVL_Process.stActual.fExternalDisplacementMm := fbDisplacementFilter.rOutput;
+GVL_Process.stActual.bDisplacementValid := fbDisplacementSignalValidity.bValid
+    AND fbDisplacementFilter.bValid;
+
+(* Collision链同时要求人工数字输入映射、标定和真实轴位置有效。 *)
+bCollisionCalibrationValid := GVL_Calibration.stCollision.bValid
+    AND (GVL_Calibration.stCollision.nRevision > 0)
+    AND (GVL_Calibration.stCollision.nSampleCount >= 3)
+    AND FC_IsFiniteLReal(rValue := GVL_Calibration.stCollision.fReferencePositionMm);
+bAxisPositionValid := GVL_Status.stHardwareBinding.bZAxisDriveLinked
+    AND GVL_Status.stFast.stZAxis.bReady
+    AND NOT GVL_Status.stFast.stZAxis.bError
+    AND FC_IsFiniteLReal(rValue := GVL_Status.stFast.stZAxis.rActualPosition_mm);
+fbCollisionDebounce(
+    bEnable := GVL_Status.stHardwareBinding.bCollisionInputMapped,
+    bReset := NOT GVL_Status.stHardwareBinding.bCollisionInputMapped,
+    bInput := GVL_IO.bCollisionReferenceSensor,
+    tOnDelay := GVL_Config.stSensorProcessing.tCollisionDebounce,
+    tOffDelay := GVL_Config.stSensorProcessing.tCollisionDebounce);
+GVL_Process.stActual.bCollisionSensorActive := fbCollisionDebounce.bOutput;
+GVL_Process.stActual.bCollisionValid := GVL_Status.stHardwareBinding.bCollisionInputMapped
+    AND bCollisionCalibrationValid AND bAxisPositionValid AND fbCollisionDebounce.bValid;
+
+IF bCollisionCalibrationValid AND bAxisPositionValid THEN
+    GVL_Process.stActual.fCollisionDeltaMm := GVL_Status.stFast.stZAxis.rActualPosition_mm
+        - GVL_Calibration.stCollision.fReferencePositionMm;
+ELSE
+    GVL_Process.stActual.fCollisionDeltaMm := 0.0;
+END_IF
+GVL_Process.stActual.fCollisionReferenceMm := GVL_Process.stActual.fCollisionDeltaMm;
+
+(* Contact参考点只按变化的RequestId处理一次，步骤切换绝不重置S_rel。 *)
+IF GVL_Command.stProcessReference.udiContactReferenceRequestId
+    <> GVL_Process.stActual.udiContactReferenceAcceptedId THEN
+    GVL_Process.stActual.udiContactReferenceAcceptedId :=
+        GVL_Command.stProcessReference.udiContactReferenceRequestId;
+
+    IF GVL_Command.stProcessReference.bResetContactReference THEN
+        GVL_Process.stActual.bContactReferenceValid := FALSE;
+        GVL_Process.stActual.fContactSensorPositionMm := 0.0;
+        GVL_Process.stActual.fContactAxisPositionMm := 0.0;
+    ELSIF GVL_Command.stProcessReference.bLatchContactReference THEN
+        IF GVL_Process.stActual.bForceValid AND GVL_Process.stActual.bDisplacementValid
+            AND bAxisPositionValid THEN
+            GVL_Process.stActual.fContactSensorPositionMm := GVL_Process.stActual.fExternalDisplacementMm;
+            GVL_Process.stActual.fContactAxisPositionMm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
+            GVL_Process.stActual.bContactReferenceValid := TRUE;
+        ELSE
+            GVL_Process.stActual.bContactReferenceValid := FALSE;
+        END_IF
+    END_IF
+END_IF
+
+IF GVL_Process.stActual.bContactReferenceValid AND GVL_Process.stActual.bDisplacementValid THEN
+    GVL_Process.stActual.fSRelSensorMm := GVL_Process.stActual.fExternalDisplacementMm
+        - GVL_Process.stActual.fContactSensorPositionMm;
+ELSE
+    GVL_Process.stActual.fSRelSensorMm := 0.0;
+END_IF
+
+IF GVL_Process.stActual.bContactReferenceValid AND bAxisPositionValid THEN
+    GVL_Process.stActual.fSRelAxisMm := GVL_Status.stFast.stZAxis.rActualPosition_mm
+        - GVL_Process.stActual.fContactAxisPositionMm;
+ELSE
+    GVL_Process.stActual.fSRelAxisMm := 0.0;
+END_IF
+
+GVL_Process.stActual.fAxisSensorDeltaMm := GVL_Process.stActual.fSRelAxisMm
+    - GVL_Process.stActual.fSRelSensorMm;
+GVL_Process.stActual.fRelativeDistanceMm := GVL_Process.stActual.fSRelSensorMm;
+GVL_Process.stActual.bAxisSensorAgreement := GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bDisplacementValid AND bAxisPositionValid
+    AND (ABS(GVL_Process.stActual.fAxisSensorDeltaMm)
+        <= ABS(GVL_Config.stSensorProcessing.rAxisSensorDeltaMaximumMm));
+
+GVL_Process.stActual.bValid := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bCollisionValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement;
+
+(* 发布Fast快照；未完成硬件映射时上述有效位自然保持FALSE。 *)
+GVL_Status.stFast.nCycleCounter := GVL_Status.stFast.nCycleCounter + 1;
+GVL_Status.stFast.nActualPeriodUs := GVL_Config.stMachine.nFastTaskCycleUs;
+GVL_Status.stFast.stProcess := GVL_Process.stActual;]]></ST></Implementation></POU></TcPlcObject>

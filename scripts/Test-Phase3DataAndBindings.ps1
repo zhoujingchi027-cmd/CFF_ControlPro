@@ -185,9 +185,15 @@ if (Test-Path -LiteralPath $systemProjectPath -PathType Leaf) {
             }
         }
     }
-    $projectConfigurationText = $systemXml.TcSmProject.Project.OuterXml
-    foreach ($token in @('AX5000','EP3174','EtherCAT','TwinSAFE','SimulationDrive')) {
-        if ($projectConfigurationText -match [regex]::Escape($token)) { Fail "Forbidden hardware/simulation token in system project: $token" }
+    $ioConfigurationNode = $systemXml.SelectSingleNode('/TcSmProject/Project/Io')
+    $motionConfigurationNode = $systemXml.SelectSingleNode('/TcSmProject/Project/Motion')
+    $ioConfigurationText = if ($null -eq $ioConfigurationNode) { '' } else { $ioConfigurationNode.OuterXml }
+    $motionConfigurationText = if ($null -eq $motionConfigurationNode) { '' } else { $motionConfigurationNode.OuterXml }
+    foreach ($token in @('EP3174','EtherCAT','TwinSAFE')) {
+        if ($ioConfigurationText -match [regex]::Escape($token)) { Fail "Forbidden configured I/O/Safety token: $token" }
+    }
+    foreach ($token in @('AX5000','SimulationDrive')) {
+        if ($motionConfigurationText -match [regex]::Escape($token)) { Fail "Forbidden configured drive/simulation token: $token" }
     }
 }
 

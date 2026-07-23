@@ -9,8 +9,22 @@ VAR_GLOBAL
 
     (* TODO_HW_MAP：力传感器原始输入通道，当前未映射。 *)
     nForceChannelRaw AT %I* : INT;
+    (* TODO_HW_MAP：EP3174力通道错误状态，当前未映射。 *)
+    bForceChannelError AT %I* : BOOL;
+    (* TODO_HW_MAP：EP3174力通道上溢状态，当前未映射。 *)
+    bForceChannelOverrange AT %I* : BOOL;
+    (* TODO_HW_MAP：EP3174力通道下溢状态，当前未映射。 *)
+    bForceChannelUnderrange AT %I* : BOOL;
     (* TODO_HW_MAP：位移传感器原始输入通道，当前未映射。 *)
     nDisplacementChannelRaw AT %I* : INT;
+    (* TODO_HW_MAP：位移输入通道错误状态，当前未映射。 *)
+    bDisplacementChannelError AT %I* : BOOL;
+    (* TODO_HW_MAP：位移输入通道上溢状态，当前未映射。 *)
+    bDisplacementChannelOverrange AT %I* : BOOL;
+    (* TODO_HW_MAP：位移输入通道下溢状态，当前未映射。 *)
+    bDisplacementChannelUnderrange AT %I* : BOOL;
+    (* TODO_HW_MAP：Collision Reference Sensor输入，当前未映射。 *)
+    bCollisionReferenceSensor AT %I* : BOOL;
     (* TODO_HW_MAP：碰撞检测输入，当前未映射。 *)
     bCollisionDetected AT %I* : BOOL;
     (* TODO_HW_MAP：紧固件在位输入，当前未映射。 *)

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_SensorProcessingConfig" Id="{D5000000-0000-4000-8000-000000000001}"><Declaration><![CDATA[TYPE ST_SensorProcessingConfig : STRUCT
+    (* ForceRaw、ForceCriterion、ForceControl和ForceDisplay四个通道的时间常数，单位秒。 *)
+    arForceFilterTimeConstants_s : ARRAY[1..4] OF LREAL;
+    (* 经标定力信号允许的最小工程值，单位牛顿。 *)
+    rForceMinimumN : LREAL;
+    (* 经标定力信号允许的最大工程值，单位牛顿。 *)
+    rForceMaximumN : LREAL;
+    (* 力信号无效条件的确认延时。 *)
+    tForceInvalidDelay : TIME;
+    (* 外部位移一阶滤波时间常数，单位秒。 *)
+    rDisplacementTimeConstant_s : LREAL;
+    (* 外部位移允许的最小工程值，单位毫米。 *)
+    rDisplacementMinimumMm : LREAL;
+    (* 外部位移允许的最大工程值，单位毫米。 *)
+    rDisplacementMaximumMm : LREAL;
+    (* 位移信号无效条件的确认延时。 *)
+    tDisplacementInvalidDelay : TIME;
+    (* Collision Reference Sensor输入去抖时间。 *)
+    tCollisionDebounce : TIME;
+    (* NC相对位移与外部传感器相对位移的最大允许差，单位毫米。 *)
+    rAxisSensorDeltaMaximumMm : LREAL;
+    (* 传感器处理参数已经过工程确认。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

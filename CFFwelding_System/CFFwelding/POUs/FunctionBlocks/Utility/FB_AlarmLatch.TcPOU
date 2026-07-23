@@ -51,4 +51,4 @@ ELSIF bReset THEN
     END_IF
 END_IF
 
-bPreviousSetRequest := bSetRequest]]></ST></Implementation></POU></TcPlcObject>
+bPreviousSetRequest := bSetRequest;]]></ST></Implementation></POU></TcPlcObject>

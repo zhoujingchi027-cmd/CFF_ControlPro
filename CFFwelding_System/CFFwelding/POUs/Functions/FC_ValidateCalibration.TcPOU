@@ -15,4 +15,4 @@ FC_ValidateCalibration := bCalibrationValid
     AND (udiRevision > 0)
     AND FC_IsFiniteLReal(rValue := rGain)
     AND (ABS(rGain) > 0.0)
-    AND ((nDirection = 1) OR (nDirection = -1))]]></ST></Implementation></POU></TcPlcObject>
+    AND ((nDirection = 1) OR (nDirection = -1));]]></ST></Implementation></POU></TcPlcObject>

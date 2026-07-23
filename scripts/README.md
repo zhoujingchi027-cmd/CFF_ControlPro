@@ -41,3 +41,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase4Uti
 ```
 
 该脚本检查14个纯计算FC和6个通用FB的唯一性、PLC编译清单、中文接口/算法注释、复位与边界接口，并拒绝这些通用对象访问`GVL`、`AXIS_REF`或任何`MC_*`对象。
+
+## Phase 5 传感器处理验收
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase5SensorProcessing.ps1
+```
+
+该脚本检查EP3174/位移/Collision占位及诊断、四路Force、Contact参考点事务、累计`SRelSensor/SRelAxis`和差值契约，并确认未创建真实I/O配置、未强制任何映射或Production Ready为真。
