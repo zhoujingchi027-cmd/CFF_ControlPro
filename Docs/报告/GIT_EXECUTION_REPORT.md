@@ -45,6 +45,7 @@
 | Phase 0 | `1cf77561cc09d95e28dabeb531cebee61763b9df` | `chore(repo): initialize CFFwelding greenfield repository` | 环境检测、UTF-8、凭据模式、Git差异、旧工程源文件摘要 | 已Push到工作分支 |
 | Phase 1 | `717737001cd31e960c9f6e618458830fafd722d1` | `feat(project): create empty CFFwelding TwinCAT solution` | Phase 1验收、真实XAE Build、`LastBuildInfo=0`、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
 | Phase 2 | `8780363b820c4a14da16664ad4b043d2307deebd` | `feat(architecture): add Phase 2 task and program skeletons` | Phase 1/2验收、真实XAE Build、`LastBuildInfo=0`、任务同步、中文注释、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
+| Phase 3 | `d5667d7e13238828e7bd3db65801724e5ae5b29e` | `feat(data): add Phase 3 model and offline NC bindings` | Phase 1/2/3验收、真实XAE Build、`LastBuildInfo=0`、NC SAF/Fast周期同步、4条内部轴映射、硬件边界、凭据模式、暂存差异 | 报告Commit后Push并复核远端Hash |
 
 ## 保护检查
 
@@ -85,5 +86,17 @@ Upstream: origin/codex/cffwelding-greenfield-v3.3
 Phase 2 primary commit: 8780363b820c4a14da16664ad4b043d2307deebd
 Remote primary commit: 8780363b820c4a14da16664ad4b043d2307deebd
 Architecture test: PASS (23 PROGRAM, 14 interface DUT, 3 tasks)
+XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
+```
+
+## Phase 3主提交后的状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Upstream: origin/codex/cffwelding-greenfield-v3.3
+Phase 3 primary commit: d5667d7e13238828e7bd3db65801724e5ae5b29e
+Data/binding test: PASS (26 enums, 33 structures, 13 GVLs)
+NC SAF / PLC Fast / System Fast: 2 ms
+PLC-to-NC internal mappings: PASS (4)
 XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
 ```
