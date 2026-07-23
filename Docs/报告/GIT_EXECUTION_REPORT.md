@@ -47,6 +47,7 @@
 | Phase 2 | `8780363b820c4a14da16664ad4b043d2307deebd` | `feat(architecture): add Phase 2 task and program skeletons` | Phase 1/2验收、真实XAE Build、`LastBuildInfo=0`、任务同步、中文注释、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
 | Phase 3 | `d5667d7e13238828e7bd3db65801724e5ae5b29e` | `feat(data): add Phase 3 model and offline NC bindings` | Phase 1/2/3验收、真实XAE Build、`LastBuildInfo=0`、NC SAF/Fast周期同步、4条内部轴映射、硬件边界、凭据模式、暂存差异 | GitHub 443不可达；主Commit与报告Commit保留本地待Push |
 | Phase 4 | `7be809a2284b67f42c931df15ad8ae52738f09cc` | `feat(plc): add reusable functions and utility blocks` | Phase 1/2/3回归、Phase 4验收、20个POU XML、真实XAE Build、`LastBuildInfo=0`、分层边界、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
+| Phase 5 | `5aa37a6f2394f899f4115aebd7f5e25e9b013f22` | `feat(sensor): add force displacement and collision interfaces` | Phase 1–4回归、Phase 5验收、真实XAE Build、`LastBuildInfo=0`、无真实I/O/Drive/Safety、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
 
 ## 保护检查
 
@@ -117,6 +118,16 @@ Branch: codex/cffwelding-greenfield-v3.3
 Upstream: origin/codex/cffwelding-greenfield-v3.3
 Phase 4 primary commit: 7be809a2284b67f42c931df15ad8ae52738f09cc
 Utility test: PASS (14 FC, 6 utility FB)
+XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
+Push: pending because github.com:443 is unreachable
+```
+
+## Phase 5主提交后的状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Phase 5 primary commit: 5aa37a6f2394f899f4115aebd7f5e25e9b013f22
+Sensor test: PASS (4 Force channels, Sensor/Axis/Delta/Collision)
 XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
 Push: pending because github.com:443 is unreachable
 ```

@@ -17,6 +17,7 @@
 | Phase 2 | `Release\|TwinCAT RT (x64)` | 已执行 | `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 3 | `Release\|TwinCAT RT (x64)` | 已执行 | 轴映射后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 4 | `Release\|TwinCAT RT (x64)` | 已执行 | 14个FC和6个通用FB加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 5 | `Release\|TwinCAT RT (x64)` | 已执行 | Force/Displacement/S_rel/Collision处理加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -125,3 +126,9 @@ LastBuildInfo: 0
 ```
 
 Phase 4对象没有`AXIS_REF`、`MC_*`或GVL依赖，也没有创建或修改硬件配置。Build只证明PLC对象可编译。
+
+## Phase 5执行记录
+
+Phase 5实现未绑定EP3174/位移/Collision占位的诊断处理、四路Force、Contact参考点事务和累计`SRelSensor/SRelAxis`。首次实际引用通用POU时，XAE报告4处末语句缺少分号；根据XAE Error List精确修复并增加回归测试后，最终`LastBuildInfo=0`。
+
+本阶段Build不证明物理PDO、传感器标定、轴位置或Collision功能有效；对应Mapped、DriveLinked和Production Ready状态保持`FALSE`。
