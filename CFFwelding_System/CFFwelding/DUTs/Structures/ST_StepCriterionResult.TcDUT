@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_StepCriterionResult" Id="{D3100000-0000-4000-8000-000000000017}"><Declaration><![CDATA[TYPE ST_StepCriterionResult : STRUCT
+    (* 被评估的 CFF 步骤。 *)
+    eStep : E_CffStep;
+    (* 实际步骤结束原因。 *)
+    eEndCause : E_StepEndCause;
+    (* 主判据是否已经锁存。 *)
+    bPrimaryLatched : BOOL;
+    (* 次级判据是否已经锁存。 *)
+    bSecondaryLatched : BOOL;
+    (* 步骤是否判为不合格。 *)
+    bNok : BOOL;
+    (* 判据触发时的周期计数。 *)
+    nTriggerCycle : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

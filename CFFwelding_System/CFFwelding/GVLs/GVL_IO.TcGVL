@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_IO" Id="{C3100000-0000-4000-8000-000000000002}"><Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'TcContextName' := 'Task_CffFast'}
+VAR_GLOBAL
+    (* Z 轴 PLC 运动控制引用；仅允许连接离线 NC 轴，不绑定真实驱动。 *)
+    Z_axis : AXIS_REF;
+    (* R 轴 PLC 运动控制引用；仅允许连接离线 NC 轴，不绑定真实驱动。 *)
+    R_axis : AXIS_REF;
+
+    (* TODO_HW_MAP：力传感器原始输入通道，当前未映射。 *)
+    nForceChannelRaw AT %I* : INT;
+    (* TODO_HW_MAP：位移传感器原始输入通道，当前未映射。 *)
+    nDisplacementChannelRaw AT %I* : INT;
+    (* TODO_HW_MAP：碰撞检测输入，当前未映射。 *)
+    bCollisionDetected AT %I* : BOOL;
+    (* TODO_HW_MAP：紧固件在位输入，当前未映射。 *)
+    bFastenerPresent AT %I* : BOOL;
+    (* TODO_HW_MAP：供料器就绪输入，当前未映射。 *)
+    bFeederReady AT %I* : BOOL;
+    (* TODO_HW_MAP：夹紧到位输入，当前未映射。 *)
+    bClampClosed AT %I* : BOOL;
+    (* TODO_HW_MAP：机器人许可输入，当前未映射。 *)
+    bRobotPermit AT %I* : BOOL;
+
+    (* TODO_HW_MAP：供料请求输出，当前未映射。 *)
+    bFeedRequest AT %Q* : BOOL;
+    (* TODO_HW_MAP：夹紧请求输出，当前未映射。 *)
+    bClampRequest AT %Q* : BOOL;
+    (* TODO_HW_MAP：机器人就绪输出，当前未映射。 *)
+    bRobotReady AT %Q* : BOOL;
+    (* TODO_HW_MAP：红色塔灯输出，当前未映射。 *)
+    bTowerRed AT %Q* : BOOL;
+    (* TODO_HW_MAP：黄色塔灯输出，当前未映射。 *)
+    bTowerYellow AT %Q* : BOOL;
+    (* TODO_HW_MAP：绿色塔灯输出，当前未映射。 *)
+    bTowerGreen AT %Q* : BOOL;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

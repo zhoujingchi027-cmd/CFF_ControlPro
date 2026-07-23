@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_CommandRejectReason" Id="{E3000000-0000-4000-8000-000000000022}"><Declaration><![CDATA[TYPE E_CommandRejectReason : (
+    REJECT_NONE := 0,
+    REJECT_INVALID_COMMAND := 10,
+    REJECT_INVALID_MODE := 20,
+    REJECT_INVALID_SOURCE := 30,
+    REJECT_INVALID_STATE := 40,
+    REJECT_PERMISSION_DENIED := 50,
+    REJECT_HARDWARE_NOT_READY := 60,
+    REJECT_PROGRAM_INVALID := 70,
+    REJECT_SESSION_INVALID := 80,
+    REJECT_BUSY := 90
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_FeederInput" Id="{D3100000-0000-4000-8000-000000000026}"><Declaration><![CDATA[TYPE ST_FeederInput : STRUCT
+    (* 供料器就绪反馈。 *)
+    bReady : BOOL;
+    (* 紧固件在位传感器。 *)
+    bFastenerPresent : BOOL;
+    (* 供料器忙反馈。 *)
+    bBusy : BOOL;
+    (* 供料器故障反馈。 *)
+    bFault : BOOL;
+    (* 输入映射和通信是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

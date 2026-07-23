@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ForceCalibration" Id="{D3100000-0000-4000-8000-000000000003}"><Declaration><![CDATA[TYPE ST_ForceCalibration : STRUCT
+    (* 传感器零点原始值。 *)
+    fRawZero : LREAL;
+    (* 原始值至工程单位的增益。 *)
+    fGain : LREAL;
+    (* 工程单位偏置，单位牛顿。 *)
+    fOffsetN : LREAL;
+    (* 力方向系数，仅允许正一或负一。 *)
+    nDirection : DINT;
+    (* 标定最大残差，单位牛顿。 *)
+    fMaxResidualN : LREAL;
+    (* 标定迟滞，单位牛顿。 *)
+    fHysteresisN : LREAL;
+    (* 标定重复性误差，单位牛顿。 *)
+    fRepeatabilityN : LREAL;
+    (* 静态噪声峰峰值，单位牛顿。 *)
+    fNoisePeakToPeakN : LREAL;
+    (* 测量链路延迟，单位微秒。 *)
+    nDelayUs : UDINT;
+    (* 标定修订号。 *)
+    nRevision : UDINT;
+    (* 标定数据是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

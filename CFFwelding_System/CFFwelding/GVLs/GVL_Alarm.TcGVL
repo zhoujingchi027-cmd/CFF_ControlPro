@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Alarm" Id="{C3100000-0000-4000-8000-000000000009}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 各功能块发布的报警请求槽。 *)
+    astRequests : ARRAY[1..64] OF ST_AlarmRequest;
+    (* 汇总后的报警状态。 *)
+    stStatus : ST_AlarmStatus;
+    (* 报警确认命令请求编号。 *)
+    nAcknowledgeRequestId : UDINT;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

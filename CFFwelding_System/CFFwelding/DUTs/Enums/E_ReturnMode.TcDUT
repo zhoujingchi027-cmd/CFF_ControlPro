@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_ReturnMode" Id="{E3000000-0000-4000-8000-000000000019}"><Declaration><![CDATA[TYPE E_ReturnMode : (
+    RETURN_MODE_LOCAL := 0,
+    RETURN_MODE_REFERENCE := 10
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

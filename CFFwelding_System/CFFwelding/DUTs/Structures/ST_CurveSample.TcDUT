@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CurveSample" Id="{D3100000-0000-4000-8000-000000000032}"><Declaration><![CDATA[TYPE ST_CurveSample : STRUCT
+    (* 快速任务循环计数。 *)
+    nCycleCounter : UDINT;
+    (* 单调时间戳，单位微秒。 *)
+    nTimestampUs : ULINT;
+    (* 过程力，单位牛顿。 *)
+    fForceN : LREAL;
+    (* 接触点后的相对位移，单位毫米。 *)
+    fRelativeDistanceMm : LREAL;
+    (* R 轴转速，单位转每分钟。 *)
+    fSpeedRpm : LREAL;
+    (* R 轴扭矩，单位牛米。 *)
+    fTorqueNm : LREAL;
+    (* 瞬时机械功率，单位瓦。 *)
+    fPowerW : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

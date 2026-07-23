@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_JoiningPointAssignment" Id="{D3100000-0000-4000-8000-000000000013}"><Declaration><![CDATA[TYPE ST_JoiningPointAssignment : STRUCT
+    (* 机器人加工点编号。 *)
+    nJoiningPointId : UDINT;
+    (* 该点关联的加工程序编号。 *)
+    nProgramId : UDINT;
+    (* 关联关系修订号。 *)
+    nRevision : UDINT;
+    (* 关联关系是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

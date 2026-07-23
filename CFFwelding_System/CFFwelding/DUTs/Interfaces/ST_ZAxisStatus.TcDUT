@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZAxisStatus" Id="{D2000000-0000-4000-8000-000000000006}"><Declaration><![CDATA[TYPE ST_ZAxisStatus :
 STRUCT
-    (* Z轴程序接口已具备接收命令的内部条件。 *)
+    (* Z 轴程序接口具备接收命令的内部条件。 *)
     bReady : BOOL;
-    (* Z轴已使能。 *)
+    (* Z 轴已经使能。 *)
     bEnabled : BOOL;
-    (* Z轴正在运动。 *)
+    (* Z 轴正在运动。 *)
     bMoving : BOOL;
-    (* Z轴处于静止状态。 *)
+    (* Z 轴处于静止状态。 *)
     bStandstill : BOOL;
-    (* External Setpoint生命周期有效。 *)
+    (* 外部设定值生命周期有效。 *)
     bExternalSetpointActive : BOOL;
-    (* Z轴Adapter报告错误。 *)
+    (* Z 轴适配器报告错误。 *)
     bError : BOOL;
-    (* Z轴或MC错误编号，0表示无错误。 *)
+    (* Z 轴或运动控制错误编号，零表示无错误。 *)
     nErrorId : UDINT;
-    (* 当前唯一命令Owner数值，后续由显式枚举替换。 *)
-    nActiveOwner : UDINT;
-    (* Z轴实际位置，向下为正，单位mm。 *)
+    (* 当前唯一命令所有者。 *)
+    eActiveOwner : E_ZCommandOwner;
+    (* Z 轴实际位置，向下为正，单位毫米。 *)
     rActualPosition_mm : LREAL;
-    (* Z轴实际速度，向下为正，单位mm/s。 *)
+    (* Z 轴实际速度，向下为正，单位毫米每秒。 *)
     rActualVelocity_mm_s : LREAL;
 END_STRUCT
 END_TYPE

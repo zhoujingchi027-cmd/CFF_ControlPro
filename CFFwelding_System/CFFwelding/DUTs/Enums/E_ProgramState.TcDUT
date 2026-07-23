@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_ProgramState" Id="{E3000000-0000-4000-8000-000000000025}"><Declaration><![CDATA[TYPE E_ProgramState : (
+    PROGRAM_EMPTY := 0,
+    PROGRAM_DRAFT := 10,
+    PROGRAM_VALID := 20,
+    PROGRAM_ACTIVE := 30,
+    PROGRAM_INVALID := 40
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

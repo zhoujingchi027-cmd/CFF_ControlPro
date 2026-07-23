@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_MaintenanceFunction" Id="{E3000000-0000-4000-8000-000000000005}"><Declaration><![CDATA[TYPE E_MaintenanceFunction : (
+    MAINTENANCE_NONE := 0,
+    MAINTENANCE_CALIBRATION := 10,
+    MAINTENANCE_MOTION_TEST := 20,
+    MAINTENANCE_FEEDING_TEST := 30,
+    MAINTENANCE_CYLINDER_JOG := 40,
+    MAINTENANCE_LAMP_TEST := 50,
+    MAINTENANCE_IO_DIAGNOSTIC := 60
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

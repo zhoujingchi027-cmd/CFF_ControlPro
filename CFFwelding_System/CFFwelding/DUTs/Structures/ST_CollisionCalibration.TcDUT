@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CollisionCalibration" Id="{D3100000-0000-4000-8000-000000000005}"><Declaration><![CDATA[TYPE ST_CollisionCalibration : STRUCT
+    (* 碰撞基准位置，单位毫米。 *)
+    fReferencePositionMm : LREAL;
+    (* 多次测量均值，单位毫米。 *)
+    fMeanPositionMm : LREAL;
+    (* 多次测量极差，单位毫米。 *)
+    fRangeMm : LREAL;
+    (* 标定样本数量。 *)
+    nSampleCount : UINT;
+    (* 标定修订号。 *)
+    nRevision : UDINT;
+    (* 标定数据是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

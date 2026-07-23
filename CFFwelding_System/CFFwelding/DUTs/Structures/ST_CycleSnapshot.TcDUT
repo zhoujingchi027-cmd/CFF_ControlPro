@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CycleSnapshot" Id="{D3100000-0000-4000-8000-000000000014}"><Declaration><![CDATA[TYPE ST_CycleSnapshot : STRUCT
+    (* 周期请求编号。 *)
+    nRequestId : UDINT;
+    (* 已接受的加工点编号。 *)
+    nJoiningPointId : UDINT;
+    (* 已冻结的加工程序。 *)
+    stProgram : ST_CffJoinProgram;
+    (* 机器配置修订号。 *)
+    nMachineConfigRevision : UDINT;
+    (* 标定修订号。 *)
+    nCalibrationRevision : UDINT;
+    (* 快照修订号。 *)
+    nSnapshotRevision : UDINT;
+    (* 快照完整性校验值。 *)
+    nCrc32 : UDINT;
+    (* 周期快照是否可执行。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

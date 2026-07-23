@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_ZCommandOwner" Id="{E3000000-0000-4000-8000-000000000013}"><Declaration><![CDATA[TYPE E_ZCommandOwner : (
+    Z_OWNER_NONE := 0,
+    Z_OWNER_HOME := 10,
+    Z_OWNER_MANUAL := 20,
+    Z_OWNER_APPROACH := 30,
+    Z_OWNER_FORCE_PROCESS := 40,
+    Z_OWNER_RETRACT := 50,
+    Z_OWNER_FAULT_STOP := 100
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_StepProceedingConfig" Id="{D3100000-0000-4000-8000-000000000008}"><Declaration><![CDATA[TYPE ST_StepProceedingConfig : STRUCT
+    (* 本步骤唯一主结束判据。 *)
+    ePrimaryCriterion : E_StepPrimaryCriterion;
+    (* 次级判据触发后的动作。 *)
+    eSecondaryAction : E_SecondaryCriterionAction;
+    (* 相对位移阈值，单位毫米。 *)
+    fRelativeDistanceMm : LREAL;
+    (* 步骤超时时间，单位毫秒。 *)
+    nTimeoutMs : UDINT;
+    (* 力下降判据阈值，单位牛顿。 *)
+    fForceDeclineN : LREAL;
+    (* 判据稳定窗口，单位毫秒。 *)
+    nStableWindowMs : UDINT;
+    (* 判据配置是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

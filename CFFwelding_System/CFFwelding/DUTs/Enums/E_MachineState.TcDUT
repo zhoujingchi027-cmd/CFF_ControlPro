@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_MachineState" Id="{E3000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[TYPE E_MachineState : (
+    MACHINE_BOOT := 0,
+    MACHINE_STOPPED := 10,
+    MACHINE_INITIALIZING := 20,
+    MACHINE_READY := 30,
+    MACHINE_STARTING := 40,
+    MACHINE_RUNNING := 50,
+    MACHINE_MAINTENANCE_ACTIVE := 60,
+    MACHINE_CONTROLLED_STOPPING := 70,
+    MACHINE_CYCLE_COMPLETE := 80,
+    MACHINE_RESETTING := 90,
+    MACHINE_FAULT := 100
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

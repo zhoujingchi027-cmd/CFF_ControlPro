@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_DisplacementCalibration" Id="{D3100000-0000-4000-8000-000000000004}"><Declaration><![CDATA[TYPE ST_DisplacementCalibration : STRUCT
+    (* 位移传感器零点原始值。 *)
+    fRawZero : LREAL;
+    (* 原始值至毫米的增益。 *)
+    fGainMmPerCount : LREAL;
+    (* 位移零点偏置，单位毫米。 *)
+    fOffsetMm : LREAL;
+    (* 位移方向系数，仅允许正一或负一。 *)
+    nDirection : DINT;
+    (* 标定最大残差，单位毫米。 *)
+    fMaxResidualMm : LREAL;
+    (* 标定修订号。 *)
+    nRevision : UDINT;
+    (* 标定数据是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

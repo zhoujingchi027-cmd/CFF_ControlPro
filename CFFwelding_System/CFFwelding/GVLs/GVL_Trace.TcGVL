@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Trace" Id="{C3100000-0000-4000-8000-000000000011}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 快速曲线环形缓冲区。 *)
+    astCurveBuffer : ARRAY[0..2047] OF ST_CurveSample;
+    (* 下一个曲线样本写入索引。 *)
+    nWriteIndex : UINT;
+    (* 当前曲线样本数量。 *)
+    nSampleCount : UDINT;
+    (* 曲线缓冲区是否发生覆盖。 *)
+    bWrapped : BOOL;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_HMI" Id="{C3100000-0000-4000-8000-000000000010}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* HMI 发布的命令邮箱。 *)
+    stCommand : ST_CommandMailbox;
+    (* HMI 最近确认的命令请求编号。 *)
+    nAcceptedRequestId : UDINT;
+    (* HMI 当前查看的曲线页编号。 *)
+    nCurvePageIndex : UDINT;
+    (* HMI 数据快照修订号。 *)
+    nSnapshotRevision : UDINT;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

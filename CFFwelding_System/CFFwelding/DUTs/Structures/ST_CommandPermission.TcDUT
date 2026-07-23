@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CommandPermission" Id="{D3100000-0000-4000-8000-000000000022}"><Declaration><![CDATA[TYPE ST_CommandPermission : STRUCT
+    (* 是否允许启动自动周期。 *)
+    bAllowCycleStart : BOOL;
+    (* 是否允许复位故障。 *)
+    bAllowReset : BOOL;
+    (* 是否允许手动 Z 轴动作。 *)
+    bAllowManualZ : BOOL;
+    (* 是否允许手动 R 轴动作。 *)
+    bAllowManualR : BOOL;
+    (* 是否允许执行维护功能。 *)
+    bAllowMaintenance : BOOL;
+    (* 是否允许执行标定。 *)
+    bAllowCalibration : BOOL;
+    (* 禁止原因位掩码。 *)
+    nInhibitMask : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

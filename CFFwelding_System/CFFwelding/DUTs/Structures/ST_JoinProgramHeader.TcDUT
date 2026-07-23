@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_JoinProgramHeader" Id="{D3100000-0000-4000-8000-000000000010}"><Declaration><![CDATA[TYPE ST_JoinProgramHeader : STRUCT
+    (* 加工程序编号。 *)
+    nProgramId : UDINT;
+    (* 加工程序名称。 *)
+    sProgramName : STRING(63);
+    (* 材料总厚度，单位毫米。 *)
+    fMaterialThicknessMm : LREAL;
+    (* 厚度允许偏差，单位毫米。 *)
+    fThicknessToleranceMm : LREAL;
+    (* 紧固件类型编号。 *)
+    nElementTypeId : UDINT;
+    (* 完成后的返回模式。 *)
+    eReturnMode : E_ReturnMode;
+    (* 返回速度，单位毫米每秒。 *)
+    fReturnVelocityMmS : LREAL;
+    (* 返回开口位置，单位毫米。 *)
+    fReturnOpeningMm : LREAL;
+    (* 力控制参数编号。 *)
+    nForceProfileId : UDINT;
+    (* 旋转轴参数编号。 *)
+    nRAxisProfileId : UDINT;
+    (* 工具编号。 *)
+    nToolId : UDINT;
+    (* 砧座编号。 *)
+    nAnvilId : UDINT;
+    (* 程序修订号。 *)
+    nRevision : UDINT;
+    (* 程序生命周期状态。 *)
+    eState : E_ProgramState;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

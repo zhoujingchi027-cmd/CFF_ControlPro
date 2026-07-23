@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Program" Id="{C3100000-0000-4000-8000-000000000005}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 加工程序数据库。 *)
+    astJoinPrograms : ARRAY[1..64] OF ST_CffJoinProgram;
+    (* 加工点至程序的关联数据库。 *)
+    astJoiningPointAssignments : ARRAY[1..512] OF ST_JoiningPointAssignment;
+    (* 当前周期冻结快照。 *)
+    stCycleSnapshot : ST_CycleSnapshot;
+    (* 已选择的程序编号。 *)
+    nSelectedProgramId : UDINT;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

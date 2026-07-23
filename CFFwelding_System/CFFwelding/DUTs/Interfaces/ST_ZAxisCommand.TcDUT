@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZAxisCommand" Id="{D2000000-0000-4000-8000-000000000005}"><Declaration><![CDATA[TYPE ST_ZAxisCommand :
 STRUCT
-    (* 请求使能Z轴。 *)
+    (* 请求使能 Z 轴。 *)
     bEnable : BOOL;
-    (* 请求复位Z轴错误。 *)
+    (* 请求复位 Z 轴错误。 *)
     bReset : BOOL;
-    (* 请求受控停止Z轴。 *)
+    (* 请求受控停止 Z 轴。 *)
     bStop : BOOL;
     (* 请求标准绝对定位。 *)
     bMoveAbsolute : BOOL;
     (* 请求标准速度运动。 *)
     bMoveVelocity : BOOL;
-    (* 请求由External Setpoint Adapter接管。 *)
+    (* 请求由外部设定值适配器接管。 *)
     bUseExternalSetpoint : BOOL;
-    (* 绝对位置目标，向下为正，单位mm。 *)
+    (* 绝对位置目标，向下为正，单位毫米。 *)
     rPosition_mm : LREAL;
-    (* 速度目标，向下为正，单位mm/s。 *)
+    (* 速度目标，向下为正，单位毫米每秒。 *)
     rVelocity_mm_s : LREAL;
-    (* 加速度限制，单位mm/s2。 *)
+    (* 加速度限制，单位毫米每二次方秒。 *)
     rAcceleration_mm_s2 : LREAL;
-    (* 减速度限制，单位mm/s2。 *)
+    (* 减速度限制，单位毫米每二次方秒。 *)
     rDeceleration_mm_s2 : LREAL;
-    (* 命令Owner数值，后续由显式枚举替换。 *)
-    nOwnerRequest : UDINT;
+    (* 请求取得控制权的命令所有者。 *)
+    eOwnerRequest : E_ZCommandOwner;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

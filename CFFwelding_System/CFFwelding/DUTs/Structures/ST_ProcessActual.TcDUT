@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ProcessActual" Id="{D3100000-0000-4000-8000-000000000015}"><Declaration><![CDATA[TYPE ST_ProcessActual : STRUCT
+    (* 经标定的原始测量力，单位牛顿。 *)
+    fForceRawN : LREAL;
+    (* 判据使用的滤波力，单位牛顿。 *)
+    fForceCriterionN : LREAL;
+    (* 控制环使用的滤波力，单位牛顿。 *)
+    fForceControlN : LREAL;
+    (* HMI 显示使用的滤波力，单位牛顿。 *)
+    fForceDisplayN : LREAL;
+    (* 接触点后的相对位移，单位毫米。 *)
+    fRelativeDistanceMm : LREAL;
+    (* 碰撞基准相对量，单位毫米。 *)
+    fCollisionReferenceMm : LREAL;
+    (* R 轴实际转速，单位转每分钟。 *)
+    fSpeedRpm : LREAL;
+    (* R 轴实际扭矩，单位牛米。 *)
+    fTorqueNm : LREAL;
+    (* 瞬时机械功率，单位瓦。 *)
+    fPowerW : LREAL;
+    (* 周期累计能量，单位焦耳。 *)
+    fEnergyJ : LREAL;
+    (* 过程测量链是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

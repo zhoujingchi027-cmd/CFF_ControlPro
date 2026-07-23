@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_FeederOutput" Id="{D3100000-0000-4000-8000-000000000027}"><Declaration><![CDATA[TYPE ST_FeederOutput : STRUCT
+    (* 请求供给一个紧固件。 *)
+    bFeedRequest : BOOL;
+    (* 请求停止供料器。 *)
+    bStop : BOOL;
+    (* 请求复位供料器故障。 *)
+    bReset : BOOL;
+    (* 供料模式编号。 *)
+    nMode : UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

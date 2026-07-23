@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_FastStatus" Id="{D3100000-0000-4000-8000-000000000031}"><Declaration><![CDATA[TYPE ST_FastStatus : STRUCT
+    (* 快速任务已接受的命令请求编号。 *)
+    nAcceptedRequestId : UDINT;
+    (* 快速任务循环计数。 *)
+    nCycleCounter : UDINT;
+    (* 快速任务实际周期，单位微秒。 *)
+    nActualPeriodUs : UDINT;
+    (* CFF 顺序状态。 *)
+    stSequence : ST_CffSequenceStatus;
+    (* Z 轴状态。 *)
+    stZAxis : ST_ZAxisStatus;
+    (* R 轴状态。 *)
+    stRAxis : ST_RAxisStatus;
+    (* 快速过程实际值。 *)
+    stProcess : ST_ProcessActual;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

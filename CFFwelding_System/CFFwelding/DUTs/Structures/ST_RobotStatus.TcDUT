@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_RobotStatus" Id="{D3100000-0000-4000-8000-000000000025}"><Declaration><![CDATA[TYPE ST_RobotStatus : STRUCT
+    (* 已接受的机器人命令序号。 *)
+    nAcceptedSequence : UDINT;
+    (* 机器是否准备好接收命令。 *)
+    bReady : BOOL;
+    (* 机器是否正在执行命令。 *)
+    bBusy : BOOL;
+    (* 最近命令是否完成。 *)
+    bComplete : BOOL;
+    (* 最近周期是否合格。 *)
+    bOk : BOOL;
+    (* 最近周期是否不合格。 *)
+    bNok : BOOL;
+    (* 机器是否存在故障。 *)
+    bFault : BOOL;
+    (* 已接受的加工点编号。 *)
+    nAcceptedJoiningPointId : UDINT;
+    (* 最近焊接结果编号。 *)
+    nWeldId : ULINT;
+    (* 最近命令拒绝原因。 *)
+    eRejectReason : E_CommandRejectReason;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

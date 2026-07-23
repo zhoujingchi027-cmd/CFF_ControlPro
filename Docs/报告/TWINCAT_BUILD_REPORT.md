@@ -15,6 +15,7 @@
 | Phase 0 | 不适用 | 未执行 | 当时尚无Solution | N/A |
 | Phase 1 | `Release\|TwinCAT RT (x64)` | 已执行 | `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 2 | `Release\|TwinCAT RT (x64)` | 已执行 | `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 3 | `Release\|TwinCAT RT (x64)` | 已执行 | 轴映射后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -44,11 +45,10 @@ LastBuildInfo: 0
 
 ## 构建边界
 
-本次Build只证明当前空PLC工程可由本机XAE成功编译。它不证明：
+当前 Build 证明本机 XAE 可以编译 PLC 数据架构、两个离线 NC 轴、Fast/SAF 周期同步和 PLC↔NC 内部映射。它不证明：
 
 - 真实I/O或PDO映射有效；
-- NC轴、驱动或编码器配置有效；
-- NC SAF周期已确认；
+- 真实驱动、编码器或物理轴配置有效；
 - External Setpoint调用已验证；
 - 安全功能、工艺参数或Production Ready状态已验证。
 
@@ -73,3 +73,35 @@ LastBuildInfo: 0
 ```
 
 Phase 2构建仍不证明NC SAF周期已确认。`Task_CffFast`的10 ms为明确标记的临时占位，必须在后续取得新工程实际NC SAF周期后校正。
+
+## Phase 3执行记录
+
+Phase 3加入26个显式数值枚举、33个共享结构体、13个`qualified_only` GVL，以及两个未绑定真实驱动的离线NC轴。XAE创建的`NC_Cff SAF`实际周期为`20000 × 100 ns = 2 ms`，因此PLC和系统`Task_CffFast`均同步为2 ms。
+
+内部映射严格为：
+
+```text
+Task_CffFast Inputs^GVL_IO.Z_axis.NcToPlc  <-> Z_Axis_NC^Outputs^ToPlc
+Task_CffFast Outputs^GVL_IO.Z_axis.PlcToNc <-> Z_Axis_NC^Inputs^FromPlc
+Task_CffFast Inputs^GVL_IO.R_axis.NcToPlc  <-> R_Axis_NC^Outputs^ToPlc
+Task_CffFast Outputs^GVL_IO.R_axis.PlcToNc <-> R_Axis_NC^Inputs^FromPlc
+```
+
+最终控制台证据：
+
+```text
+PowerShell syntax: PASSED
+Phase 1 acceptance test: PASSED
+Phase 2 architecture test: PASSED
+Phase 3 data and binding test: PASSED
+Enum count: 26
+Structure count: 33
+GVL count: 13
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+工程没有 I/O 设备节点或 Safety 配置。XAE为映射基础设施自动序列化的空`<Io/>`容器不包含主站、设备、端子或PDO链接。两个NC轴的默认Drive/Encoder对象未与任何真实硬件或仿真驱动关联。

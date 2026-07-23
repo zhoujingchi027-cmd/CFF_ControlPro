@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CalibrationCommand" Id="{D3100000-0000-4000-8000-000000000028}"><Declaration><![CDATA[TYPE ST_CalibrationCommand : STRUCT
+    (* 标定请求编号。 *)
+    nRequestId : UDINT;
+    (* 启动标定请求。 *)
+    bStart : BOOL;
+    (* 取消标定请求。 *)
+    bCancel : BOOL;
+    (* 标定类型编号。 *)
+    nCalibrationType : UINT;
+    (* 当前标定点编号。 *)
+    nPointIndex : UINT;
+    (* 当前标定参考值。 *)
+    fReferenceValue : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -12,6 +12,7 @@ _CompileInfo/
 *.log
 .idea/
 *.userprefs
+*.project.~u
 *.ncb
 *.sdf
 *.opensdf

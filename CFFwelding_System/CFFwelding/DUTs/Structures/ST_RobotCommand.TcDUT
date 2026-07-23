@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_RobotCommand" Id="{D3100000-0000-4000-8000-000000000024}"><Declaration><![CDATA[TYPE ST_RobotCommand : STRUCT
+    (* 机器人命令序号。 *)
+    nSequence : UDINT;
+    (* 机器人命令代码。 *)
+    eCommand : E_RobotCommandCode;
+    (* 加工点编号。 *)
+    nJoiningPointId : UDINT;
+    (* 机器人心跳计数。 *)
+    nHeartbeat : UDINT;
+    (* 机器人请求自动启动。 *)
+    bStart : BOOL;
+    (* 机器人请求中止。 *)
+    bAbort : BOOL;
+    (* 机器人请求复位。 *)
+    bReset : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

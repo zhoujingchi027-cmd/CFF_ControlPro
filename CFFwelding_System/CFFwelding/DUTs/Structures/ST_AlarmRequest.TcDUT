@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_AlarmRequest" Id="{D3100000-0000-4000-8000-000000000019}"><Declaration><![CDATA[TYPE ST_AlarmRequest : STRUCT
+    (* 报警代码。 *)
+    eCode : E_AlarmCode;
+    (* 报警等级。 *)
+    eLevel : E_AlarmLevel;
+    (* 本地化文本编号。 *)
+    nTextId : UDINT;
+    (* 报警源对象编号。 *)
+    nSourceId : UDINT;
+    (* 报警是否需要锁存。 *)
+    bLatch : BOOL;
+    (* 报警请求当前是否有效。 *)
+    bActive : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

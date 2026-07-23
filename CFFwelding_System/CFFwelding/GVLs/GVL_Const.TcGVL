@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Const" Id="{C3100000-0000-4000-8000-000000000001}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL CONSTANT
+    (* CFF 固定工艺步骤数量。 *)
+    c_nCffStepCount : UINT := 4;
+    (* 本阶段允许的最大加工程序数量。 *)
+    c_nMaxJoinPrograms : UINT := 64;
+    (* 本阶段允许的最大加工点数量。 *)
+    c_nMaxJoiningPoints : UINT := 512;
+    (* 快速曲线环形缓冲区容量。 *)
+    c_nCurveBufferSize : UINT := 2048;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1">
-  <!-- TODO_NC_SAF：Phase 2临时使用10000 us占位。Phase 3取得新工程实际NC SAF周期后必须校正，当前值不得解释为已匹配SAF。 -->
+  <!-- Phase 3：周期取自本工程离线 NC_Cff SAF 的实际 20000 x 100 ns，即 2000 us。 -->
   <Task Name="Task_CffFast" Id="{C2000000-0000-4000-8000-000000000001}">
-    <CycleTime>10000</CycleTime>
+    <CycleTime>2000</CycleTime>
     <Priority>10</Priority>
     <PouCall><Name>PRG_FastInputs</Name></PouCall>
     <PouCall><Name>PRG_CffSequence</Name></PouCall>

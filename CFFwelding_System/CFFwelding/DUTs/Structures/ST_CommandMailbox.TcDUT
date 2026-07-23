@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CommandMailbox" Id="{D3100000-0000-4000-8000-000000000021}"><Declaration><![CDATA[TYPE ST_CommandMailbox : STRUCT
+    (* 单调递增的命令请求编号。 *)
+    nRequestId : UDINT;
+    (* 控制源类型。 *)
+    eSource : E_ControlSource;
+    (* HMI 命令代码。 *)
+    eHmiCommand : E_HmiCommandCode;
+    (* 机器人命令代码。 *)
+    eRobotCommand : E_RobotCommandCode;
+    (* 命令目标对象编号。 *)
+    nObjectId : UDINT;
+    (* 通用整数载荷。 *)
+    nPayloadDint : DINT;
+    (* 通用浮点载荷。 *)
+    fPayloadLreal : LREAL;
+    (* 命令执行状态。 *)
+    eState : E_CommandExecutionState;
+    (* 命令拒绝原因。 *)
+    eRejectReason : E_CommandRejectReason;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

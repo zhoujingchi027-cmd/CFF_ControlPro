@@ -124,8 +124,24 @@ foreach ($typeName in $interfaceTypes) {
     }
 }
 
+$expectedFastCycleUs = 10000
+$requiresSafTodo = $true
+if (Test-Path -LiteralPath $systemProjectPath -PathType Leaf) {
+    [xml]$phaseAwareSystemXml = Get-Content -Raw -Encoding UTF8 -LiteralPath $systemProjectPath
+    if ($null -ne $phaseAwareSystemXml.TcSmProject.Project.Motion.NC.SafTask) {
+        $safCycle100ns = [int]$phaseAwareSystemXml.TcSmProject.Project.Motion.NC.SafTask.CycleTime
+        if (($safCycle100ns % 10) -ne 0) {
+            Add-Failure "NC SAF cycle cannot be represented in PLC task microseconds: $safCycle100ns x 100 ns."
+        }
+        else {
+            $expectedFastCycleUs = $safCycle100ns / 10
+            $requiresSafTodo = $false
+        }
+    }
+}
+
 $taskDefinitions = @(
-    [pscustomobject]@{ Name = 'Task_CffFast'; CycleUs = 10000; Calls = $fastPrograms; RequiresSafTodo = $true },
+    [pscustomobject]@{ Name = 'Task_CffFast'; CycleUs = $expectedFastCycleUs; Calls = $fastPrograms; RequiresSafTodo = $requiresSafTodo },
     [pscustomobject]@{ Name = 'Task_CffMain'; CycleUs = 10000; Calls = $mainPrograms; RequiresSafTodo = $false },
     [pscustomobject]@{ Name = 'Task_CffSlow'; CycleUs = 50000; Calls = $slowPrograms; RequiresSafTodo = $false }
 )
@@ -144,7 +160,7 @@ foreach ($taskDefinition in $taskDefinitions) {
             Add-Failure "Task name mismatch in $($taskFile.Name)."
         }
         if ([int]$taskNode.CycleTime -ne $taskDefinition.CycleUs) {
-            Add-Failure "$($taskDefinition.Name) cycle must be $($taskDefinition.CycleUs) us for the Phase 2 placeholder/configuration."
+            Add-Failure "$($taskDefinition.Name) cycle must be $($taskDefinition.CycleUs) us for the current phase configuration."
         }
         $actualCalls = @($taskNode.PouCall | ForEach-Object { $_.Name })
         if (($actualCalls -join '|') -ne ($taskDefinition.Calls -join '|')) {
@@ -157,6 +173,9 @@ foreach ($taskDefinition in $taskDefinitions) {
 
     if ($taskDefinition.RequiresSafTodo -and $taskText -notmatch 'TODO_NC_SAF') {
         Add-Failure 'Task_CffFast must state that its Phase 2 cycle is provisional until NC SAF is measured.'
+    }
+    if (-not $taskDefinition.RequiresSafTodo -and $taskDefinition.Name -eq 'Task_CffFast' -and $taskText -notmatch 'NC_Cff SAF') {
+        Add-Failure 'Task_CffFast must document the Phase 3 NC SAF cycle source.'
     }
     if ($plcProjectText -notmatch [regex]::Escape($taskFile.Name)) {
         Add-Failure "PLC project does not compile $($taskFile.Name)."
@@ -177,10 +196,11 @@ foreach ($reportName in @('INSTANCE_OWNERSHIP_MATRIX.md', 'INTERNAL_INTERFACE_CA
 if (Test-Path -LiteralPath $systemProjectPath -PathType Leaf) {
     [xml]$systemXml = Get-Content -Raw -Encoding UTF8 -LiteralPath $systemProjectPath
     $systemSections = @($systemXml.TcSmProject.Project.ChildNodes | ForEach-Object { $_.Name })
-    foreach ($section in @('Io', 'NC', 'Safety')) {
-        if ($section -in $systemSections) {
-            Add-Failure "Phase 2 unexpectedly contains system section: $section"
-        }
+    if (@($systemXml.SelectNodes('/TcSmProject/Project/Io/*')).Count -gt 0) {
+        Add-Failure 'The project unexpectedly contains configured I/O nodes.'
+    }
+    if ('Safety' -in $systemSections) {
+        Add-Failure 'The project unexpectedly contains a Safety section.'
     }
 
     $expectedSystemTaskNames = @('Task_CffFast', 'Task_CffMain', 'Task_CffSlow')

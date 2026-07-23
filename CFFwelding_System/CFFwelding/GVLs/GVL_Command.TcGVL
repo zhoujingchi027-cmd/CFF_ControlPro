@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Command" Id="{C3100000-0000-4000-8000-000000000006}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 统一外部命令邮箱。 *)
+    stMailbox : ST_CommandMailbox;
+    (* 当前命令权限计算结果。 *)
+    stPermission : ST_CommandPermission;
+    (* 主任务发布给快速任务的命令。 *)
+    stFast : ST_FastCommand;
+    (* 机器人接口命令。 *)
+    stRobot : ST_RobotCommand;
+    (* 维护力保持请求。 *)
+    stMaintenanceHold : ST_MaintenanceHoldRequest;
+    (* 供料器输出命令。 *)
+    stFeeder : ST_FeederOutput;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

@@ -3,27 +3,27 @@
 STRUCT
     (* 最近接受并开始处理的事务编号。 *)
     nAcceptedCommandId : UDINT;
-    (* CFF循环正在执行。 *)
+    (* CFF 周期正在执行。 *)
     bBusy : BOOL;
-    (* CFF循环正常完成并等待上层确认。 *)
+    (* CFF 周期正常完成并等待上层确认。 *)
     bDone : BOOL;
-    (* CFF循环已按Stop或Abort退出。 *)
+    (* CFF 周期已按停止或中止请求退出。 *)
     bAborted : BOOL;
-    (* CFF流程报告NOK或Fault。 *)
+    (* CFF 流程报告不合格或故障。 *)
     bError : BOOL;
-    (* 流程错误编号，0表示无错误。 *)
+    (* 流程错误编号，零表示无错误。 *)
     nErrorId : UDINT;
-    (* CFF主状态数值，后续由显式枚举替换。 *)
-    nState : UDINT;
-    (* 当前正式步骤数值，后续由显式枚举替换。 *)
-    nStep : UDINT;
-    (* 当前步骤子阶段数值，后续由显式枚举替换。 *)
-    nSubPhase : UDINT;
-    (* 最近步骤结束原因数值，后续由显式枚举替换。 *)
-    nEndCause : UDINT;
-    (* 当前流程目标压向力，单位kN。 *)
+    (* CFF 主状态。 *)
+    eState : E_CffState;
+    (* 当前正式工艺步骤。 *)
+    eStep : E_CffStep;
+    (* 当前步骤子阶段。 *)
+    eSubPhase : E_StepSubPhase;
+    (* 最近步骤结束原因。 *)
+    eEndCause : E_StepEndCause;
+    (* 当前流程目标轴向力，单位千牛。 *)
     rForceSet_kN : LREAL;
-    (* 当前流程目标主轴速度，单位rpm。 *)
+    (* 当前流程目标主轴速度，单位转每分钟。 *)
     rSpeedSet_rpm : LREAL;
 END_STRUCT
 END_TYPE

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_InterfaceEventState" Id="{E3000000-0000-4000-8000-000000000026}"><Declaration><![CDATA[TYPE E_InterfaceEventState : (
+    INTERFACE_EVENT_IDLE := 0,
+    INTERFACE_EVENT_CANDIDATE := 10,
+    INTERFACE_EVENT_CONFIRMED := 20,
+    INTERFACE_EVENT_REJECTED := 30,
+    INTERFACE_EVENT_EXPIRED := 40
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

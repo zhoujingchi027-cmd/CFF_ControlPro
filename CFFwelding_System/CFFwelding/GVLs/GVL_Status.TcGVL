@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Status" Id="{C3100000-0000-4000-8000-000000000007}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 生产就绪总状态；真实硬件全部人工映射并验证前必须为假。 *)
+    bProductionReady : BOOL := FALSE;
+    (* 当前操作模式。 *)
+    eOperationMode : E_OperationMode;
+    (* 当前控制源。 *)
+    eControlSource : E_ControlSource;
+    (* 当前机器状态。 *)
+    eMachineState : E_MachineState;
+    (* 当前初始化状态。 *)
+    eInitializeState : E_InitializeState;
+    (* 当前维护状态。 *)
+    eMaintenanceState : E_MaintenanceState;
+    (* 硬件绑定完成状态。 *)
+    stHardwareBinding : ST_HardwareBindingStatus;
+    (* 快速任务状态快照。 *)
+    stFast : ST_FastStatus;
+    (* 机器人接口状态。 *)
+    stRobot : ST_RobotStatus;
+    (* 供料器输入状态。 *)
+    stFeeder : ST_FeederInput;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

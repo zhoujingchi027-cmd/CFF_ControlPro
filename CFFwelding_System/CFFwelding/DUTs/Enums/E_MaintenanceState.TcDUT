@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_MaintenanceState" Id="{E3000000-0000-4000-8000-000000000006}"><Declaration><![CDATA[TYPE E_MaintenanceState : (
+    MAINT_STATE_IDLE := 0,
+    MAINT_STATE_SELECTED := 10,
+    MAINT_STATE_PRECHECK := 20,
+    MAINT_STATE_ACTIVE := 30,
+    MAINT_STATE_STOPPING := 40,
+    MAINT_STATE_COMPLETE := 50,
+    MAINT_STATE_CANCELLED := 60,
+    MAINT_STATE_FAULT := 100
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

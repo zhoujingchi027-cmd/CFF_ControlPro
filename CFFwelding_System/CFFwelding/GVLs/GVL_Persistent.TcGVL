@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Persistent" Id="{C3100000-0000-4000-8000-000000000012}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL PERSISTENT RETAIN
+    (* 下一个焊接结果编号。 *)
+    nNextWeldId : ULINT := 1;
+    (* 持久化数据架构修订号。 *)
+    nSchemaRevision : UDINT := 1;
+    (* 最近激活的加工程序编号。 *)
+    nLastActiveProgramId : UDINT;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

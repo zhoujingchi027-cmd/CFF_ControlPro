@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_FastCommand" Id="{D3100000-0000-4000-8000-000000000030}"><Declaration><![CDATA[TYPE ST_FastCommand : STRUCT
+    (* 主任务发布的快速命令请求编号。 *)
+    nRequestId : UDINT;
+    (* 命令引用的周期快照修订号。 *)
+    nCycleSnapshotRevision : UDINT;
+    (* CFF 顺序命令。 *)
+    stSequence : ST_CffSequenceCommand;
+    (* Z 轴命令。 *)
+    stZAxis : ST_ZAxisCommand;
+    (* R 轴命令。 *)
+    stRAxis : ST_RAxisCommand;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

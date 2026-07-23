@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_AlarmStatus" Id="{D3100000-0000-4000-8000-000000000020}"><Declaration><![CDATA[TYPE ST_AlarmStatus : STRUCT
+    (* 当前最高优先级报警代码。 *)
+    eCurrentCode : E_AlarmCode;
+    (* 当前最高报警等级。 *)
+    eCurrentLevel : E_AlarmLevel;
+    (* 是否存在活动报警。 *)
+    bActive : BOOL;
+    (* 当前报警是否已确认。 *)
+    bAcknowledged : BOOL;
+    (* 活动报警数量。 *)
+    nActiveCount : UINT;
+    (* 报警集合修订号。 *)
+    nRevision : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

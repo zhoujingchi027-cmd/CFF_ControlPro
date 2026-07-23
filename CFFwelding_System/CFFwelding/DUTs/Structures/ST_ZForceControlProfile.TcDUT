@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZForceControlProfile" Id="{D3100000-0000-4000-8000-000000000006}"><Declaration><![CDATA[TYPE ST_ZForceControlProfile : STRUCT
+    (* 比例增益。 *)
+    fKp : LREAL;
+    (* 积分增益。 *)
+    fKi : LREAL;
+    (* 抗积分饱和增益。 *)
+    fKaw : LREAL;
+    (* 积分项绝对限幅。 *)
+    fIntegralLimit : LREAL;
+    (* 向上最大速度，单位毫米每秒。 *)
+    fMaxUpVelocityMmS : LREAL;
+    (* 向下最大速度，单位毫米每秒。 *)
+    fMaxDownVelocityMmS : LREAL;
+    (* 最大加速度，单位毫米每二次方秒。 *)
+    fMaxAccelerationMmS2 : LREAL;
+    (* 制动距离裕量，单位毫米。 *)
+    fBrakeMarginMm : LREAL;
+    (* 设定力斜坡，单位牛顿每秒。 *)
+    fForceRampNS : LREAL;
+    (* 参数是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_HardwareBindingStatus" Id="{D3100000-0000-4000-8000-000000000033}"><Declaration><![CDATA[TYPE ST_HardwareBindingStatus : STRUCT
+    (* Z 轴 PLC 与 NC 内部变量是否完成映射。 *)
+    bZAxisNcAssigned : BOOL;
+    (* R 轴 PLC 与 NC 内部变量是否完成映射。 *)
+    bRAxisNcAssigned : BOOL;
+    (* Z 轴实际驱动与编码器是否完成工程映射。 *)
+    bZAxisDriveLinked : BOOL;
+    (* R 轴实际驱动与编码器是否完成工程映射。 *)
+    bRAxisDriveLinked : BOOL;
+    (* 力传感器输入是否完成工程映射。 *)
+    bForceInputMapped : BOOL;
+    (* 位移传感器输入是否完成工程映射。 *)
+    bDisplacementInputMapped : BOOL;
+    (* 碰撞检测输入是否完成工程映射。 *)
+    bCollisionInputMapped : BOOL;
+    (* 外围离散量接口是否完成工程映射。 *)
+    bPeripheralIoMapped : BOOL;
+    (* 所有生产硬件绑定是否完整。 *)
+    bProductionHardwareBindingComplete : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

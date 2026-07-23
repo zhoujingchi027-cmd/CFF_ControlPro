@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_ProjectInfo" Id="{C3100000-0000-4000-8000-000000000013}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL CONSTANT
+    (* 工程名称。 *)
+    c_sProjectName : STRING(63) := 'CFFwelding';
+    (* 当前绿地架构版本。 *)
+    c_sArchitectureVersion : STRING(31) := 'V3.3';
+    (* 当前实现阶段。 *)
+    c_sImplementationPhase : STRING(31) := 'Phase 3';
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

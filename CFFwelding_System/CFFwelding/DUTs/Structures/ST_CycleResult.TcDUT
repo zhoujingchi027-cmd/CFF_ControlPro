@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CycleResult" Id="{D3100000-0000-4000-8000-000000000018}"><Declaration><![CDATA[TYPE ST_CycleResult : STRUCT
+    (* 全局焊接结果编号。 *)
+    nWeldId : ULINT;
+    (* 加工点编号。 *)
+    nJoiningPointId : UDINT;
+    (* 加工程序编号。 *)
+    nProgramId : UDINT;
+    (* 周期是否合格。 *)
+    bOk : BOOL;
+    (* 周期是否不合格。 *)
+    bNok : BOOL;
+    (* 周期是否中止。 *)
+    bAborted : BOOL;
+    (* 四个步骤的实际结束原因。 *)
+    aeStepEndCause : ARRAY[1..4] OF E_StepEndCause;
+    (* 周期特征值。 *)
+    stFeatures : ST_ProcessFeatures;
+    (* 周期持续时间，单位毫秒。 *)
+    nCycleTimeMs : UDINT;
+    (* 曲线缓冲区是否完整。 *)
+    bCurveBufferComplete : BOOL;
+    (* 已记录的曲线样本数量。 *)
+    nCurveSampleCount : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

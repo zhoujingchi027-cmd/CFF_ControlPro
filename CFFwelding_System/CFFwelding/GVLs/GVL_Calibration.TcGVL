@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_Calibration" Id="{C3100000-0000-4000-8000-000000000004}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* 力传感器标定数据。 *)
+    stForce : ST_ForceCalibration;
+    (* 位移传感器标定数据。 *)
+    stDisplacement : ST_DisplacementCalibration;
+    (* 碰撞基准标定数据。 *)
+    stCollision : ST_CollisionCalibration;
+    (* 标定命令邮箱。 *)
+    stCommand : ST_CalibrationCommand;
+    (* 标定执行状态。 *)
+    stStatus : ST_CalibrationStatus;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

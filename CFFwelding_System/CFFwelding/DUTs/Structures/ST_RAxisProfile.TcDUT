@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_RAxisProfile" Id="{D3100000-0000-4000-8000-000000000007}"><Declaration><![CDATA[TYPE ST_RAxisProfile : STRUCT
+    (* 目标转速，单位转每分钟。 *)
+    fTargetSpeedRpm : LREAL;
+    (* 转速斜坡，单位转每分钟每秒。 *)
+    fSpeedRampRpmS : LREAL;
+    (* 加速时间，单位秒。 *)
+    fAccelerationTimeS : LREAL;
+    (* 减速时间，单位秒。 *)
+    fDecelerationTimeS : LREAL;
+    (* 进入工艺阶段所需的最低合格转速。 *)
+    fMinimumQualifiedSpeedRpm : LREAL;
+    (* 参数是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ProcessMonitorProfile" Id="{D3100000-0000-4000-8000-000000000011}"><Declaration><![CDATA[TYPE ST_ProcessMonitorProfile : STRUCT
+    (* 最小允许过程力，单位牛顿。 *)
+    fMinForceN : LREAL;
+    (* 最大允许过程力，单位牛顿。 *)
+    fMaxForceN : LREAL;
+    (* 最小允许相对位移，单位毫米。 *)
+    fMinRelativeDistanceMm : LREAL;
+    (* 最大允许相对位移，单位毫米。 *)
+    fMaxRelativeDistanceMm : LREAL;
+    (* 最小允许扭矩，单位牛米。 *)
+    fMinTorqueNm : LREAL;
+    (* 最大允许扭矩，单位牛米。 *)
+    fMaxTorqueNm : LREAL;
+    (* 最小允许能量，单位焦耳。 *)
+    fMinEnergyJ : LREAL;
+    (* 最大允许能量，单位焦耳。 *)
+    fMaxEnergyJ : LREAL;
+    (* 监控参数是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><TcPlcObject Version="1.1.0.1"><DUT Name="E_CffStep" Id="{E3000000-0000-4000-8000-000000000008}"><Declaration><![CDATA[TYPE E_CffStep : (
+    CFF_STEP_NONE := 0,
+    CFF_STEP1_PENETRATION := 10,
+    CFF_STEP2_CLEAN_ACTIVATE := 20,
+    CFF_STEP3_WELDING := 30,
+    CFF_STEP4_COMPRESSION := 40
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

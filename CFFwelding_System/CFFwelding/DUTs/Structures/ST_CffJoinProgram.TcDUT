@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffJoinProgram" Id="{D3100000-0000-4000-8000-000000000012}"><Declaration><![CDATA[TYPE ST_CffJoinProgram : STRUCT
+    (* 程序头及版本信息。 *)
+    stHeader : ST_JoinProgramHeader;
+    (* 四个固定 CFF 工艺步骤。 *)
+    astSteps : ARRAY[1..4] OF ST_CffStepProgram;
+    (* 程序级过程监控参数。 *)
+    stMonitor : ST_ProcessMonitorProfile;
+    (* 数据完整性校验值。 *)
+    nCrc32 : UDINT;
+    (* 完整程序是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

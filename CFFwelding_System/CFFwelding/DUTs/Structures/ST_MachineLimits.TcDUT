@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_MachineLimits" Id="{D3100000-0000-4000-8000-000000000002}"><Declaration><![CDATA[TYPE ST_MachineLimits : STRUCT
+    (* Z 轴最小允许位置，单位毫米。 *)
+    fZMinPositionMm : LREAL;
+    (* Z 轴最大允许位置，单位毫米。 *)
+    fZMaxPositionMm : LREAL;
+    (* Z 轴最大速度，单位毫米每秒。 *)
+    fZMaxVelocityMmS : LREAL;
+    (* Z 轴最大加速度，单位毫米每二次方秒。 *)
+    fZMaxAccelerationMmS2 : LREAL;
+    (* 最大允许过程力，单位牛顿。 *)
+    fMaxForceN : LREAL;
+    (* R 轴最大转速，单位转每分钟。 *)
+    fRMaxSpeedRpm : LREAL;
+    (* R 轴最大扭矩，单位牛米。 *)
+    fRMaxTorqueNm : LREAL;
+    (* 限值集合是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

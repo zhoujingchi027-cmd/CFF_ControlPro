@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffStepProgram" Id="{D3100000-0000-4000-8000-000000000009}"><Declaration><![CDATA[TYPE ST_CffStepProgram : STRUCT
+    (* 步骤编号。 *)
+    eStep : E_CffStep;
+    (* 目标轴向力，单位牛顿。 *)
+    fSetForceN : LREAL;
+    (* 目标转速，单位转每分钟。 *)
+    fSetSpeedRpm : LREAL;
+    (* 力斜坡，单位牛顿每秒。 *)
+    fForceRampNS : LREAL;
+    (* 本步骤结束判据配置。 *)
+    stProceeding : ST_StepProceedingConfig;
+    (* 过程监控参数编号。 *)
+    nMonitorProfileId : UDINT;
+    (* 步骤参数是否有效。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

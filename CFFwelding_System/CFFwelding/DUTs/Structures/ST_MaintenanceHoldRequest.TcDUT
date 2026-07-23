@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_MaintenanceHoldRequest" Id="{D3100000-0000-4000-8000-000000000023}"><Declaration><![CDATA[TYPE ST_MaintenanceHoldRequest : STRUCT
+    (* 维护请求编号。 *)
+    nRequestId : UDINT;
+    (* 请求的维护功能。 *)
+    eFunction : E_MaintenanceFunction;
+    (* 请求保持的目标力，单位牛顿。 *)
+    fHoldForceN : LREAL;
+    (* 最大保持时间，单位毫秒。 *)
+    nTimeoutMs : UDINT;
+    (* 请求是否有效。 *)
+    bExecute : BOOL;
+    (* 请求是否取消。 *)
+    bCancel : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>
