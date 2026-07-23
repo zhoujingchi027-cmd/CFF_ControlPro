@@ -16,6 +16,7 @@
 | Phase 1 | `Release\|TwinCAT RT (x64)` | 已执行 | `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 2 | `Release\|TwinCAT RT (x64)` | 已执行 | `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 3 | `Release\|TwinCAT RT (x64)` | 已执行 | 轴映射后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 4 | `Release\|TwinCAT RT (x64)` | 已执行 | 14个FC和6个通用FB加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -105,3 +106,22 @@ LastBuildInfo: 0
 ```
 
 工程没有 I/O 设备节点或 Safety 配置。XAE为映射基础设施自动序列化的空`<Io/>`容器不包含主站、设备、端子或PDO链接。两个NC轴的默认Drive/Encoder对象未与任何真实硬件或仿真驱动关联。
+
+## Phase 4执行记录
+
+Phase 4加入14个纯计算FC和6个通用FB，覆盖缩放、限幅、积分、插值、单位换算、能量增量、标定/Program校验、制动速度边界、滤波、去抖、信号有效性、斜坡、命令握手和报警锁存。
+
+第一次调用构建脚本时，XAE已经暴露System Project对象，但`SolutionBuild.SolutionConfigurations`尚未完成异步加载，因此脚本在Build前报告配置列表为空。脚本增加第二加载边界等待后，最终证据为：
+
+```text
+Phase 4 utility test: PASSED
+Function count: 14
+Utility FB count: 6
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+Phase 4对象没有`AXIS_REF`、`MC_*`或GVL依赖，也没有创建或修改硬件配置。Build只证明PLC对象可编译。

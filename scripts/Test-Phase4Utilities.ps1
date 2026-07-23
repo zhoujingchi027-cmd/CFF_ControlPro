@@ -122,9 +122,9 @@ foreach ($entry in $functionContracts.GetEnumerator()) {
     }
 }
 
-$phaseReportPath = Join-Path $RepositoryRoot 'Docs\报告\PHASE_4_EXECUTION_REPORT.md'
-if (-not (Test-Path -LiteralPath $phaseReportPath -PathType Leaf)) {
-    Fail "Missing Phase 4 execution report: $phaseReportPath"
+$phaseReportFiles = @(Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'Docs') -Recurse -File -Filter 'PHASE_4_EXECUTION_REPORT.md' -ErrorAction SilentlyContinue)
+if ($phaseReportFiles.Count -ne 1) {
+    Fail "Expected exactly one Phase 4 execution report; found $($phaseReportFiles.Count)."
 }
 
 if ($failures.Count -gt 0) {
