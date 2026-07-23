@@ -80,7 +80,7 @@ LastBuildInfo: 0
 
 ## Git状态
 
-- Phase 6主Commit：提交后回填。
+- Phase 6主Commit：`566ae2d9e9bafcb6f649a7ba5c4c643bd934079b`。
 - Commit消息：`feat(motion): add Phase 6 NC adapters and owner arbitration`
 - Push：先完成本地Commit；GitHub网络恢复后推送累计提交。
 
