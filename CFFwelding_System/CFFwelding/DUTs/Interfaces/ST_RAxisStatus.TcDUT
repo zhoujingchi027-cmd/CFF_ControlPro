@@ -9,10 +9,16 @@ STRUCT
     bMoving : BOOL;
     (* R轴处于静止状态。 *)
     bStandstill : BOOL;
+    (* R轴标准NC命令仍在执行。 *)
+    bBusy : BOOL;
+    (* 最近R轴标准NC命令已经完成。 *)
+    bDone : BOOL;
     (* R轴Adapter报告错误。 *)
     bError : BOOL;
     (* R轴或MC错误编号，0表示无错误。 *)
     nErrorId : UDINT;
+    (* R轴Adapter已处理的最后命令事务编号。 *)
+    udiAcceptedCommandId : UDINT;
     (* R轴实际速度，单位rpm。 *)
     rActualVelocity_rpm : LREAL;
     (* R轴实际转矩，仅用于监控，单位Nm。 *)

@@ -1767,7 +1767,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{3B1364E2-6C34-4CB9-BD73-174C89442C9B}" Name="CFFwelding" PrjFilePath="CFFwelding\CFFwelding.plcproj" TmcFilePath="CFFwelding\CFFwelding.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{579F6696-9A91-2E43-A979-05E52229D0A1}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{65FB00D1-829D-9B13-5312-3759CD5911E5}">
 					<Name>CFFwelding Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">

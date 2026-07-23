@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_AxisCommandArbiter" Id="{A4100000-0000-4000-8000-000000000001}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_AxisCommandArbiter
+VAR_INPUT
+    (* 复位Owner和已选命令。 *)
+    bReset : BOOL;
+    (* 最高优先级故障受控停止请求。 *)
+    bFaultStopRequest : BOOL;
+    (* 力过程已完成受控退出，允许转交Owner。 *)
+    bForceProcessExitComplete : BOOL;
+    (* 回零Owner候选命令。 *)
+    stHomeCommand : ST_ZAxisCommand;
+    (* 手动Owner候选命令。 *)
+    stManualCommand : ST_ZAxisCommand;
+    (* 接近Owner候选命令。 *)
+    stApproachCommand : ST_ZAxisCommand;
+    (* 力过程Owner候选命令。 *)
+    stForceProcessCommand : ST_ZAxisCommand;
+    (* 回撤Owner候选命令。 *)
+    stRetractCommand : ST_ZAxisCommand;
+END_VAR
+VAR_OUTPUT
+    (* 唯一获准发往Z轴Adapter的命令。 *)
+    stCommand : ST_ZAxisCommand;
+    (* 当前唯一Z轴命令Owner。 *)
+    eActiveOwner : E_ZCommandOwner;
+    (* 当前扫描存在有效Owner。 *)
+    bOwnerActive : BOOL;
+    (* 力过程尚未受控退出，Owner切换被拒绝。 *)
+    bTransitionDenied : BOOL;
+END_VAR
+VAR
+    (* 力过程候选在当前扫描有效。 *)
+    bForceProcessRequested : BOOL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Z轴命令Owner仲裁状态。
+   进入：Task_CffFast每扫描调用。
+   动作：Fault Stop最高；活动力过程须先完成受控退出；其后
+         按Home、Retract、Approach、Manual选择唯一命令。
+   成功：只发布一个ST_ZAxisCommand和一个ActiveOwner。
+   超时：由上层流程负责；本FB不访问任务时钟或硬件。
+   Fault：立即选择FAULT_STOP并发布受控Stop。
+   --------------------------------------------------------- *)
+bForceProcessRequested := stForceProcessCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
+bTransitionDenied := FALSE;
+
+IF bReset THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_NONE;
+ELSIF bFaultStopRequest THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_FAULT_STOP;
+ELSIF (eActiveOwner = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS)
+    AND NOT bForceProcessExitComplete THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
+    bTransitionDenied := NOT bForceProcessRequested;
+ELSIF bForceProcessRequested THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
+ELSIF stHomeCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_HOME THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_HOME;
+ELSIF stRetractCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_RETRACT THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_RETRACT;
+ELSIF stApproachCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_APPROACH THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_APPROACH;
+ELSIF stManualCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_MANUAL THEN
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_MANUAL;
+ELSE
+    eActiveOwner := E_ZCommandOwner.Z_OWNER_NONE;
+END_IF
+
+CASE eActiveOwner OF
+    E_ZCommandOwner.Z_OWNER_HOME:
+        stCommand := stHomeCommand;
+    E_ZCommandOwner.Z_OWNER_MANUAL:
+        stCommand := stManualCommand;
+    E_ZCommandOwner.Z_OWNER_APPROACH:
+        stCommand := stApproachCommand;
+    E_ZCommandOwner.Z_OWNER_FORCE_PROCESS:
+        IF bForceProcessRequested THEN
+            stCommand := stForceProcessCommand;
+        END_IF
+    E_ZCommandOwner.Z_OWNER_RETRACT:
+        stCommand := stRetractCommand;
+    E_ZCommandOwner.Z_OWNER_FAULT_STOP:
+        stCommand.bEnable := TRUE;
+        stCommand.bReset := FALSE;
+        stCommand.bStop := TRUE;
+        stCommand.bHome := FALSE;
+        stCommand.bMoveAbsolute := FALSE;
+        stCommand.bMoveVelocity := FALSE;
+        stCommand.bUseExternalSetpoint := FALSE;
+        stCommand.rHomePosition_mm := 0.0;
+        stCommand.rPosition_mm := 0.0;
+        stCommand.rVelocity_mm_s := 0.0;
+        stCommand.rAcceleration_mm_s2 := 0.0;
+        stCommand.rDeceleration_mm_s2 := 0.0;
+        stCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_FAULT_STOP;
+    ELSE
+        stCommand.bEnable := FALSE;
+        stCommand.bReset := FALSE;
+        stCommand.bStop := FALSE;
+        stCommand.bHome := FALSE;
+        stCommand.bMoveAbsolute := FALSE;
+        stCommand.bMoveVelocity := FALSE;
+        stCommand.bUseExternalSetpoint := FALSE;
+        stCommand.rHomePosition_mm := 0.0;
+        stCommand.rPosition_mm := 0.0;
+        stCommand.rVelocity_mm_s := 0.0;
+        stCommand.rAcceleration_mm_s2 := 0.0;
+        stCommand.rDeceleration_mm_s2 := 0.0;
+        stCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+END_CASE
+
+bOwnerActive := eActiveOwner <> E_ZCommandOwner.Z_OWNER_NONE;]]></ST></Implementation></POU></TcPlcObject>

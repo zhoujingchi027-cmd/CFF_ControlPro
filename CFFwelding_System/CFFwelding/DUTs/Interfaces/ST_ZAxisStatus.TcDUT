@@ -5,10 +5,16 @@ STRUCT
     bReady : BOOL;
     (* Z 轴已经使能。 *)
     bEnabled : BOOL;
+    (* Z 轴已完成回零并具有有效参考坐标。 *)
+    bHomed : BOOL;
     (* Z 轴正在运动。 *)
     bMoving : BOOL;
     (* Z 轴处于静止状态。 *)
     bStandstill : BOOL;
+    (* 标准 NC 命令仍在执行。 *)
+    bBusy : BOOL;
+    (* 最近标准 NC 命令已经完成。 *)
+    bDone : BOOL;
     (* 外部设定值生命周期有效。 *)
     bExternalSetpointActive : BOOL;
     (* Z 轴适配器报告错误。 *)
@@ -17,6 +23,8 @@ STRUCT
     nErrorId : UDINT;
     (* 当前唯一命令所有者。 *)
     eActiveOwner : E_ZCommandOwner;
+    (* Z 轴 Adapter 已处理的最后命令事务编号。 *)
+    udiAcceptedCommandId : UDINT;
     (* Z 轴实际位置，向下为正，单位毫米。 *)
     rActualPosition_mm : LREAL;
     (* Z 轴实际速度，向下为正，单位毫米每秒。 *)

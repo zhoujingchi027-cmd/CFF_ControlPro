@@ -57,9 +57,10 @@
 
 `PRG_HmiAdsInterface`、`PRG_ResultTraceability`、`PRG_Statistics`和`PRG_Persistence`在Phase 2不声明FB实例。后续若引入队列、握手或持久化FB，必须先在本矩阵中分配唯一Owner，且不得把字符串、文件、数据库或ADS大数组搬运放入`Task_CffFast`。
 
-## Phase 5核对
+## Phase 6核对
 
 - `PRG_FastInputs`已按本矩阵唯一声明力滤波数组、力/位移有效性、位移滤波和Collision去抖实例；其他PROGRAM没有重复声明。
+- `PRG_FastAxisControl`已唯一声明`fbZAxisArbiter`、`fbZAxisNc`和`fbRAxisNc`；每个实例均有用途、任务、Owner、输入、输出和Reset/生命周期中文块注释。
 - 当前不存在`GVL_Instance`。
-- 其余计划实例仍处于“已分配Owner、尚未声明”状态。
-- 轴Adapter是未来唯一允许使用`VAR_IN_OUT AXIS_REF`的FB；算法FB不得访问`AXIS_REF`。
+- 除上述Phase 5/6实例外，其余计划实例仍处于“已分配Owner、尚未声明”状态。
+- 只有`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`使用`VAR_IN_OUT AXIS_REF`；Owner仲裁、流程PROGRAM和算法FB均不访问轴引用。

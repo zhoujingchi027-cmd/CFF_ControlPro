@@ -49,3 +49,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase5Sen
 ```
 
 该脚本检查EP3174/位移/Collision占位及诊断、四路Force、Contact参考点事务、累计`SRelSensor/SRelAxis`和差值契约，并确认未创建真实I/O配置、未强制任何映射或Production Ready为真。
+
+## Phase 6 标准运动Adapter验收
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase6MotionAdapters.ps1
+```
+
+该脚本检查Z轴Owner仲裁、Z/R标准NC Adapter、命令编号上升沿、MC调用边界和唯一实例声明。它同时确认真实驱动未绑定时`Ready=FALSE`且所有Power/运动请求都受`DriveLinked`硬门控，并拒绝在`PRG_CffSequence`或算法FB中出现MC调用。

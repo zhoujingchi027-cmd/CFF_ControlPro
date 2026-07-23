@@ -6,6 +6,6 @@ VAR_GLOBAL CONSTANT
     (* 当前绿地架构版本。 *)
     c_sArchitectureVersion : STRING(31) := 'V3.3';
     (* 当前实现阶段。 *)
-    c_sImplementationPhase : STRING(31) := 'Phase 3';
+    c_sImplementationPhase : STRING(31) := 'Phase 6';
 END_VAR
 ]]></Declaration></GVL></TcPlcObject>

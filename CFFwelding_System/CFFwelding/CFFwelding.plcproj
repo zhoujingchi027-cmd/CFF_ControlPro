@@ -135,6 +135,9 @@
     <Compile Include="POUs\FunctionBlocks\Utility\FB_SetpointRamp.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\FunctionBlocks\Utility\FB_CommandHandshake.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\FunctionBlocks\Utility\FB_AlarmLatch.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_AxisCommandArbiter.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_RAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_CffSequence.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_FastAxisControl.TcPOU"><SubType>Code</SubType></Compile>
@@ -170,6 +173,7 @@
     <Folder Include="POUs\Functions" />
     <Folder Include="POUs\FunctionBlocks" />
     <Folder Include="POUs\FunctionBlocks\Utility" />
+    <Folder Include="POUs\FunctionBlocks\Axis" />
     <Folder Include="POUs\Fast" />
     <Folder Include="POUs\Main" />
     <Folder Include="POUs\Slow" />

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_ZAxisNcAdapter" Id="{A4100000-0000-4000-8000-000000000002}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_ZAxisNcAdapter
+VAR_IN_OUT
+    (* 唯一Z轴NC引用；仅允许本Adapter访问。 *)
+    Axis : AXIS_REF;
+END_VAR
+VAR_INPUT
+    (* 真实驱动、编码器和NC轴已经人工关联并验证。 *)
+    bDriveLinked : BOOL;
+    (* 上层命令事务编号；只有变化才产生MC Execute上升沿。 *)
+    udiCommandId : UDINT;
+    (* 经Owner仲裁的唯一Z轴标准命令。 *)
+    stCommand : ST_ZAxisCommand;
+END_VAR
+VAR_OUTPUT
+    (* Z轴标准运动状态快照。 *)
+    stStatus : ST_ZAxisStatus;
+    (* Adapter已处理的最后命令事务编号。 *)
+    udiAcceptedCommandId : UDINT;
+END_VAR
+VAR
+    (* Z轴软件使能实例。 *)
+    fbPower : MC_Power;
+    (* Z轴错误复位实例。 *)
+    fbReset : MC_Reset;
+    (* Z轴标准回零实例。 *)
+    fbHome : MC_Home;
+    (* Z轴绝对定位实例。 *)
+    fbMoveAbsolute : MC_MoveAbsolute;
+    (* Z轴速度运动双实例A，用于以新命令替换活动速度命令。 *)
+    fbMoveVelocityA : MC_MoveVelocity;
+    (* Z轴速度运动双实例B，用于以新命令替换活动速度命令。 *)
+    fbMoveVelocityB : MC_MoveVelocity;
+    (* Z轴受控停止实例。 *)
+    fbHalt : MC_Halt;
+    (* 当前扫描检测到新的命令编号。 *)
+    bNewCommand : BOOL;
+    (* 当前扫描的复位Execute脉冲。 *)
+    bResetPulse : BOOL;
+    (* 当前扫描的回零Execute脉冲。 *)
+    bHomePulse : BOOL;
+    (* 当前扫描的绝对定位Execute脉冲。 *)
+    bMoveAbsolutePulse : BOOL;
+    (* 当前扫描速度实例A的Execute脉冲。 *)
+    bMoveVelocityPulseA : BOOL;
+    (* 当前扫描速度实例B的Execute脉冲。 *)
+    bMoveVelocityPulseB : BOOL;
+    (* 当前扫描的受控停止Execute脉冲。 *)
+    bHaltPulse : BOOL;
+    (* 下次速度命令选择A实例，否则选择B实例。 *)
+    bSelectVelocityA : BOOL;
+    (* 速度命令方向。 *)
+    eVelocityDirection : MC_Direction;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Z轴标准NC Adapter状态。
+   进入：Task_CffFast每扫描调用，且由PRG_FastAxisControl唯一持有。
+   动作：更新AXIS_REF状态；命令编号变化时产生一次MC上升沿。
+   成功：发布真实NC状态；Ready还必须满足真实驱动已人工关联。
+   超时：由上层流程负责；MC Busy/Error保持可诊断。
+   Fault：Stop优先；未绑定驱动时Power和全部运动Execute硬门控。
+   --------------------------------------------------------- *)
+Axis.ReadStatus();
+
+bNewCommand := udiCommandId <> udiAcceptedCommandId;
+bResetPulse := FALSE;
+bHomePulse := FALSE;
+bMoveAbsolutePulse := FALSE;
+bMoveVelocityPulseA := FALSE;
+bMoveVelocityPulseB := FALSE;
+bHaltPulse := FALSE;
+
+IF stCommand.rVelocity_mm_s >= 0.0 THEN
+    eVelocityDirection := MC_Positive_Direction;
+ELSE
+    eVelocityDirection := MC_Negative_Direction;
+END_IF
+
+IF bNewCommand THEN
+    udiAcceptedCommandId := udiCommandId;
+    bResetPulse := bDriveLinked AND stCommand.bReset;
+
+    IF bDriveLinked AND stCommand.bStop THEN
+        bHaltPulse := TRUE;
+    ELSIF bDriveLinked AND stCommand.bEnable AND NOT stCommand.bUseExternalSetpoint THEN
+        IF stCommand.bHome THEN
+            bHomePulse := TRUE;
+        ELSIF stCommand.bMoveAbsolute THEN
+            bMoveAbsolutePulse := TRUE;
+        ELSIF stCommand.bMoveVelocity THEN
+            IF ABS(stCommand.rVelocity_mm_s) > 0.0 THEN
+                bSelectVelocityA := NOT bSelectVelocityA;
+                bMoveVelocityPulseA := bSelectVelocityA;
+                bMoveVelocityPulseB := NOT bSelectVelocityA;
+            ELSE
+                bHaltPulse := TRUE;
+            END_IF
+        END_IF
+    END_IF
+END_IF
+
+(* 未完成真实驱动关联时Enable恒为FALSE，不能因离线NC对象而产生Ready。 *)
+fbPower(
+    Axis := Axis,
+    Enable := bDriveLinked AND stCommand.bEnable,
+    Enable_Positive := bDriveLinked AND stCommand.bEnable,
+    Enable_Negative := bDriveLinked AND stCommand.bEnable,
+    Override := 100.0,
+    BufferMode := MC_Aborting);
+fbReset(Axis := Axis, Execute := bResetPulse);
+fbHome(
+    Axis := Axis,
+    Execute := bHomePulse,
+    Position := stCommand.rHomePosition_mm,
+    HomingMode := MC_DefaultHoming);
+fbMoveAbsolute(
+    Axis := Axis,
+    Execute := bMoveAbsolutePulse,
+    Position := stCommand.rPosition_mm,
+    Velocity := ABS(stCommand.rVelocity_mm_s),
+    Acceleration := ABS(stCommand.rAcceleration_mm_s2),
+    Deceleration := ABS(stCommand.rDeceleration_mm_s2),
+    Jerk := 0.0,
+    BufferMode := MC_Aborting);
+fbMoveVelocityA(
+    Axis := Axis,
+    Execute := bMoveVelocityPulseA,
+    Velocity := ABS(stCommand.rVelocity_mm_s),
+    Acceleration := ABS(stCommand.rAcceleration_mm_s2),
+    Deceleration := ABS(stCommand.rDeceleration_mm_s2),
+    Jerk := 0.0,
+    Direction := eVelocityDirection,
+    BufferMode := MC_Aborting);
+fbMoveVelocityB(
+    Axis := Axis,
+    Execute := bMoveVelocityPulseB,
+    Velocity := ABS(stCommand.rVelocity_mm_s),
+    Acceleration := ABS(stCommand.rAcceleration_mm_s2),
+    Deceleration := ABS(stCommand.rDeceleration_mm_s2),
+    Jerk := 0.0,
+    Direction := eVelocityDirection,
+    BufferMode := MC_Aborting);
+fbHalt(
+    Axis := Axis,
+    Execute := bHaltPulse,
+    Deceleration := ABS(stCommand.rDeceleration_mm_s2),
+    Jerk := 0.0,
+    BufferMode := MC_Aborting);
+
+stStatus.bError := bDriveLinked AND (Axis.Status.Error OR fbPower.Error OR fbReset.Error
+    OR fbHome.Error OR fbMoveAbsolute.Error OR fbMoveVelocityA.Error
+    OR fbMoveVelocityB.Error OR fbHalt.Error);
+stStatus.nErrorId := 0;
+IF bDriveLinked AND Axis.Status.Error THEN
+    stStatus.nErrorId := DWORD_TO_UDINT(Axis.NcToPlc.ErrorCode);
+ELSIF fbPower.Error THEN
+    stStatus.nErrorId := fbPower.ErrorID;
+ELSIF fbReset.Error THEN
+    stStatus.nErrorId := fbReset.ErrorID;
+ELSIF fbHome.Error THEN
+    stStatus.nErrorId := fbHome.ErrorID;
+ELSIF fbMoveAbsolute.Error THEN
+    stStatus.nErrorId := fbMoveAbsolute.ErrorID;
+ELSIF fbMoveVelocityA.Error THEN
+    stStatus.nErrorId := fbMoveVelocityA.ErrorID;
+ELSIF fbMoveVelocityB.Error THEN
+    stStatus.nErrorId := fbMoveVelocityB.ErrorID;
+ELSIF fbHalt.Error THEN
+    stStatus.nErrorId := fbHalt.ErrorID;
+END_IF
+
+stStatus.bReady := bDriveLinked AND fbPower.Status AND Axis.Status.Operational
+    AND NOT stStatus.bError;
+stStatus.bEnabled := bDriveLinked AND fbPower.Status;
+stStatus.bHomed := bDriveLinked AND Axis.Status.Homed;
+stStatus.bMoving := bDriveLinked AND (Axis.Status.DiscreteMotion
+    OR Axis.Status.ContinuousMotion OR Axis.Status.Homing);
+stStatus.bStandstill := bDriveLinked AND Axis.Status.StandStill;
+stStatus.bBusy := bDriveLinked AND (fbReset.Busy OR fbHome.Busy OR fbMoveAbsolute.Busy
+    OR fbMoveVelocityA.Busy OR fbMoveVelocityB.Busy OR fbHalt.Busy);
+stStatus.bDone := bDriveLinked AND (fbReset.Done OR fbHome.Done OR fbMoveAbsolute.Done
+    OR fbMoveVelocityA.InVelocity OR fbMoveVelocityB.InVelocity OR fbHalt.Done);
+stStatus.bExternalSetpointActive := FALSE;
+stStatus.eActiveOwner := stCommand.eOwnerRequest;
+stStatus.udiAcceptedCommandId := udiAcceptedCommandId;
+
+IF bDriveLinked THEN
+    stStatus.rActualPosition_mm := Axis.NcToPlc.ActPos;
+    stStatus.rActualVelocity_mm_s := Axis.NcToPlc.ActVelo;
+ELSE
+    stStatus.rActualPosition_mm := 0.0;
+    stStatus.rActualVelocity_mm_s := 0.0;
+END_IF;]]></ST></Implementation></POU></TcPlcObject>

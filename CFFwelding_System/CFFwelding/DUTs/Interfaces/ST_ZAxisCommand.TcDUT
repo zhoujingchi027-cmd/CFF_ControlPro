@@ -7,12 +7,16 @@ STRUCT
     bReset : BOOL;
     (* 请求受控停止 Z 轴。 *)
     bStop : BOOL;
+    (* 请求执行标准 NC 回零。 *)
+    bHome : BOOL;
     (* 请求标准绝对定位。 *)
     bMoveAbsolute : BOOL;
     (* 请求标准速度运动。 *)
     bMoveVelocity : BOOL;
     (* 请求由外部设定值适配器接管。 *)
     bUseExternalSetpoint : BOOL;
+    (* 回零完成后使用的参考位置，向下为正，单位毫米。 *)
+    rHomePosition_mm : LREAL;
     (* 绝对位置目标，向下为正，单位毫米。 *)
     rPosition_mm : LREAL;
     (* 速度目标，向下为正，单位毫米每秒。 *)

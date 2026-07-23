@@ -18,6 +18,7 @@
 | Phase 3 | `Release\|TwinCAT RT (x64)` | 已执行 | 轴映射后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 4 | `Release\|TwinCAT RT (x64)` | 已执行 | 14个FC和6个通用FB加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 5 | `Release\|TwinCAT RT (x64)` | 已执行 | Force/Displacement/S_rel/Collision处理加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 6 | `Release\|TwinCAT RT (x64)` | 已执行 | Z/R标准NC Adapter与Owner仲裁加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -132,3 +133,17 @@ Phase 4对象没有`AXIS_REF`、`MC_*`或GVL依赖，也没有创建或修改硬
 Phase 5实现未绑定EP3174/位移/Collision占位的诊断处理、四路Force、Contact参考点事务和累计`SRelSensor/SRelAxis`。首次实际引用通用POU时，XAE报告4处末语句缺少分号；根据XAE Error List精确修复并增加回归测试后，最终`LastBuildInfo=0`。
 
 本阶段Build不证明物理PDO、传感器标定、轴位置或Collision功能有效；对应Mapped、DriveLinked和Production Ready状态保持`FALSE`。
+
+## Phase 6执行记录
+
+Phase 6实现Z轴Owner仲裁、Z轴标准回零/绝对定位/速度/停止/复位Adapter，以及R轴RPM/停止/复位Adapter。MC接口按本机`Tc2_MC2 3.3.65.0`和Beckhoff官方文档核对，真实XAE构建证据为：
+
+```text
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+该Build只证明标准运动对象与当前库版本可编译。`bZAxisDriveLinked`和`bRAxisDriveLinked`仍为`FALSE`，因此Adapter的Power、运动Execute和Ready均被硬门控；没有进行配置激活、下载、Runtime登录或物理轴动作。

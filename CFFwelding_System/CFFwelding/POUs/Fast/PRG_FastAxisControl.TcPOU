@@ -1,11 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastAxisControl" Id="{A2000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[PROGRAM PRG_FastAxisControl
 VAR
+    (* ---------------------------------------------------------
+       Z轴命令Owner仲裁实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：主任务发布的Home/Manual/Approach/Force/Retract候选。
+       输出：唯一Z轴Owner和标准命令。
+       Reset：上层Reset清除Owner；力过程必须受控退出后才转交。
+       --------------------------------------------------------- *)
+    fbZAxisArbiter : FB_AxisCommandArbiter;
+    (* ---------------------------------------------------------
+       Z轴标准NC适配实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：仲裁命令、命令编号、Z轴AXIS_REF和真实驱动绑定状态。
+       输出：Z轴标准NC状态；Reset：事务化MC_Reset。
+       生命周期：每Fast扫描调用，未绑定驱动时Ready保持FALSE。
+       --------------------------------------------------------- *)
+    fbZAxisNc : FB_ZAxisNcAdapter;
+    (* ---------------------------------------------------------
+       R轴标准NC适配实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：RPM命令、命令编号、R轴AXIS_REF和真实驱动绑定状态。
+       输出：R轴速度、只读Torque及MC状态；Reset：事务化MC_Reset。
+       生命周期：每Fast扫描调用，未绑定驱动时Ready保持FALSE。
+       --------------------------------------------------------- *)
+    fbRAxisNc : FB_RAxisNcAdapter;
+
+    (* Home候选命令。 *)
+    stHomeCommand : ST_ZAxisCommand;
+    (* Manual候选命令。 *)
+    stManualCommand : ST_ZAxisCommand;
+    (* Approach候选命令。 *)
+    stApproachCommand : ST_ZAxisCommand;
+    (* Force Process候选命令。 *)
+    stForceProcessCommand : ST_ZAxisCommand;
+    (* Retract候选命令。 *)
+    stRetractCommand : ST_ZAxisCommand;
+    (* Owner输出与轴复位请求合并后的标准Z轴命令。 *)
+    stSelectedZCommand : ST_ZAxisCommand;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
-   程序骨架：Z/R轴命令Owner仲裁、力控制和轴Adapter调用。
-   所属任务：Task_CffFast，调用顺序3。
-   唯一Owner：PRG_FastAxisControl。
-   当前阶段：不声明AXIS_REF实例，不发出任何运动命令。
-   后续实现：标准NC与External Setpoint生命周期。
-   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>
+   快速轴控制状态。
+   进入：Task_CffFast在PRG_CffSequence之后每扫描调用。
+   动作：按Owner拆分候选、唯一仲裁，并调用Z/R标准NC Adapter。
+   成功：发布GVL_Status.stFast轴状态。
+   超时：由流程和命令分派层负责。
+   Fault：Fault Stop抢占；硬件未绑定时禁止Power与所有MC运动沿。
+   --------------------------------------------------------- *)
+stHomeCommand := GVL_Command.stFast.stZAxis;
+stManualCommand := GVL_Command.stFast.stZAxis;
+stApproachCommand := GVL_Command.stFast.stZAxis;
+stForceProcessCommand := GVL_Command.stFast.stZAxis;
+stRetractCommand := GVL_Command.stFast.stZAxis;
+
+stHomeCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+stManualCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+stApproachCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+stForceProcessCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+stRetractCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+
+CASE GVL_Command.stFast.stZAxis.eOwnerRequest OF
+    E_ZCommandOwner.Z_OWNER_HOME:
+        stHomeCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_HOME;
+    E_ZCommandOwner.Z_OWNER_MANUAL:
+        stManualCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_MANUAL;
+    E_ZCommandOwner.Z_OWNER_APPROACH:
+        stApproachCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_APPROACH;
+    E_ZCommandOwner.Z_OWNER_FORCE_PROCESS:
+        stForceProcessCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
+    E_ZCommandOwner.Z_OWNER_RETRACT:
+        stRetractCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_RETRACT;
+END_CASE
+
+fbZAxisArbiter(
+    bReset := GVL_Command.stFast.stZAxis.bReset,
+    bFaultStopRequest := GVL_Command.stFast.stZAxis.eOwnerRequest
+        = E_ZCommandOwner.Z_OWNER_FAULT_STOP,
+    bForceProcessExitComplete := NOT GVL_Command.stFast.stZAxis.bUseExternalSetpoint,
+    stHomeCommand := stHomeCommand,
+    stManualCommand := stManualCommand,
+    stApproachCommand := stApproachCommand,
+    stForceProcessCommand := stForceProcessCommand,
+    stRetractCommand := stRetractCommand);
+
+(* 轴Reset不依赖Owner有效，仍以同一事务编号交给Adapter。 *)
+stSelectedZCommand := fbZAxisArbiter.stCommand;
+stSelectedZCommand.bReset := GVL_Command.stFast.stZAxis.bReset;
+
+fbZAxisNc(
+    Axis := GVL_IO.Z_axis,
+    bDriveLinked := GVL_Status.stHardwareBinding.bZAxisDriveLinked,
+    udiCommandId := GVL_Command.stFast.nRequestId,
+    stCommand := stSelectedZCommand);
+GVL_Status.stFast.stZAxis := fbZAxisNc.stStatus;
+
+fbRAxisNc(
+    Axis := GVL_IO.R_axis,
+    bDriveLinked := GVL_Status.stHardwareBinding.bRAxisDriveLinked,
+    udiCommandId := GVL_Command.stFast.nRequestId,
+    stCommand := GVL_Command.stFast.stRAxis);
+GVL_Status.stFast.stRAxis := fbRAxisNc.stStatus;
+
+(* Fast任务接受编号只表示已消费PLC内部事务，不代表未绑定硬件已执行。 *)
+GVL_Status.stFast.nAcceptedRequestId := GVL_Command.stFast.nRequestId;]]></ST></Implementation></POU></TcPlcObject>

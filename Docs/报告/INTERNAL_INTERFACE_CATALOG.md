@@ -37,11 +37,11 @@
 
 ### `ST_ZAxisCommand`
 
-包含Enable、Reset、Stop、绝对定位、速度运行和External Setpoint选择；位置使用`mm`，速度使用`mm/s`，加减速度使用`mm/s2`，`nOwnerRequest`后续替换为`E_ZCommandOwner`。
+包含Enable、Reset、Stop、标准回零、绝对定位、速度运行和External Setpoint选择；位置使用`mm`，速度使用`mm/s`，加减速度使用`mm/s2`，Owner使用`E_ZCommandOwner`。
 
 ### `ST_ZAxisStatus`
 
-发布Ready、Enabled、Moving、Standstill、External Active、Error、ErrorId、ActiveOwner，以及Z轴实际位置`mm`和实际速度`mm/s`。Ready只表示内部轴接口条件，真实驱动未关联时不得转换为生产Ready。
+发布Ready、Enabled、Homed、Moving、Standstill、Busy、Done、External Active、Error、ErrorId、AcceptedCommandId、ActiveOwner，以及Z轴实际位置`mm`和实际速度`mm/s`。真实驱动未关联时Ready、状态有效值和运动量保持无效/零，不得转换为生产Ready。
 
 ### `ST_ZExtSetpointCommand`
 
@@ -59,7 +59,7 @@
 
 ### `ST_RAxisStatus`
 
-发布Ready、Enabled、Moving、Standstill、Error、ErrorId、实际`rpm`和仅用于监控的实际转矩`Nm`。
+发布Ready、Enabled、Moving、Standstill、Busy、Done、Error、ErrorId、AcceptedCommandId、实际`rpm`和仅用于监控的实际转矩`Nm`。
 
 ## Contact接口
 
@@ -169,5 +169,7 @@
 - 14个接口DUT已经加入PLC工程，并在Phase 3完成枚举类型化。
 - Phase 4加入14个纯计算FC和6个通用FB；当前只定义可复用类型，不提前声明业务实例。
 - Phase 5加入传感器处理与Contact参考点契约，并由`PRG_FastInputs`唯一写入快速过程实际值。
-- 所有接口只定义数据契约，不读写硬件、不生成命令、不改变Ready。
+- Phase 6加入`FB_AxisCommandArbiter`、`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`。只有两个Adapter持有`AXIS_REF`及MC实例；`PRG_FastAxisControl`只负责候选拆分、调用和状态发布。
+- 标准运动以`ST_FastCommand.nRequestId`作为事务编号；Adapter只在编号变化时产生一次MC `Execute`上升沿，活动速度命令使用双实例交替以允许新事务按`MC_Aborting`替换。
+- 数据DUT只定义契约；Phase 6 MC命令仅由两个轴Adapter生成，真实驱动未关联时不生成执行沿且Ready保持FALSE。
 - PROGRAM骨架没有跨PROGRAM局部变量访问。
