@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_CalcStrokeVelocityLimit" Id="{F4000000-0000-4000-8000-000000000013}"><Declaration><![CDATA[FUNCTION FC_CalcStrokeVelocityLimit : LREAL
+VAR_INPUT
+    (* 距离几何边界的剩余正向行程，单位毫米。 *)
+    rRemainingStroke_mm : LREAL;
+    (* 在边界前保留的制动裕量，单位毫米。 *)
+    rBrakeMargin_mm : LREAL;
+    (* 允许的最大减速度，单位毫米每二次方秒。 *)
+    rMaximumDeceleration_mm_s2 : LREAL;
+END_VAR
+VAR
+    (* 扣除制动裕量后的可用行程，单位毫米。 *)
+    rUsableStroke_mm : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[IF (rRemainingStroke_mm <= rBrakeMargin_mm)
+    OR (rBrakeMargin_mm < 0.0)
+    OR (rMaximumDeceleration_mm_s2 <= 0.0)
+    OR NOT FC_IsFiniteLReal(rValue := rRemainingStroke_mm)
+    OR NOT FC_IsFiniteLReal(rValue := rBrakeMargin_mm)
+    OR NOT FC_IsFiniteLReal(rValue := rMaximumDeceleration_mm_s2) THEN
+    (* 已到边界或减速度无效时，向边界方向速度上限必须为零。 *)
+    FC_CalcStrokeVelocityLimit := 0.0;
+    RETURN;
+END_IF
+
+rUsableStroke_mm := rRemainingStroke_mm - rBrakeMargin_mm;
+FC_CalcStrokeVelocityLimit := SQRT(2.0 * rMaximumDeceleration_mm_s2 * rUsableStroke_mm)]]></ST></Implementation></POU></TcPlcObject>

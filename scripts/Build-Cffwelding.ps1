@@ -61,11 +61,32 @@ try {
         Start-Sleep -Milliseconds 500
     }
 
-    $availableConfigurations = @(
-        foreach ($solutionConfiguration in $solution.SolutionBuild.SolutionConfigurations) {
-            "$($solutionConfiguration.Name)|$($solutionConfiguration.PlatformName)"
+    # XAE may expose the System Project object before Visual Studio has populated
+    # SolutionBuild.SolutionConfigurations. Wait for that second asynchronous
+    # load boundary as well, otherwise larger PLC projects can fail before Build.
+    $availableConfigurations = @()
+    for ($attempt = 1; $attempt -le 90 -and $availableConfigurations.Count -eq 0; $attempt++) {
+        try {
+            $availableConfigurations = @(
+                foreach ($solutionConfiguration in $solution.SolutionBuild.SolutionConfigurations) {
+                    "$($solutionConfiguration.Name)|$($solutionConfiguration.PlatformName)"
+                }
+            )
         }
-    )
+        catch [System.Runtime.InteropServices.COMException] {
+            $errorCode = '0x{0:X8}' -f ($_.Exception.HResult -band 0xffffffffL)
+            if ($errorCode -notin @('0x80010001', '0x8001010A')) {
+                throw
+            }
+        }
+
+        if ($availableConfigurations.Count -eq 0) {
+            if ($attempt -eq 90) {
+                throw 'TwinCAT solution configurations did not finish loading before the build timeout.'
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
     if ($Configuration -notin $availableConfigurations) {
         throw "Build configuration '$Configuration' is unavailable. Available: $($availableConfigurations -join ', ')"
     }

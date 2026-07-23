@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_SetpointRamp" Id="{B4000000-0000-4000-8000-000000000004}"><Declaration><![CDATA[FUNCTION_BLOCK FB_SetpointRamp
+VAR_INPUT
+    (* 斜坡运行许可。 *)
+    bEnable : BOOL;
+    (* 内部状态复位请求。 *)
+    bReset : BOOL;
+    (* 首次使能或复位后的连续起始值。 *)
+    rInitialValue : LREAL;
+    (* 需要平滑到达的目标值。 *)
+    rTarget : LREAL;
+    (* 正方向最大变化率，单位每秒。 *)
+    rRateUpPer_s : LREAL;
+    (* 负方向最大变化率绝对值，单位每秒。 *)
+    rRateDownPer_s : LREAL;
+    (* 实际调用周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+    (* 判断到达目标的绝对容差。 *)
+    rTolerance : LREAL;
+END_VAR
+VAR_OUTPUT
+    (* 当前斜坡输出。 *)
+    rOutput : LREAL;
+    (* 仍在向目标变化时为TRUE。 *)
+    bBusy : BOOL;
+    (* 输出进入目标容差且不再需要变化时为TRUE。 *)
+    bReached : BOOL;
+    (* 周期、速率和输入均有效时为TRUE。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 已用起始值建立连续输出。 *)
+    bInitialized : BOOL;
+    (* 非负到达容差。 *)
+    rAbsoluteTolerance : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[IF bReset OR NOT bEnable THEN
+    rOutput := rInitialValue;
+    bInitialized := FALSE;
+    bBusy := FALSE;
+    bReached := FALSE;
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+IF NOT bInitialized THEN
+    rOutput := rInitialValue;
+    bInitialized := TRUE;
+END_IF
+
+bValid := (rCycleTime_s > 0.0)
+    AND (rRateUpPer_s >= 0.0)
+    AND (rRateDownPer_s >= 0.0)
+    AND FC_IsFiniteLReal(rValue := rInitialValue)
+    AND FC_IsFiniteLReal(rValue := rTarget);
+IF NOT bValid THEN
+    (* 参数无效时保持最后连续输出，不向设备发布跳变。 *)
+    bBusy := FALSE;
+    bReached := FALSE;
+    RETURN;
+END_IF
+
+rOutput := FC_LimitRate(
+    rCurrent := rOutput,
+    rTarget := rTarget,
+    rRateUpPer_s := rRateUpPer_s,
+    rRateDownPer_s := rRateDownPer_s,
+    rCycleTime_s := rCycleTime_s);
+rAbsoluteTolerance := ABS(rTolerance);
+bReached := ABS(rTarget - rOutput) <= rAbsoluteTolerance;
+bBusy := NOT bReached]]></ST></Implementation></POU></TcPlcObject>

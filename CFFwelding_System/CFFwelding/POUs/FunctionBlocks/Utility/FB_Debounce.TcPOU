@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_Debounce" Id="{B4000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[FUNCTION_BLOCK FB_Debounce
+VAR_INPUT
+    (* 去抖运行许可；FALSE时输出回到FALSE。 *)
+    bEnable : BOOL;
+    (* 状态复位请求。 *)
+    bReset : BOOL;
+    (* 待去抖的原始布尔输入。 *)
+    bInput : BOOL;
+    (* FALSE到TRUE必须连续保持的时间。 *)
+    tOnDelay : TIME;
+    (* TRUE到FALSE必须连续保持的时间。 *)
+    tOffDelay : TIME;
+END_VAR
+VAR_OUTPUT
+    (* 去抖后的稳定输出。 *)
+    bOutput : BOOL;
+    (* 输出上升沿单扫描脉冲。 *)
+    bRisingEdge : BOOL;
+    (* 输出下降沿单扫描脉冲。 *)
+    bFallingEdge : BOOL;
+    (* 去抖功能处于有效运行状态。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 输入接通连续计时器。 *)
+    fbOnTimer : TON;
+    (* 输入断开连续计时器。 *)
+    fbOffTimer : TON;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bRisingEdge := FALSE;
+bFallingEdge := FALSE;
+
+IF bReset OR NOT bEnable THEN
+    fbOnTimer(IN := FALSE, PT := T#0s);
+    fbOffTimer(IN := FALSE, PT := T#0s);
+    bFallingEdge := bOutput;
+    bOutput := FALSE;
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+IF (tOnDelay < T#0s) OR (tOffDelay < T#0s) THEN
+    (* 负延时是配置错误；不把它传给定时器，也不发布有效输出。 *)
+    fbOnTimer(IN := FALSE, PT := T#0s);
+    fbOffTimer(IN := FALSE, PT := T#0s);
+    bOutput := FALSE;
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+(* 只有与当前稳定状态相反的输入才启动相应计时器。 *)
+fbOnTimer(IN := bInput AND NOT bOutput, PT := tOnDelay);
+fbOffTimer(IN := NOT bInput AND bOutput, PT := tOffDelay);
+
+IF NOT bOutput AND bInput AND ((tOnDelay <= T#0s) OR fbOnTimer.Q) THEN
+    bOutput := TRUE;
+    bRisingEdge := TRUE;
+ELSIF bOutput AND NOT bInput AND ((tOffDelay <= T#0s) OR fbOffTimer.Q) THEN
+    bOutput := FALSE;
+    bFallingEdge := TRUE;
+END_IF
+bValid := TRUE]]></ST></Implementation></POU></TcPlcObject>

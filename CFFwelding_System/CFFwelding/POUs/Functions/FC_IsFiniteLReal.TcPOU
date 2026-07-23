@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_IsFiniteLReal" Id="{F4000000-0000-4000-8000-000000000008}"><Declaration><![CDATA[FUNCTION FC_IsFiniteLReal : BOOL
+VAR_INPUT
+    (* 待检查的双精度值。 *)
+    rValue : LREAL;
+END_VAR
+VAR CONSTANT
+    (* 工程计算允许的对称有限上界，远高于本机物理量范围。 *)
+    c_rEngineeringFiniteLimit : LREAL := 1.0E+300;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* NaN不等于自身；正负无穷也会超出工程有限上界。 *)
+FC_IsFiniteLReal := (rValue = rValue)
+    AND (rValue <= c_rEngineeringFiniteLimit)
+    AND (rValue >= -c_rEngineeringFiniteLimit)]]></ST></Implementation></POU></TcPlcObject>

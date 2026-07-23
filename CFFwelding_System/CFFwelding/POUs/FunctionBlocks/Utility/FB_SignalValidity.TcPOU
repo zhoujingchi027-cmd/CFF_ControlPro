@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_SignalValidity" Id="{B4000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[FUNCTION_BLOCK FB_SignalValidity
+VAR_INPUT
+    (* 有效性监控运行许可。 *)
+    bEnable : BOOL;
+    (* 有效性状态复位请求。 *)
+    bReset : BOOL;
+    (* 硬件或上游算法发布的原始有效位。 *)
+    bRawValid : BOOL;
+    (* 待检查的工程量。 *)
+    rValue : LREAL;
+    (* 允许范围第一个边界；实现会处理上下限传反。 *)
+    rMinimum : LREAL;
+    (* 允许范围第二个边界；实现会处理上下限传反。 *)
+    rMaximum : LREAL;
+    (* 无效条件持续超过该时间后撤销有效状态。 *)
+    tInvalidDelay : TIME;
+END_VAR
+VAR_OUTPUT
+    (* 当前值在归一化范围内且为有限数。 *)
+    bInRange : BOOL;
+    (* 延时判定后的正式有效状态。 *)
+    bValid : BOOL;
+    (* 无效条件已经达到配置延时。 *)
+    bInvalidLatched : BOOL;
+END_VAR
+VAR
+    (* 无效条件持续计时器。 *)
+    fbInvalidTimer : TON;
+    (* 本周期未经延时的即时有效条件。 *)
+    bInstantValid : BOOL;
+    (* 归一化后的范围下边界。 *)
+    rLow : LREAL;
+    (* 归一化后的范围上边界。 *)
+    rHigh : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[IF bReset OR NOT bEnable THEN
+    fbInvalidTimer(IN := FALSE, PT := T#0s);
+    bInRange := FALSE;
+    bValid := FALSE;
+    bInvalidLatched := FALSE;
+    RETURN;
+END_IF
+
+IF tInvalidDelay < T#0s THEN
+    (* 负延时属于配置错误，立即撤销有效位且不启动定时器。 *)
+    fbInvalidTimer(IN := FALSE, PT := T#0s);
+    bInRange := FALSE;
+    bValid := FALSE;
+    bInvalidLatched := TRUE;
+    RETURN;
+END_IF
+
+IF rMinimum <= rMaximum THEN
+    rLow := rMinimum;
+    rHigh := rMaximum;
+ELSE
+    rLow := rMaximum;
+    rHigh := rMinimum;
+END_IF
+bInRange := FC_IsFiniteLReal(rValue := rValue)
+    AND FC_IsFiniteLReal(rValue := rLow)
+    AND FC_IsFiniteLReal(rValue := rHigh)
+    AND (rValue >= rLow)
+    AND (rValue <= rHigh);
+
+bInstantValid := bRawValid AND bInRange;
+fbInvalidTimer(IN := NOT bInstantValid, PT := tInvalidDelay);
+
+IF bInstantValid THEN
+    bValid := TRUE;
+    bInvalidLatched := FALSE;
+ELSIF (tInvalidDelay <= T#0s) OR fbInvalidTimer.Q THEN
+    bValid := FALSE;
+    bInvalidLatched := TRUE;
+END_IF]]></ST></Implementation></POU></TcPlcObject>

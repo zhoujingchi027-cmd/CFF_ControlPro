@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_RpmToRadPerSec" Id="{F4000000-0000-4000-8000-000000000005}"><Declaration><![CDATA[FUNCTION FC_RpmToRadPerSec : LREAL
+VAR_INPUT
+    (* 旋转速度，单位转每分钟，符号表示方向。 *)
+    rRpm : LREAL;
+END_VAR
+VAR CONSTANT
+    (* 圆周率常量。 *)
+    c_rPi : LREAL := 3.14159265358979323846;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* rpm乘以二派并除以六十，结果单位为弧度每秒。 *)
+FC_RpmToRadPerSec := rRpm * (2.0 * c_rPi / 60.0)]]></ST></Implementation></POU></TcPlcObject>

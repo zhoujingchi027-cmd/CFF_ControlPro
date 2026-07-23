@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_GetPrimaryEndCause" Id="{F4000000-0000-4000-8000-000000000012}"><Declaration><![CDATA[FUNCTION FC_GetPrimaryEndCause : E_StepEndCause
+VAR_INPUT
+    (* 已确认成立的唯一主判据。 *)
+    ePrimaryCriterion : E_StepPrimaryCriterion;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[CASE ePrimaryCriterion OF
+    STEP_CRIT_RELATIVE_DISTANCE:
+        FC_GetPrimaryEndCause := STEP_END_PRIMARY_RELATIVE_DISTANCE;
+    STEP_CRIT_STEP_TIME:
+        FC_GetPrimaryEndCause := STEP_END_PRIMARY_STEP_TIME;
+    STEP_CRIT_FORCE_DECLINE_TO:
+        FC_GetPrimaryEndCause := STEP_END_PRIMARY_FORCE_DECLINE;
+ELSE
+    (* 未知枚举不得伪造成已完成步骤。 *)
+    FC_GetPrimaryEndCause := STEP_END_NONE;
+END_CASE]]></ST></Implementation></POU></TcPlcObject>

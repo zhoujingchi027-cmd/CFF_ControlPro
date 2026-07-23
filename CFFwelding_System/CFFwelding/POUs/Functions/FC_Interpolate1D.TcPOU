@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_Interpolate1D" Id="{F4000000-0000-4000-8000-000000000009}"><Declaration><![CDATA[FUNCTION FC_Interpolate1D : LREAL
+VAR_INPUT
+    (* 查询横坐标。 *)
+    rX : LREAL;
+    (* 第一个标定点横坐标。 *)
+    rX0 : LREAL;
+    (* 第一个标定点纵坐标。 *)
+    rY0 : LREAL;
+    (* 第二个标定点横坐标。 *)
+    rX1 : LREAL;
+    (* 第二个标定点纵坐标。 *)
+    rY1 : LREAL;
+    (* TRUE时禁止区间外外推。 *)
+    bClampInput : BOOL;
+END_VAR
+VAR_OUTPUT
+    (* 两个横坐标不重合且所有输入有限时为TRUE。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 实际参与插值的横坐标。 *)
+    rQueryX : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bValid := (rX1 <> rX0)
+    AND FC_IsFiniteLReal(rValue := rX)
+    AND FC_IsFiniteLReal(rValue := rX0)
+    AND FC_IsFiniteLReal(rValue := rY0)
+    AND FC_IsFiniteLReal(rValue := rX1)
+    AND FC_IsFiniteLReal(rValue := rY1);
+IF NOT bValid THEN
+    FC_Interpolate1D := rY0;
+    RETURN;
+END_IF
+
+IF bClampInput THEN
+    rQueryX := FC_ClampLReal(rValue := rX, rMinimum := rX0, rMaximum := rX1);
+ELSE
+    rQueryX := rX;
+END_IF
+
+FC_Interpolate1D := rY0 + ((rQueryX - rX0) / (rX1 - rX0)) * (rY1 - rY0)]]></ST></Implementation></POU></TcPlcObject>

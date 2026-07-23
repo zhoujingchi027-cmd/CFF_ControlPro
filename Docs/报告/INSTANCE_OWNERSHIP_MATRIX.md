@@ -4,7 +4,7 @@
 
 - 每个FB实例只允许声明一次。
 - 默认声明在唯一Owner PROGRAM的`VAR`区。
-- 当前Phase 2只建立PROGRAM骨架，尚未创建FB类型，因此当前代码中没有未定义类型的占位实例。
+- Phase 4已创建通用FB类型，但业务实例仍只在对应后续Phase按本矩阵声明；当前PROGRAM中没有提前实例化对象。
 - 下表是后续Phase必须遵守的唯一声明位置；实现对应FB时才能加入实例声明。
 - 每个实际实例声明前必须使用中文块注释说明用途、任务、Owner、输入、输出和Reset/生命周期。
 - 禁止PROGRAM读取其他PROGRAM的局部实例或内部变量。
@@ -56,9 +56,9 @@
 
 `PRG_HmiAdsInterface`、`PRG_ResultTraceability`、`PRG_Statistics`和`PRG_Persistence`在Phase 2不声明FB实例。后续若引入队列、握手或持久化FB，必须先在本矩阵中分配唯一Owner，且不得把字符串、文件、数据库或ADS大数组搬运放入`Task_CffFast`。
 
-## Phase 2核对
+## Phase 4核对
 
 - 当前PROGRAM的`VAR`区均为空，因此不存在重复FB实例。
 - 当前不存在`GVL_Instance`。
-- 当前所有实例均处于“已分配Owner、尚未声明”状态。
+- 通用FB类型已经可编译；当前所有计划实例仍处于“已分配Owner、尚未声明”状态。
 - 轴Adapter是未来唯一允许使用`VAR_IN_OUT AXIS_REF`的FB；算法FB不得访问`AXIS_REF`。

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_AlarmLatch" Id="{B4000000-0000-4000-8000-000000000006}"><Declaration><![CDATA[FUNCTION_BLOCK FB_AlarmLatch
+VAR_INPUT
+    (* 报警锁存功能运行许可。 *)
+    bEnable : BOOL;
+    (* 操作者或上层状态机提出的复位请求。 *)
+    bReset : BOOL;
+    (* 本周期报警置位请求。 *)
+    bSetRequest : BOOL;
+    (* 产生报警的源条件当前仍然存在。 *)
+    bSourceActive : BOOL;
+    (* 当前模式、权限和状态允许清除锁存。 *)
+    bResetAllowed : BOOL;
+END_VAR
+VAR_OUTPUT
+    (* 报警已经锁存；源条件消失后仍保持。 *)
+    bLatched : BOOL;
+    (* 报警首次置位的单扫描脉冲。 *)
+    bSetPulse : BOOL;
+    (* 复位请求因源仍存在或权限不足被拒绝。 *)
+    bResetRejected : BOOL;
+    (* 报警锁存功能处于运行状态。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 上一扫描的置位请求，用于形成边沿脉冲。 *)
+    bPreviousSetRequest : BOOL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bSetPulse := FALSE;
+bResetRejected := FALSE;
+bValid := bEnable;
+
+IF NOT bEnable THEN
+    bPreviousSetRequest := bSetRequest;
+    RETURN;
+END_IF
+
+(* 置位优先于复位，确保同一扫描出现故障时不会被清除。 *)
+IF bSetRequest OR bSourceActive THEN
+    bSetPulse := NOT bLatched AND ((bSetRequest AND NOT bPreviousSetRequest) OR bSourceActive);
+    bLatched := TRUE;
+    IF bReset THEN
+        (* 故障源仍存在或同一扫描重新置位时，复位请求明确被拒绝。 *)
+        bResetRejected := TRUE;
+    END_IF
+ELSIF bReset THEN
+    IF bResetAllowed AND NOT bSourceActive THEN
+        bLatched := FALSE;
+    ELSE
+        bResetRejected := TRUE;
+    END_IF
+END_IF
+
+bPreviousSetRequest := bSetRequest]]></ST></Implementation></POU></TcPlcObject>

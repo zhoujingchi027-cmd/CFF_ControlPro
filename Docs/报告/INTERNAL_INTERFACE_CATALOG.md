@@ -4,7 +4,7 @@
 
 - 所有标识符使用英文ASCII。
 - 每个公开字段前使用独立行中文注释说明意义、单位或生命周期。
-- 当前Phase 2只使用基础IEC类型；需要枚举的`UDINT`字段将在Phase 3创建显式赋值枚举后替换。
+- Phase 3已将接口状态字段替换为显式赋值枚举；Phase 4通用对象继续只依赖类型化参数和返回值。
 - PROGRAM之间不得访问彼此局部变量；后续通过GVL中的这些类型化契约交互。
 - 算法输入由调用者完整赋值，输出由对应FB或PROGRAM唯一写入。
 - 只有轴Adapter允许通过`VAR_IN_OUT AXIS_REF`访问轴；以下算法接口均不包含`AXIS_REF`。
@@ -110,8 +110,41 @@
 | `ST_CffSequenceCommand` | `PRG_CommandDispatcher`/跨任务发布契约 | `PRG_CffSequence` |
 | `ST_CffSequenceStatus` | `PRG_CffSequence` | Main Task状态机和ADS快照层 |
 
-## Phase 2状态
+## Phase 4纯计算FC
 
-- 14个接口DUT已经加入PLC工程并由Phase 2验收脚本检查。
+| FC | 输入/输出契约 | 无效或边界处理 |
+|---|---|---|
+| `FC_ClampLReal` | 数值与两个边界 → 限幅值 | 自动归一化传反的上下限 |
+| `FC_ScaleLinear` | 原始/工程量程 → 线性换算值、`bValid` | 零跨度或非有限输入返回工程下端并撤销有效位 |
+| `FC_LimitRate` | 当前值、目标、上下变化率、周期 → 连续值 | 非正周期、负速率或非有限输入保持当前值 |
+| `FC_TrapezoidIntegrate` | 上次积分、相邻样本、周期 → 新积分 | 非正周期或非有限样本保持累计值 |
+| `FC_RpmToRadPerSec` | rpm → rad/s | 保留方向符号 |
+| `FC_CalcEnergyIncrement` | Torque、RPM、周期 → J增量、`bValid` | 工程值或周期无效时增量为零 |
+| `FC_ConvertDirection` | 工程值、`+1/-1`方向 → 换向值、`bValid` | 非法方向返回零并撤销有效位 |
+| `FC_IsFiniteLReal` | `LREAL` → `BOOL` | 拒绝NaN、无穷及超出工程有限上界的值 |
+| `FC_Interpolate1D` | 两点与查询值 → 插值、`bValid` | 重合横坐标或非有限输入返回第一个纵坐标 |
+| `FC_ValidateCalibration` | 有效位、Revision、Gain、Direction → `BOOL` | 任何必要条件缺失均拒绝 |
+| `FC_ValidateJoinProgram` | 四步骤Program、Machine Limits → `BOOL` | 固定步骤顺序、判据、超时和机器硬限值逐项校验 |
+| `FC_GetPrimaryEndCause` | Primary枚举 → EndCause枚举 | 未知枚举返回`STEP_END_NONE` |
+| `FC_CalcStrokeVelocityLimit` | 剩余行程、裕量、减速度 → 制动速度上限 | 到达边界、负裕量或无效减速度返回零 |
+| `FC_CheckModeSourceMatrix` | Mode、Source → `BOOL` | 只放行三种冻结合法组合 |
+
+## Phase 4通用FB
+
+| FB | 状态接口 | Reset/生命周期 |
+|---|---|---|
+| `FB_LowPassFilter` | Enable、输入有效位、周期、时间常数 → 滤波值/有效位 | Reset/Disable清历史；无效输入保持最后值并撤销有效位 |
+| `FB_Debounce` | 输入、On/Off延时 → 稳定值和双边沿脉冲 | Reset/Disable清计时；负延时拒绝运行 |
+| `FB_SignalValidity` | 原始有效位、值、范围、无效延时 → 正式有效位 | Reset清状态；负延时立即无效；范围传反自动归一化 |
+| `FB_SetpointRamp` | 起始值、目标、双向速率、周期 → 连续输出 | Reset/Disable回到起始值；无效参数保持连续输出 |
+| `FB_CommandHandshake` | RequestId → AcceptedId、新请求脉冲 | Reset将AcceptedId归零；相同编号标记重复 |
+| `FB_AlarmLatch` | 置位、源状态、复位权限 → 锁存/拒绝 | 置位优先；源仍存在或权限不足时拒绝复位 |
+
+这些对象不访问GVL、PROGRAM局部变量、`AXIS_REF`或`MC_*`；实际实例仍按实例所有权矩阵在对应后续Phase由唯一Owner声明。
+
+## 分阶段状态
+
+- 14个接口DUT已经加入PLC工程，并在Phase 3完成枚举类型化。
+- Phase 4加入14个纯计算FC和6个通用FB；当前只定义可复用类型，不提前声明业务实例。
 - 所有接口只定义数据契约，不读写硬件、不生成命令、不改变Ready。
 - PROGRAM骨架没有跨PROGRAM局部变量访问。

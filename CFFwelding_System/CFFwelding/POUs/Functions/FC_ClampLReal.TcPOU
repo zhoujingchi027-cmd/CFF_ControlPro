@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_ClampLReal" Id="{F4000000-0000-4000-8000-000000000001}"><Declaration><![CDATA[FUNCTION FC_ClampLReal : LREAL
+VAR_INPUT
+    (* 待限制的双精度数值。 *)
+    rValue : LREAL;
+    (* 允许区间的第一个边界；函数会自动处理上下限传反。 *)
+    rMinimum : LREAL;
+    (* 允许区间的第二个边界；函数会自动处理上下限传反。 *)
+    rMaximum : LREAL;
+END_VAR
+VAR
+    (* 归一化后的下边界。 *)
+    rLow : LREAL;
+    (* 归一化后的上边界。 *)
+    rHigh : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 先归一化边界，防止配方上下限传反后失去硬限制。 *)
+IF rMinimum <= rMaximum THEN
+    rLow := rMinimum;
+    rHigh := rMaximum;
+ELSE
+    rLow := rMaximum;
+    rHigh := rMinimum;
+END_IF
+
+IF rValue < rLow THEN
+    FC_ClampLReal := rLow;
+ELSIF rValue > rHigh THEN
+    FC_ClampLReal := rHigh;
+ELSE
+    FC_ClampLReal := rValue;
+END_IF]]></ST></Implementation></POU></TcPlcObject>

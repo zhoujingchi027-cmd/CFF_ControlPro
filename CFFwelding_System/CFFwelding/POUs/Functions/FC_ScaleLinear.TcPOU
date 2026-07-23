@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_ScaleLinear" Id="{F4000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[FUNCTION FC_ScaleLinear : LREAL
+VAR_INPUT
+    (* 待缩放的原始输入值。 *)
+    rInput : LREAL;
+    (* 原始量程下端。 *)
+    rInputMinimum : LREAL;
+    (* 原始量程上端。 *)
+    rInputMaximum : LREAL;
+    (* 工程量程下端。 *)
+    rOutputMinimum : LREAL;
+    (* 工程量程上端。 *)
+    rOutputMaximum : LREAL;
+    (* TRUE时先把输入限制在原始量程内。 *)
+    bClampInput : BOOL;
+END_VAR
+VAR_OUTPUT
+    (* 量程跨度有效时为TRUE；输入跨度为零时为FALSE。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 参与换算的输入值。 *)
+    rScaledInput : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bValid := (rInputMaximum <> rInputMinimum)
+    AND FC_IsFiniteLReal(rValue := rInput)
+    AND FC_IsFiniteLReal(rValue := rInputMinimum)
+    AND FC_IsFiniteLReal(rValue := rInputMaximum)
+    AND FC_IsFiniteLReal(rValue := rOutputMinimum)
+    AND FC_IsFiniteLReal(rValue := rOutputMaximum);
+IF NOT bValid THEN
+    (* 零跨度不能换算，返回工程量下端并显式标记无效。 *)
+    FC_ScaleLinear := rOutputMinimum;
+    RETURN;
+END_IF
+
+IF bClampInput THEN
+    rScaledInput := FC_ClampLReal(rValue := rInput, rMinimum := rInputMinimum, rMaximum := rInputMaximum);
+ELSE
+    rScaledInput := rInput;
+END_IF
+
+FC_ScaleLinear := rOutputMinimum
+    + ((rScaledInput - rInputMinimum) / (rInputMaximum - rInputMinimum))
+    * (rOutputMaximum - rOutputMinimum)]]></ST></Implementation></POU></TcPlcObject>

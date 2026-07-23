@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_ValidateJoinProgram" Id="{F4000000-0000-4000-8000-000000000011}"><Declaration><![CDATA[FUNCTION FC_ValidateJoinProgram : BOOL
+VAR_INPUT
+    (* 待校验的四步骤连接程序。 *)
+    stProgram : ST_CffJoinProgram;
+    (* 机器硬限制；程序值不得超过这些边界。 *)
+    stMachineLimits : ST_MachineLimits;
+END_VAR
+VAR
+    (* 固定四步骤遍历索引。 *)
+    nStepIndex : INT;
+    (* 当前步骤的局部副本。 *)
+    stStep : ST_CffStepProgram;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[FC_ValidateJoinProgram := FALSE;
+
+(* 程序、机器限值和受控修订必须先有效。 *)
+IF NOT stProgram.bValid OR NOT stMachineLimits.bValid
+    OR (stProgram.stHeader.nProgramId = 0)
+    OR (stProgram.stHeader.nRevision = 0)
+    OR (stMachineLimits.fMaxForceN <= 0.0)
+    OR (stMachineLimits.fRMaxSpeedRpm <= 0.0) THEN
+    RETURN;
+END_IF
+
+FOR nStepIndex := 1 TO 4 DO
+    stStep := stProgram.astSteps[nStepIndex];
+    IF NOT stStep.bValid OR NOT stStep.stProceeding.bValid
+        OR (stStep.fSetForceN < 0.0)
+        OR (stStep.fSetForceN > stMachineLimits.fMaxForceN)
+        OR (ABS(stStep.fSetSpeedRpm) > stMachineLimits.fRMaxSpeedRpm)
+        OR (stStep.fForceRampNS <= 0.0)
+        OR (stStep.stProceeding.nTimeoutMs = 0) THEN
+        RETURN;
+    END_IF
+
+    (* 数组位置和显式步骤编号必须一致，防止配方步骤错位。 *)
+    CASE nStepIndex OF
+        1: IF stStep.eStep <> CFF_STEP1_PENETRATION THEN RETURN; END_IF
+        2: IF stStep.eStep <> CFF_STEP2_CLEAN_ACTIVATE THEN RETURN; END_IF
+        3: IF stStep.eStep <> CFF_STEP3_WELDING THEN RETURN; END_IF
+        4: IF stStep.eStep <> CFF_STEP4_COMPRESSION THEN RETURN; END_IF
+    END_CASE
+
+    CASE stStep.stProceeding.ePrimaryCriterion OF
+        STEP_CRIT_RELATIVE_DISTANCE:
+            IF stStep.stProceeding.fRelativeDistanceMm <= 0.0 THEN RETURN; END_IF
+        STEP_CRIT_STEP_TIME:
+            (* 时间主判据必须配置累计相对位移次级边界。 *)
+            IF stStep.stProceeding.fRelativeDistanceMm <= 0.0 THEN RETURN; END_IF
+        STEP_CRIT_FORCE_DECLINE_TO:
+            (* 力下降主判据必须低于本步骤目标力并有去抖窗口和次级位移边界。 *)
+            IF (stStep.stProceeding.fForceDeclineN < 0.0)
+                OR (stStep.stProceeding.fForceDeclineN >= stStep.fSetForceN)
+                OR (stStep.stProceeding.nStableWindowMs = 0)
+                OR (stStep.stProceeding.fRelativeDistanceMm <= 0.0) THEN
+                RETURN;
+            END_IF
+    ELSE
+        RETURN;
+    END_CASE
+END_FOR
+
+FC_ValidateJoinProgram := TRUE]]></ST></Implementation></POU></TcPlcObject>

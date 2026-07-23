@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_CalcEnergyIncrement" Id="{F4000000-0000-4000-8000-000000000006}"><Declaration><![CDATA[FUNCTION FC_CalcEnergyIncrement : LREAL
+VAR_INPUT
+    (* 本周期工程扭矩，单位牛米。 *)
+    rTorque_Nm : LREAL;
+    (* 本周期旋转速度，单位转每分钟。 *)
+    rRpm : LREAL;
+    (* 实际采样周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+    (* TRUE时按功率绝对值累计能量。 *)
+    bAbsolutePower : BOOL;
+END_VAR
+VAR_OUTPUT
+    (* 周期为正且输入为有限工程值时为TRUE。 *)
+    bValid : BOOL;
+END_VAR
+VAR
+    (* 当前机械功率，单位瓦。 *)
+    rPower_W : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bValid := (rCycleTime_s > 0.0)
+    AND FC_IsFiniteLReal(rValue := rTorque_Nm)
+    AND FC_IsFiniteLReal(rValue := rRpm);
+IF NOT bValid THEN
+    FC_CalcEnergyIncrement := 0.0;
+    RETURN;
+END_IF
+
+rPower_W := rTorque_Nm * FC_RpmToRadPerSec(rRpm := rRpm);
+IF bAbsolutePower THEN
+    rPower_W := ABS(rPower_W);
+END_IF
+
+(* 瓦乘秒得到本周期焦耳增量。 *)
+FC_CalcEnergyIncrement := rPower_W * rCycleTime_s]]></ST></Implementation></POU></TcPlcObject>

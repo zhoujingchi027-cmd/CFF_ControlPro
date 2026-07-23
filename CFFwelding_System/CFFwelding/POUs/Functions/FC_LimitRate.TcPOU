@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_LimitRate" Id="{F4000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[FUNCTION FC_LimitRate : LREAL
+VAR_INPUT
+    (* 当前输出值。 *)
+    rCurrent : LREAL;
+    (* 本周期目标值。 *)
+    rTarget : LREAL;
+    (* 正方向最大变化率，单位每秒，必须非负。 *)
+    rRateUpPer_s : LREAL;
+    (* 负方向最大变化率绝对值，单位每秒，必须非负。 *)
+    rRateDownPer_s : LREAL;
+    (* 实际调用周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+END_VAR
+VAR
+    (* 本周期允许的正向增量。 *)
+    rMaximumUpStep : LREAL;
+    (* 本周期允许的负向增量绝对值。 *)
+    rMaximumDownStep : LREAL;
+    (* 目标与当前值之差。 *)
+    rDelta : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 无效周期或负速率时保持当前值，防止产生方向相反的跳变。 *)
+IF (rCycleTime_s <= 0.0) OR (rRateUpPer_s < 0.0) OR (rRateDownPer_s < 0.0)
+    OR NOT FC_IsFiniteLReal(rValue := rCurrent)
+    OR NOT FC_IsFiniteLReal(rValue := rTarget)
+    OR NOT FC_IsFiniteLReal(rValue := rRateUpPer_s)
+    OR NOT FC_IsFiniteLReal(rValue := rRateDownPer_s) THEN
+    FC_LimitRate := rCurrent;
+    RETURN;
+END_IF
+
+rMaximumUpStep := rRateUpPer_s * rCycleTime_s;
+rMaximumDownStep := rRateDownPer_s * rCycleTime_s;
+rDelta := rTarget - rCurrent;
+
+IF rDelta > rMaximumUpStep THEN
+    FC_LimitRate := rCurrent + rMaximumUpStep;
+ELSIF rDelta < -rMaximumDownStep THEN
+    FC_LimitRate := rCurrent - rMaximumDownStep;
+ELSE
+    FC_LimitRate := rTarget;
+END_IF]]></ST></Implementation></POU></TcPlcObject>

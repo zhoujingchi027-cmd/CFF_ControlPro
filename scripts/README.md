@@ -33,3 +33,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Cffweldi
 - `Test-Phase3DataAndBindings.ps1`：检查数据对象、任务周期、内部映射、空硬件边界和人工交付清单。
 
 链接脚本依赖最新 TMC 过程映像，因此第一次执行应先 Build；最终必须在链接后再次 Build。所有三个配置/同步/链接脚本均支持幂等复跑。
+
+## Phase 4 通用算法验收
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase4Utilities.ps1
+```
+
+该脚本检查14个纯计算FC和6个通用FB的唯一性、PLC编译清单、中文接口/算法注释、复位与边界接口，并拒绝这些通用对象访问`GVL`、`AXIS_REF`或任何`MC_*`对象。

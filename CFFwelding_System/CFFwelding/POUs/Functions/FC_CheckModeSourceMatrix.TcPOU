@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_CheckModeSourceMatrix" Id="{F4000000-0000-4000-8000-000000000014}"><Declaration><![CDATA[FUNCTION FC_CheckModeSourceMatrix : BOOL
+VAR_INPUT
+    (* 由硬件权威输入解析出的操作模式。 *)
+    eOperationMode : E_OperationMode;
+    (* 由硬件权威输入解析出的控制源。 *)
+    eControlSource : E_ControlSource;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 只允许任务书冻结的三种模式与控制源组合。 *)
+FC_CheckModeSourceMatrix :=
+    ((eOperationMode = OP_MODE_MAINTENANCE) AND (eControlSource = CONTROL_SOURCE_LOCAL))
+    OR ((eOperationMode = OP_MODE_MANUAL) AND (eControlSource = CONTROL_SOURCE_LOCAL))
+    OR ((eOperationMode = OP_MODE_AUTOMATIC) AND (eControlSource = CONTROL_SOURCE_ROBOT))]]></ST></Implementation></POU></TcPlcObject>

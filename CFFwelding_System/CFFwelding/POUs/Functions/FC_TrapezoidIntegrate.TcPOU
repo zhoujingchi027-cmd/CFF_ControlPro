@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_TrapezoidIntegrate" Id="{F4000000-0000-4000-8000-000000000004}"><Declaration><![CDATA[FUNCTION FC_TrapezoidIntegrate : LREAL
+VAR_INPUT
+    (* 上一周期累计积分值。 *)
+    rPreviousIntegral : LREAL;
+    (* 上一周期采样值。 *)
+    rPreviousValue : LREAL;
+    (* 当前周期采样值。 *)
+    rCurrentValue : LREAL;
+    (* 实际采样周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[IF (rCycleTime_s <= 0.0)
+    OR NOT FC_IsFiniteLReal(rValue := rPreviousIntegral)
+    OR NOT FC_IsFiniteLReal(rValue := rPreviousValue)
+    OR NOT FC_IsFiniteLReal(rValue := rCurrentValue) THEN
+    (* 周期无效时保持累计值，禁止用负时间反向积分。 *)
+    FC_TrapezoidIntegrate := rPreviousIntegral;
+ELSE
+    FC_TrapezoidIntegrate := rPreviousIntegral
+        + 0.5 * (rPreviousValue + rCurrentValue) * rCycleTime_s;
+END_IF]]></ST></Implementation></POU></TcPlcObject>

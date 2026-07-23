@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_ConvertDirection" Id="{F4000000-0000-4000-8000-000000000007}"><Declaration><![CDATA[FUNCTION FC_ConvertDirection : LREAL
+VAR_INPUT
+    (* 需要按机械方向换算的工程值。 *)
+    rValue : LREAL;
+    (* 方向系数，只允许正一或负一。 *)
+    nDirection : DINT;
+END_VAR
+VAR_OUTPUT
+    (* 方向系数合法时为TRUE。 *)
+    bValid : BOOL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bValid := (nDirection = 1) OR (nDirection = -1);
+IF bValid THEN
+    FC_ConvertDirection := rValue * DINT_TO_LREAL(nDirection);
+ELSE
+    (* 非法方向不得静默放行，返回零并由调用者检查有效位。 *)
+    FC_ConvertDirection := 0.0;
+END_IF]]></ST></Implementation></POU></TcPlcObject>

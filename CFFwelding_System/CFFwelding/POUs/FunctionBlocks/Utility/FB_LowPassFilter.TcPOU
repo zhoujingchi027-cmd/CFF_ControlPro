@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_LowPassFilter" Id="{B4000000-0000-4000-8000-000000000001}"><Declaration><![CDATA[FUNCTION_BLOCK FB_LowPassFilter
+VAR_INPUT
+    (* 滤波器运行许可；FALSE时撤销有效状态。 *)
+    bEnable : BOOL;
+    (* 算法复位请求；复位时清除历史值。 *)
+    bReset : BOOL;
+    (* 当前输入值是否可用于控制计算。 *)
+    bInputValid : BOOL;
+    (* 当前原始输入值。 *)
+    rInput : LREAL;
+    (* 实际调用周期，单位秒。 *)
+    rCycleTime_s : LREAL;
+    (* 一阶滤波时间常数，单位秒；零表示直接跟随。 *)
+    rTimeConstant_s : LREAL;
+END_VAR
+VAR_OUTPUT
+    (* 当前滤波输出；输入无效时保持最后有效值。 *)
+    rOutput : LREAL;
+    (* 本周期输出可用时为TRUE。 *)
+    bValid : BOOL;
+    (* 已接收过至少一个有效样本时为TRUE。 *)
+    bInitialized : BOOL;
+END_VAR
+VAR
+    (* 离散一阶滤波系数，限制在零到一。 *)
+    rAlpha : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 复位优先级最高：清除历史，且不得发布有效控制值。 *)
+IF bReset OR NOT bEnable THEN
+    rOutput := 0.0;
+    bValid := FALSE;
+    bInitialized := FALSE;
+    RETURN;
+END_IF
+
+IF NOT bInputValid OR NOT FC_IsFiniteLReal(rValue := rInput) THEN
+    (* 传感器无效时保持最后有效输出，但有效位立即撤销。 *)
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+IF NOT bInitialized THEN
+    rOutput := rInput;
+    bInitialized := TRUE;
+    bValid := TRUE;
+    RETURN;
+END_IF
+
+IF rCycleTime_s <= 0.0 THEN
+    (* 非正周期无法形成确定离散滤波，保持输出并撤销有效位。 *)
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+IF rTimeConstant_s <= 0.0 THEN
+    rOutput := rInput;
+ELSE
+    rAlpha := rCycleTime_s / (rTimeConstant_s + rCycleTime_s);
+    rAlpha := FC_ClampLReal(rValue := rAlpha, rMinimum := 0.0, rMaximum := 1.0);
+    rOutput := rOutput + rAlpha * (rInput - rOutput);
+END_IF
+bValid := TRUE]]></ST></Implementation></POU></TcPlcObject>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_ValidateCalibration" Id="{F4000000-0000-4000-8000-000000000010}"><Declaration><![CDATA[FUNCTION FC_ValidateCalibration : BOOL
+VAR_INPUT
+    (* 标定流程发布的有效状态。 *)
+    bCalibrationValid : BOOL;
+    (* 标定修订号；零表示尚未形成受控版本。 *)
+    udiRevision : UDINT;
+    (* 标定比例增益，必须为非零有限值。 *)
+    rGain : LREAL;
+    (* 工程方向，只允许正一或负一。 *)
+    nDirection : DINT;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 同时验证流程状态、版本、有限增益和方向，禁止只靠单一BOOL放行。 *)
+FC_ValidateCalibration := bCalibrationValid
+    AND (udiRevision > 0)
+    AND FC_IsFiniteLReal(rValue := rGain)
+    AND (ABS(rGain) > 0.0)
+    AND ((nDirection = 1) OR (nDirection = -1))]]></ST></Implementation></POU></TcPlcObject>

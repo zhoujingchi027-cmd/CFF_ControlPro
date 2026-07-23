@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_CommandHandshake" Id="{B4000000-0000-4000-8000-000000000005}"><Declaration><![CDATA[FUNCTION_BLOCK FB_CommandHandshake
+VAR_INPUT
+    (* 命令握手运行许可。 *)
+    bEnable : BOOL;
+    (* 握手状态复位请求；复位后接受编号回到零。 *)
+    bReset : BOOL;
+    (* 请求方最后完整写入的单调请求编号。 *)
+    udiRequestId : UDINT;
+END_VAR
+VAR_OUTPUT
+    (* 本实例已经原子接受的最后请求编号。 *)
+    udiAcceptedId : UDINT;
+    (* 本扫描发现并接受新请求时的单扫描脉冲。 *)
+    bNewRequest : BOOL;
+    (* 请求编号与已接受编号相同，表示重复请求。 *)
+    bDuplicate : BOOL;
+    (* 握手实例正在运行。 *)
+    bValid : BOOL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[bNewRequest := FALSE;
+bDuplicate := FALSE;
+bValid := bEnable;
+
+IF bReset THEN
+    udiAcceptedId := 0;
+    bValid := FALSE;
+    RETURN;
+END_IF
+
+IF NOT bEnable OR (udiRequestId = 0) THEN
+    RETURN;
+END_IF
+
+IF udiRequestId <> udiAcceptedId THEN
+    (* 调用者必须在递增RequestId前写完其余邮箱字段。 *)
+    udiAcceptedId := udiRequestId;
+    bNewRequest := TRUE;
+ELSE
+    bDuplicate := TRUE;
+END_IF]]></ST></Implementation></POU></TcPlcObject>
