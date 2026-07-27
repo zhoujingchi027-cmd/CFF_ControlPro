@@ -10,6 +10,30 @@ VAR
        --------------------------------------------------------- *)
     fbZAxisArbiter : FB_AxisCommandArbiter;
     (* ---------------------------------------------------------
+       Force Setpoint斜坡实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：当前ForceControl、Sequence目标力、Profile斜坡和实际周期。
+       输出：连续目标力；Reset：流程未使能、Stop、Fault或轴Reset。
+       生命周期：只在Sequence明确请求导纳力控时运行。
+       --------------------------------------------------------- *)
+    fbForceSetpointRamp : FB_SetpointRamp;
+    (* ---------------------------------------------------------
+       Z轴Profile无扰切换实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：切换前速度、新Profile、Ramp后目标力和ForceControl。
+       输出：单扫描积分预置；Reset：流程未使能或轴Reset。
+       生命周期：只接受Contact/Profile切换上升沿。
+       --------------------------------------------------------- *)
+    fbZProfileSwitch : FB_BumplessProfileSwitch;
+    (* ---------------------------------------------------------
+       Z轴导纳力控实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：Ramp后目标力、ForceControl、SRelSensor、Owner和External状态。
+       输出：受硬边界和Anti-windup约束的Z速度及诊断。
+       Reset：流程未使能、Stop、Fault或轴Reset；禁止访问AXIS_REF/MC。
+       --------------------------------------------------------- *)
+    fbZForceAdmittance : FB_ZForceAdmittance;
+    (* ---------------------------------------------------------
        Z轴标准NC适配实例。
        所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
        输入：仲裁命令、命令编号、Z轴AXIS_REF和真实驱动绑定状态。
@@ -50,6 +74,20 @@ VAR
     bExternalCommandChannelBusy : BOOL;
     (* External退出期间冻结标准Adapter事务编号，退出后再交付挂起命令。 *)
     udiZStandardCommandId : UDINT;
+    (* 调用导纳FB前完整赋值的类型化输入。 *)
+    stZForceInput : ST_ZForceControlInput;
+    (* Sequence正式请求导纳力控；Phase 10实现前保持FALSE。 *)
+    bForceLoopRequested : BOOL;
+    (* ForceControl从N换算后的控制量，单位kN。 *)
+    rForceActual_kN : LREAL;
+    (* FastTask配置周期换算值，单位s。 *)
+    rFastCycleTime_s : LREAL;
+    (* 最近成功应用无扰预置的Force Profile修订号。 *)
+    udiLastForceProfileRevision : UDINT;
+    (* 当前有效Profile修订号尚未完成无扰预置。 *)
+    bProfileRevisionChanged : BOOL;
+    (* Sequence脉冲或Revision变化合并后的无扰请求。 *)
+    bProfileTransferRequested : BOOL;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
    快速轴控制状态。
@@ -96,6 +134,86 @@ fbZAxisArbiter(
     stApproachCommand := stApproachCommand,
     stForceProcessCommand := stForceProcessCommand,
     stRetractCommand := stRetractCommand);
+
+(* ---------------------------------------------------------
+   Phase 8导纳链只消费正式Sequence状态和有效测量。
+   PRG_CffSequence尚未实现时bForceControlEnable保持FALSE，
+   因此本阶段不会生成活动力控或覆盖External P/V/A命令。
+   --------------------------------------------------------- *)
+bForceLoopRequested := GVL_Status.stFast.stSequence.bForceControlEnable
+    AND NOT GVL_Status.stFast.stSequence.bError
+    AND NOT GVL_Status.stFast.stSequence.bAborted;
+rForceActual_kN := GVL_Process.stActual.fForceControlN * 0.001;
+rFastCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+bProfileRevisionChanged := bForceLoopRequested
+    AND (GVL_Config.stZForceControl.nRevision <> udiLastForceProfileRevision);
+bProfileTransferRequested := GVL_Status.stFast.stSequence.bForceProfileTransfer
+    OR bProfileRevisionChanged;
+
+fbForceSetpointRamp(
+    bEnable := bForceLoopRequested,
+    bReset := GVL_Command.stFast.stZAxis.bReset
+        OR GVL_Command.stFast.stSequence.bResetPulse
+        OR NOT bForceLoopRequested,
+    rInitialValue := rForceActual_kN,
+    rTarget := GVL_Status.stFast.stSequence.rForceSet_kN,
+    rRateUpPer_s := GVL_Config.stZForceControl.fForceRampNS * 0.001,
+    rRateDownPer_s := GVL_Config.stZForceControl.fForceRampNS * 0.001,
+    rCycleTime_s := rFastCycleTime_s,
+    rTolerance := 0.000001);
+
+fbZProfileSwitch(
+    bEnable := bForceLoopRequested,
+    bReset := GVL_Command.stFast.stZAxis.bReset
+        OR GVL_Command.stFast.stSequence.bResetPulse,
+    bSwitchPulse := bProfileTransferRequested,
+    rPreviousVelocity_mm_s := GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s,
+    rVelocityFeedForward_mm_s := GVL_Config.stZForceControl.fVelocityFeedForwardMmS,
+    rProportionalGain_mm_s_per_kN := GVL_Config.stZForceControl.fKp,
+    rForceSet_kN := fbForceSetpointRamp.rOutput,
+    rForceActual_kN := rForceActual_kN,
+    rIntegralLimit_mm_s := GVL_Config.stZForceControl.fIntegralLimit);
+
+stZForceInput.bEnable := bForceLoopRequested;
+stZForceInput.bReset := GVL_Command.stFast.stZAxis.bReset
+    OR GVL_Command.stFast.stSequence.bResetPulse;
+stZForceInput.bOwnerGranted := fbZAxisArbiter.eActiveOwner
+    = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
+stZForceInput.bExternalActive := fbZExtSetpoint.stStatus.bEnabled;
+stZForceInput.bForceValid := GVL_Process.stActual.bForceValid
+    AND fbForceSetpointRamp.bValid;
+stZForceInput.bRelativePositionValid := GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement;
+stZForceInput.bBumplessTransfer := bProfileTransferRequested;
+stZForceInput.bHardForceActive := GVL_Status.stFast.stSequence.bForceHardLimitActive;
+stZForceInput.bHardStrokeActive := GVL_Status.stFast.stSequence.bStrokeHardLimitActive;
+stZForceInput.bCollisionLimitActive := GVL_Status.stFast.stSequence.bCollisionLimitActive;
+stZForceInput.rForceSet_kN := GVL_Status.stFast.stSequence.rForceSet_kN;
+stZForceInput.rForceActual_kN := rForceActual_kN;
+stZForceInput.rRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
+stZForceInput.rTargetRelativePosition_mm := GVL_Status.stFast.stSequence.rTargetRelativePosition_mm;
+stZForceInput.rHardMaximumRelativePosition_mm := GVL_Status.stFast.stSequence.rHardMaximumRelativePosition_mm;
+stZForceInput.rTransferVelocity_mm_s := GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s;
+stZForceInput.rCycleTime_s := rFastCycleTime_s;
+
+fbZForceAdmittance(
+    stInput := stZForceInput,
+    stProfile := GVL_Config.stZForceControl,
+    stLimits := GVL_Config.stLimits,
+    rForceSetRamped_kN := fbForceSetpointRamp.rOutput,
+    bApplyIntegralPreload := fbZProfileSwitch.bAccepted,
+    rIntegralPreload_mm_s := fbZProfileSwitch.rIntegralPreload_mm_s);
+GVL_Status.stFast.stZForceControl := fbZForceAdmittance.stOutput;
+IF GVL_Command.stFast.stZAxis.bReset
+    OR GVL_Command.stFast.stSequence.bResetPulse THEN
+    (* Reset后的下一有效扫描必须重新完成Profile和限值无扰提交。 *)
+    udiLastForceProfileRevision := 0;
+ELSIF NOT bForceLoopRequested THEN
+    udiLastForceProfileRevision := 0;
+ELSIF fbZProfileSwitch.bAccepted THEN
+    udiLastForceProfileRevision := GVL_Config.stZForceControl.nRevision;
+END_IF
 
 (* 轴Reset不依赖Owner有效，仍以同一事务编号交给Adapter。 *)
 stSelectedZCommand := fbZAxisArbiter.stCommand;
@@ -148,6 +266,15 @@ IF fbZExtSetpoint.stStatus.bError THEN
     GVL_Status.stFast.stZAxis.bError := TRUE;
     GVL_Status.stFast.stZAxis.nErrorId := fbZExtSetpoint.stStatus.nErrorId;
 END_IF
+
+(* 导纳力控使用固定唯一报警槽8；Profile预置错误同样不得静默忽略。 *)
+GVL_Alarm.astRequests[8].eCode := E_AlarmCode.ALARM_FORCE_CONTROL_FAULT;
+GVL_Alarm.astRequests[8].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
+GVL_Alarm.astRequests[8].nTextId := 2500;
+GVL_Alarm.astRequests[8].nSourceId := 8;
+GVL_Alarm.astRequests[8].bLatch := TRUE;
+GVL_Alarm.astRequests[8].bActive := fbZForceAdmittance.stOutput.bFault
+    OR fbZProfileSwitch.bError;
 
 (* External Setpoint使用固定唯一报警槽7；文本翻译由上位层按TextId完成。 *)
 GVL_Alarm.astRequests[7].eCode := E_AlarmCode.ALARM_EXTERNAL_SETPOINT_FAULT;

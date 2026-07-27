@@ -29,9 +29,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase3Dat
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase4Utilities.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase5SensorProcessing.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase6MotionAdapters.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase7ExternalSetpoint.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase8ForceAdmittance.ps1
 ```
 
-Phase 7开始后新增`Test-Phase7ExternalSetpoint.ps1`。每个Phase必须先运行
+Phase 7/8新增External Setpoint和导纳力控契约测试。每个Phase必须先运行
 本Phase静态测试和全部既有回归测试，再运行：
 
 ```powershell

@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_ZForceAdmittance" Id="{B5000000-0000-4000-8000-000000000002}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_ZForceAdmittance
+VAR_INPUT
+    (* 调用者完整赋值的力控、有效性和硬边界输入。 *)
+    stInput : ST_ZForceControlInput;
+    (* 候选导纳Profile；只有无扰预置成功后才提交。 *)
+    stProfile : ST_ZForceControlProfile;
+    (* 当前机器硬限值；FB不访问全局配置。 *)
+    stLimits : ST_MachineLimits;
+    (* 已由独立Ramp生成的连续目标力，单位kN。 *)
+    rForceSetRamped_kN : LREAL;
+    (* 当前扫描应用无扰切换FB生成的积分预置。 *)
+    bApplyIntegralPreload : BOOL;
+    (* 无扰切换后的积分初值，单位mm/s。 *)
+    rIntegralPreload_mm_s : LREAL;
+END_VAR
+VAR_OUTPUT
+    (* 导纳速度和完整诊断输出。 *)
+    stOutput : ST_ZForceControlOutput;
+END_VAR
+VAR
+    (* 最近一次完成无扰预置并提交的Profile快照。 *)
+    stAppliedProfile : ST_ZForceControlProfile;
+    (* 与Profile同一次无扰提交的Z轴/过程机器限值快照。 *)
+    stAppliedLimits : ST_MachineLimits;
+    (* 当前Enable生命周期已经提交一个Profile。 *)
+    bProfileInitialized : BOOL;
+    (* 候选Profile或几何目标绕过无扰切换。 *)
+    bProfileMismatch : BOOL;
+    (* 机器限值在未提交新Profile时发生变化。 *)
+    bLimitsMismatch : BOOL;
+    (* 算法故障锁存；只有显式Reset清除。 *)
+    bFaultLatched : BOOL;
+    (* 已锁存的确定性故障编号。 *)
+    udiLatchedFaultId : UDINT;
+    (* Profile、机器限值和周期均满足算法运行条件。 *)
+    bConfigurationValid : BOOL;
+    (* 本周期所有工艺输入均为有限数。 *)
+    bInputFinite : BOOL;
+    (* Hard Force、Hard S_rel或Collision边界当前有效。 *)
+    bHardLimitActive : BOOL;
+    (* 向下硬边界当前有效，但不禁止受控上抬。 *)
+    bDownwardBoundaryActive : BOOL;
+    (* 当前周期冻结积分。 *)
+    bFreezeIntegral : BOOL;
+    (* 当前力误差要求继续向下。 *)
+    bErrorRequestsDownward : BOOL;
+    (* Rate Limit后的速度超过当前S_rel制动包络。 *)
+    bEnvelopeViolation : BOOL;
+    (* PI积分分量，单位mm/s。 *)
+    rIntegralTerm_mm_s : LREAL;
+    (* 本周期限幅前的积分更新候选，单位mm/s。 *)
+    rUpdatedIntegralTerm_mm_s : LREAL;
+    (* 力误差，单位kN。 *)
+    rForceError_kN : LREAL;
+    (* 未饱和PI速度，单位mm/s。 *)
+    rUnsaturatedVelocity_mm_s : LREAL;
+    (* 固定硬边界限幅后的速度，单位mm/s。 *)
+    rBoundaryLimitedVelocity_mm_s : LREAL;
+    (* 包含加速度和最终制动包络的速度，单位mm/s。 *)
+    rSaturatedVelocity_mm_s : LREAL;
+    (* 上一有效周期速度命令，单位mm/s。 *)
+    rPreviousVelocity_mm_s : LREAL;
+    (* S_rel制动计算得到的最大向下速度，单位mm/s。 *)
+    rStrokeVelocityLimit_mm_s : LREAL;
+    (* 当前Profile与机器限值合并后的最大上抬速度绝对值。 *)
+    rMaximumUpVelocity_mm_s : LREAL;
+    (* 当前Profile、机器和S_rel合并后的最大下压速度绝对值。 *)
+    rMaximumDownVelocity_mm_s : LREAL;
+    (* 候选Profile与机器限值合并后的最大上抬速度绝对值。 *)
+    rCandidateMaximumUpVelocity_mm_s : LREAL;
+    (* 候选Profile与机器限值合并后的最大下压速度绝对值。 *)
+    rCandidateMaximumDownVelocity_mm_s : LREAL;
+    (* 当前Profile与机器限值合并后的最大加速度绝对值。 *)
+    rMaximumAcceleration_mm_s2 : LREAL;
+    (* Anti-windup积分导数，单位mm/s2。 *)
+    rIntegralDerivative_mm_s2 : LREAL;
+    (* Z轴绝对软限位跨度，作为S_rel硬上限的配置边界。 *)
+    rMaximumRelativeTravel_mm : LREAL;
+    (* 机器最大过程力换算值，单位kN。 *)
+    rMaximumForce_kN : LREAL;
+    (* 最近一次无扰提交的目标S_rel，单位mm。 *)
+    rAcceptedTargetRelativePosition_mm : LREAL;
+    (* 最近一次无扰提交的硬最大S_rel，单位mm。 *)
+    rAcceptedHardMaximumRelativePosition_mm : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Z轴导纳力控算法。
+   进入：Sequence请求、Force Process Owner和External Active全部成立。
+   周期动作：计算Ramp后力误差、PI、Anti-windup、S_rel制动和固定顺序限幅。
+   正常出口：发布连续受限速度；不生成P/V/A，不访问轴或MC。
+   无效输入：锁存故障并输出零速度，只有显式Reset清除。
+   硬边界：禁止继续向下但保留受控上抬能力，并冻结积分。
+   --------------------------------------------------------- *)
+stOutput.bActive := FALSE;
+stOutput.bLimited := FALSE;
+stOutput.bAntiWindupFrozen := TRUE;
+stOutput.bHardLimitActive := FALSE;
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;
+stOutput.rVelocityCommand_mm_s := 0.0;
+stOutput.rIntegralTerm_mm_s := rIntegralTerm_mm_s;
+stOutput.rForceSetRamped_kN := 0.0;
+stOutput.rForceError_kN := 0.0;
+stOutput.rUnsaturatedVelocity_mm_s := 0.0;
+stOutput.rSaturatedVelocity_mm_s := 0.0;
+stOutput.rStrokeVelocityLimit_mm_s := 0.0;
+
+IF stInput.bReset THEN
+    rIntegralTerm_mm_s := 0.0;
+    rPreviousVelocity_mm_s := 0.0;
+    rAcceptedTargetRelativePosition_mm := 0.0;
+    rAcceptedHardMaximumRelativePosition_mm := 0.0;
+    bProfileInitialized := FALSE;
+    bFaultLatched := FALSE;
+    udiLatchedFaultId := 0;
+    stOutput.rIntegralTerm_mm_s := 0.0;
+    stOutput.bFault := FALSE;
+    stOutput.nFaultId := 0;
+    RETURN;
+END_IF
+
+IF NOT stInput.bEnable THEN
+    rIntegralTerm_mm_s := 0.0;
+    rPreviousVelocity_mm_s := 0.0;
+    bProfileInitialized := FALSE;
+    stOutput.rIntegralTerm_mm_s := 0.0;
+    RETURN;
+END_IF
+
+IF bFaultLatched THEN
+    RETURN;
+END_IF
+
+rMaximumRelativeTravel_mm := ABS(stLimits.fZMaxPositionMm - stLimits.fZMinPositionMm);
+rMaximumForce_kN := ABS(stLimits.fMaxForceN) * 0.001;
+rCandidateMaximumUpVelocity_mm_s := ABS(stProfile.fMaxUpVelocityMmS);
+IF ABS(stLimits.fZMaxVelocityMmS) < rCandidateMaximumUpVelocity_mm_s THEN
+    rCandidateMaximumUpVelocity_mm_s := ABS(stLimits.fZMaxVelocityMmS);
+END_IF
+rCandidateMaximumDownVelocity_mm_s := ABS(stProfile.fMaxDownVelocityMmS);
+IF ABS(stLimits.fZMaxVelocityMmS) < rCandidateMaximumDownVelocity_mm_s THEN
+    rCandidateMaximumDownVelocity_mm_s := ABS(stLimits.fZMaxVelocityMmS);
+END_IF
+
+bConfigurationValid := stProfile.bValid
+    AND stLimits.bValid
+    AND (stProfile.nRevision > 0)
+    AND (stInput.rCycleTime_s > 0.0)
+    AND (stProfile.fKp >= 0.0)
+    AND (stProfile.fKi >= 0.0)
+    AND (stProfile.fKaw >= 0.0)
+    AND (stProfile.fIntegralLimit >= 0.0)
+    AND (stProfile.fMaxUpVelocityMmS > 0.0)
+    AND (stProfile.fMaxDownVelocityMmS > 0.0)
+    AND (stProfile.fMaxAccelerationMmS2 > 0.0)
+    AND (stProfile.fBrakeMarginMm >= 0.0)
+    AND (stProfile.fForceRampNS > 0.0)
+    AND (stLimits.fZMaxPositionMm > stLimits.fZMinPositionMm)
+    AND (stLimits.fZMaxVelocityMmS > 0.0)
+    AND (stLimits.fZMaxAccelerationMmS2 > 0.0)
+    AND (stLimits.fMaxForceN > 0.0)
+    AND (ABS(stProfile.fVelocityFeedForwardMmS) <= ABS(stLimits.fZMaxVelocityMmS))
+    AND (stProfile.fIntegralLimit <= ABS(stLimits.fZMaxVelocityMmS))
+    AND (stInput.rTargetRelativePosition_mm >= 0.0)
+    AND (stInput.rHardMaximumRelativePosition_mm >= stInput.rTargetRelativePosition_mm)
+    AND (stInput.rHardMaximumRelativePosition_mm <= rMaximumRelativeTravel_mm)
+    AND FC_IsFiniteLReal(rValue := rMaximumRelativeTravel_mm)
+    AND FC_IsFiniteLReal(rValue := rMaximumForce_kN)
+    AND FC_IsFiniteLReal(rValue := stInput.rCycleTime_s)
+    AND FC_IsFiniteLReal(rValue := stProfile.fVelocityFeedForwardMmS)
+    AND FC_IsFiniteLReal(rValue := stProfile.fKp)
+    AND FC_IsFiniteLReal(rValue := stProfile.fKi)
+    AND FC_IsFiniteLReal(rValue := stProfile.fKaw)
+    AND FC_IsFiniteLReal(rValue := stProfile.fIntegralLimit)
+    AND FC_IsFiniteLReal(rValue := stProfile.fMaxUpVelocityMmS)
+    AND FC_IsFiniteLReal(rValue := stProfile.fMaxDownVelocityMmS)
+    AND FC_IsFiniteLReal(rValue := stProfile.fMaxAccelerationMmS2)
+    AND FC_IsFiniteLReal(rValue := stProfile.fBrakeMarginMm)
+    AND FC_IsFiniteLReal(rValue := stProfile.fForceRampNS)
+    AND FC_IsFiniteLReal(rValue := stLimits.fZMinPositionMm)
+    AND FC_IsFiniteLReal(rValue := stLimits.fZMaxPositionMm)
+    AND FC_IsFiniteLReal(rValue := stLimits.fZMaxVelocityMmS)
+    AND FC_IsFiniteLReal(rValue := stLimits.fZMaxAccelerationMmS2)
+    AND FC_IsFiniteLReal(rValue := stLimits.fMaxForceN);
+
+bInputFinite := FC_IsFiniteLReal(rValue := rForceSetRamped_kN)
+    AND FC_IsFiniteLReal(rValue := stInput.rForceSet_kN)
+    AND FC_IsFiniteLReal(rValue := stInput.rForceActual_kN)
+    AND FC_IsFiniteLReal(rValue := stInput.rRelativePosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rTargetRelativePosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rHardMaximumRelativePosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rTransferVelocity_mm_s)
+    AND ((NOT bApplyIntegralPreload)
+        OR ((stInput.rTransferVelocity_mm_s >= -rCandidateMaximumUpVelocity_mm_s)
+            AND (stInput.rTransferVelocity_mm_s <= rCandidateMaximumDownVelocity_mm_s)))
+    AND (rForceSetRamped_kN >= 0.0)
+    AND (rForceSetRamped_kN <= ABS(stLimits.fMaxForceN) * 0.001)
+    AND (stInput.rForceSet_kN >= 0.0)
+    AND (stInput.rForceSet_kN <= ABS(stLimits.fMaxForceN) * 0.001);
+
+IF NOT bConfigurationValid THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008002;
+ELSIF NOT bInputFinite THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008003;
+ELSIF NOT stInput.bOwnerGranted OR NOT stInput.bExternalActive THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008004;
+ELSIF NOT stInput.bForceValid OR NOT stInput.bRelativePositionValid THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008005;
+ELSIF bApplyIntegralPreload AND NOT FC_IsFiniteLReal(rValue := rIntegralPreload_mm_s) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008006;
+ELSIF stInput.bBumplessTransfer AND NOT bApplyIntegralPreload THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008007;
+END_IF
+IF bFaultLatched THEN
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+(* 只有有限性和硬范围检查通过后才向ADS诊断发布目标力。 *)
+stOutput.rForceSetRamped_kN := rForceSetRamped_kN;
+
+bLimitsMismatch := FALSE;
+IF NOT bProfileInitialized THEN
+    IF NOT bApplyIntegralPreload THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00008009;
+    ELSIF stInput.rRelativePosition_mm > stInput.rHardMaximumRelativePosition_mm THEN
+        (* 已越过新Profile硬S_rel时禁止作为普通Active恢复。 *)
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#0000800B;
+    ELSE
+        stAppliedProfile := stProfile;
+        stAppliedLimits := stLimits;
+        rAcceptedTargetRelativePosition_mm := stInput.rTargetRelativePosition_mm;
+        rAcceptedHardMaximumRelativePosition_mm := stInput.rHardMaximumRelativePosition_mm;
+        bProfileInitialized := TRUE;
+    END_IF
+ELSIF bApplyIntegralPreload THEN
+    IF stInput.rRelativePosition_mm > stInput.rHardMaximumRelativePosition_mm THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#0000800B;
+    ELSE
+        stAppliedProfile := stProfile;
+        stAppliedLimits := stLimits;
+        rAcceptedTargetRelativePosition_mm := stInput.rTargetRelativePosition_mm;
+        rAcceptedHardMaximumRelativePosition_mm := stInput.rHardMaximumRelativePosition_mm;
+    END_IF
+ELSE
+    bLimitsMismatch := (stLimits.fZMinPositionMm <> stAppliedLimits.fZMinPositionMm)
+        OR (stLimits.fZMaxPositionMm <> stAppliedLimits.fZMaxPositionMm)
+        OR (stLimits.fZMaxVelocityMmS <> stAppliedLimits.fZMaxVelocityMmS)
+        OR (stLimits.fZMaxAccelerationMmS2 <> stAppliedLimits.fZMaxAccelerationMmS2)
+        OR (stLimits.fMaxForceN <> stAppliedLimits.fMaxForceN)
+        OR (stLimits.bValid <> stAppliedLimits.bValid);
+    bProfileMismatch := (stProfile.nRevision <> stAppliedProfile.nRevision)
+        OR (stProfile.fVelocityFeedForwardMmS <> stAppliedProfile.fVelocityFeedForwardMmS)
+        OR (stProfile.fKp <> stAppliedProfile.fKp)
+        OR (stProfile.fKi <> stAppliedProfile.fKi)
+        OR (stProfile.fKaw <> stAppliedProfile.fKaw)
+        OR (stProfile.fIntegralLimit <> stAppliedProfile.fIntegralLimit)
+        OR (stProfile.fMaxUpVelocityMmS <> stAppliedProfile.fMaxUpVelocityMmS)
+        OR (stProfile.fMaxDownVelocityMmS <> stAppliedProfile.fMaxDownVelocityMmS)
+        OR (stProfile.fMaxAccelerationMmS2 <> stAppliedProfile.fMaxAccelerationMmS2)
+        OR (stProfile.fBrakeMarginMm <> stAppliedProfile.fBrakeMarginMm)
+        OR (stProfile.fForceRampNS <> stAppliedProfile.fForceRampNS)
+        OR (stProfile.bValid <> stAppliedProfile.bValid)
+        OR (stInput.rTargetRelativePosition_mm <> rAcceptedTargetRelativePosition_mm)
+        OR (stInput.rHardMaximumRelativePosition_mm
+            <> rAcceptedHardMaximumRelativePosition_mm)
+        OR bLimitsMismatch;
+    IF bProfileMismatch THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#0000800A;
+    END_IF
+END_IF
+IF bFaultLatched THEN
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+IF bApplyIntegralPreload THEN
+    rIntegralTerm_mm_s := FC_ClampLReal(
+        rValue := rIntegralPreload_mm_s,
+        rMinimum := -ABS(stAppliedProfile.fIntegralLimit),
+        rMaximum := ABS(stAppliedProfile.fIntegralLimit));
+    rPreviousVelocity_mm_s := stInput.rTransferVelocity_mm_s;
+END_IF
+
+rForceError_kN := rForceSetRamped_kN - stInput.rForceActual_kN;
+rUnsaturatedVelocity_mm_s := stAppliedProfile.fVelocityFeedForwardMmS
+    + stAppliedProfile.fKp * rForceError_kN
+    + rIntegralTerm_mm_s;
+IF NOT FC_IsFiniteLReal(rValue := rUnsaturatedVelocity_mm_s) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00008008;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+(* LIMIT_STAGE_PROFILE：先执行Profile上下速度限幅。 *)
+rBoundaryLimitedVelocity_mm_s := FC_ClampLReal(
+    rValue := rUnsaturatedVelocity_mm_s,
+    rMinimum := -ABS(stAppliedProfile.fMaxUpVelocityMmS),
+    rMaximum := ABS(stAppliedProfile.fMaxDownVelocityMmS));
+
+(* LIMIT_STAGE_MACHINE：再执行机器最大速度限幅。 *)
+rMaximumUpVelocity_mm_s := ABS(stAppliedProfile.fMaxUpVelocityMmS);
+IF ABS(stLimits.fZMaxVelocityMmS) < rMaximumUpVelocity_mm_s THEN
+    rMaximumUpVelocity_mm_s := ABS(stLimits.fZMaxVelocityMmS);
+END_IF
+rMaximumDownVelocity_mm_s := ABS(stAppliedProfile.fMaxDownVelocityMmS);
+IF ABS(stLimits.fZMaxVelocityMmS) < rMaximumDownVelocity_mm_s THEN
+    rMaximumDownVelocity_mm_s := ABS(stLimits.fZMaxVelocityMmS);
+END_IF
+rBoundaryLimitedVelocity_mm_s := FC_ClampLReal(
+    rValue := rBoundaryLimitedVelocity_mm_s,
+    rMinimum := -rMaximumUpVelocity_mm_s,
+    rMaximum := rMaximumDownVelocity_mm_s);
+
+rMaximumAcceleration_mm_s2 := ABS(stAppliedProfile.fMaxAccelerationMmS2);
+IF ABS(stLimits.fZMaxAccelerationMmS2) < rMaximumAcceleration_mm_s2 THEN
+    rMaximumAcceleration_mm_s2 := ABS(stLimits.fZMaxAccelerationMmS2);
+END_IF
+(* EFFECTIVE_DECELERATION_READY：制动包络和Rate Limit必须使用同一有效加减速度。 *)
+
+(* LIMIT_STAGE_SREL_BRAKE：按S_rel剩余行程计算向下制动限速。 *)
+rStrokeVelocityLimit_mm_s := FC_CalcStrokeVelocityLimit(
+    rRemainingStroke_mm := stInput.rTargetRelativePosition_mm
+        - stInput.rRelativePosition_mm,
+    rBrakeMargin_mm := stAppliedProfile.fBrakeMarginMm,
+    rMaximumDeceleration_mm_s2 := rMaximumAcceleration_mm_s2);
+IF NOT FC_IsFiniteLReal(rValue := rStrokeVelocityLimit_mm_s) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000800D;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+IF rStrokeVelocityLimit_mm_s < rMaximumDownVelocity_mm_s THEN
+    rMaximumDownVelocity_mm_s := rStrokeVelocityLimit_mm_s;
+END_IF
+IF rBoundaryLimitedVelocity_mm_s > rMaximumDownVelocity_mm_s THEN
+    rBoundaryLimitedVelocity_mm_s := rMaximumDownVelocity_mm_s;
+END_IF
+
+bHardLimitActive := stInput.bHardForceActive
+    OR (ABS(stInput.rForceActual_kN * 1000.0) >= ABS(stLimits.fMaxForceN))
+    OR stInput.bHardStrokeActive
+    OR (stInput.rRelativePosition_mm >= stInput.rHardMaximumRelativePosition_mm)
+    OR stInput.bCollisionLimitActive;
+bDownwardBoundaryActive := stInput.bHardStrokeActive
+    OR (stInput.rRelativePosition_mm >= stInput.rHardMaximumRelativePosition_mm);
+
+(* LIMIT_STAGE_HARD_BOUNDARY：Secondary/Hard边界禁止继续向下。 *)
+IF stInput.bHardForceActive
+    OR (ABS(stInput.rForceActual_kN * 1000.0) >= ABS(stLimits.fMaxForceN))
+    OR bDownwardBoundaryActive THEN
+    IF rBoundaryLimitedVelocity_mm_s > 0.0 THEN
+        rBoundaryLimitedVelocity_mm_s := 0.0;
+    END_IF
+    rMaximumDownVelocity_mm_s := 0.0;
+END_IF
+
+(* LIMIT_STAGE_COLLISION：Collision边界同样只封锁向下方向。 *)
+IF stInput.bCollisionLimitActive THEN
+    IF rBoundaryLimitedVelocity_mm_s > 0.0 THEN
+        rBoundaryLimitedVelocity_mm_s := 0.0;
+    END_IF
+    rMaximumDownVelocity_mm_s := 0.0;
+END_IF
+
+IF bHardLimitActive AND (rPreviousVelocity_mm_s > 0.0) THEN
+    (* 已到硬边界时不得由后续加速度限幅继续保留向下速度。 *)
+    rPreviousVelocity_mm_s := 0.0;
+END_IF
+
+(* LIMIT_STAGE_ACCELERATION：最后执行速度变化率/最大加速度限幅。 *)
+rSaturatedVelocity_mm_s := FC_LimitRate(
+    rCurrent := rPreviousVelocity_mm_s,
+    rTarget := rBoundaryLimitedVelocity_mm_s,
+    rRateUpPer_s := rMaximumAcceleration_mm_s2,
+    rRateDownPer_s := rMaximumAcceleration_mm_s2,
+    rCycleTime_s := stInput.rCycleTime_s);
+IF NOT FC_IsFiniteLReal(rValue := rSaturatedVelocity_mm_s) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000800E;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+bEnvelopeViolation := (rSaturatedVelocity_mm_s > rMaximumDownVelocity_mm_s)
+    OR (rSaturatedVelocity_mm_s < -rMaximumUpVelocity_mm_s);
+IF rSaturatedVelocity_mm_s > rMaximumDownVelocity_mm_s THEN
+    (* Rate Limit不得重新越过当前S_rel制动包络。 *)
+    rSaturatedVelocity_mm_s := rMaximumDownVelocity_mm_s;
+ELSIF rSaturatedVelocity_mm_s < -rMaximumUpVelocity_mm_s THEN
+    (* 无扰预置和Rate Limit同样不得越过上抬速度硬包络。 *)
+    rSaturatedVelocity_mm_s := -rMaximumUpVelocity_mm_s;
+END_IF
+
+bErrorRequestsDownward := rForceError_kN > 0.0;
+bFreezeIntegral := bHardLimitActive
+    OR bEnvelopeViolation
+    OR (bErrorRequestsDownward AND (rMaximumDownVelocity_mm_s <= 0.0));
+
+IF bApplyIntegralPreload THEN
+    bFreezeIntegral := TRUE;
+ELSIF NOT bFreezeIntegral THEN
+    rIntegralDerivative_mm_s2 := stAppliedProfile.fKi * rForceError_kN
+        + stAppliedProfile.fKaw * (rSaturatedVelocity_mm_s - rUnsaturatedVelocity_mm_s);
+    IF NOT FC_IsFiniteLReal(rValue := rIntegralDerivative_mm_s2) THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#0000800F;
+        stOutput.bFault := TRUE;
+        stOutput.nFaultId := udiLatchedFaultId;
+        RETURN;
+    END_IF
+    rUpdatedIntegralTerm_mm_s := rIntegralTerm_mm_s
+        + rIntegralDerivative_mm_s2 * stInput.rCycleTime_s;
+    IF NOT FC_IsFiniteLReal(rValue := rUpdatedIntegralTerm_mm_s) THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00008010;
+        stOutput.bFault := TRUE;
+        stOutput.nFaultId := udiLatchedFaultId;
+        RETURN;
+    END_IF
+    rIntegralTerm_mm_s := FC_ClampLReal(
+        rValue := rUpdatedIntegralTerm_mm_s,
+        rMinimum := -ABS(stAppliedProfile.fIntegralLimit),
+        rMaximum := ABS(stAppliedProfile.fIntegralLimit));
+    IF NOT FC_IsFiniteLReal(rValue := rIntegralTerm_mm_s) THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00008011;
+        stOutput.bFault := TRUE;
+        stOutput.nFaultId := udiLatchedFaultId;
+        RETURN;
+    END_IF
+END_IF
+
+IF bEnvelopeViolation THEN
+    (* 包络突变意味着目标或测量无法按配置减速度无扰跟随。 *)
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000800C;
+    (* 故障扫描不得发布可被后续轨迹层消费的非零速度。 *)
+    rSaturatedVelocity_mm_s := 0.0;
+    stOutput.bActive := FALSE;
+END_IF
+
+stOutput.rVelocityCommand_mm_s := rSaturatedVelocity_mm_s;
+stOutput.rIntegralTerm_mm_s := rIntegralTerm_mm_s;
+stOutput.rForceSetRamped_kN := rForceSetRamped_kN;
+stOutput.rForceError_kN := rForceError_kN;
+stOutput.rUnsaturatedVelocity_mm_s := rUnsaturatedVelocity_mm_s;
+stOutput.rSaturatedVelocity_mm_s := rSaturatedVelocity_mm_s;
+stOutput.rStrokeVelocityLimit_mm_s := rStrokeVelocityLimit_mm_s;
+stOutput.bActive := NOT bFaultLatched;
+stOutput.bLimited := ABS(rSaturatedVelocity_mm_s - rUnsaturatedVelocity_mm_s) > 0.000000001;
+stOutput.bAntiWindupFrozen := bFreezeIntegral;
+stOutput.bHardLimitActive := bHardLimitActive;
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;
+rPreviousVelocity_mm_s := rSaturatedVelocity_mm_s;]]></ST></Implementation></POU></TcPlcObject>

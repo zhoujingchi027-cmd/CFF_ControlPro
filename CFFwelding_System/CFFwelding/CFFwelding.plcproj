@@ -27,146 +27,425 @@
     <Compile Include="Tasks\Task_CffSlow.TcTTO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DUTs\Enums\E_OperationMode.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_ControlSource.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_MachineState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_InitializeState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_MaintenanceFunction.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_MaintenanceState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_CffState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_CffStep.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_StepSubPhase.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_StepPrimaryCriterion.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_SecondaryCriterionAction.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_StepEndCause.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_ZCommandOwner.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_ZExtSetpointState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_AlarmLevel.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_AlarmCode.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_FastenerStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_FeederState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_ReturnMode.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_CalibrationState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_CommandExecutionState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_CommandRejectReason.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_HmiCommandCode.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_RobotCommandCode.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_ProgramState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Enums\E_InterfaceEventState.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_MachineConfig.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_MachineLimits.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ForceCalibration.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_DisplacementCalibration.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CollisionCalibration.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ZForceControlProfile.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_RAxisProfile.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_StepProceedingConfig.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CffStepProgram.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_JoinProgramHeader.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ProcessMonitorProfile.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CffJoinProgram.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_JoiningPointAssignment.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CycleSnapshot.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ProcessActual.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ProcessFeatures.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_StepCriterionResult.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CycleResult.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_AlarmRequest.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_AlarmStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CommandMailbox.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CommandPermission.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_MaintenanceHoldRequest.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_RobotCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_RobotStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_FeederInput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_FeederOutput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CalibrationCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CalibrationStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_FastCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_FastStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_CurveSample.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_HardwareBindingStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_SensorProcessingConfig.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Structures\ST_ZExtSetpointConfig.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Const.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_IO.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Config.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Calibration.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Program.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Command.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Status.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Process.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Alarm.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_HMI.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Trace.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_Persistent.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="GVLs\GVL_ProjectInfo.TcGVL"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZForceControlInput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZForceControlOutput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZAxisCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ZAxisStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_RAxisCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_RAxisStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ContactDetectInput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ContactDetectOutput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_StepCriterionInput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_StepCriterionOutput.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_CffSequenceCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_CffSequenceStatus.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="DUTs\Interfaces\ST_ProcessReferenceCommand.TcDUT"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_ClampLReal.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_ScaleLinear.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_LimitRate.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_TrapezoidIntegrate.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_RpmToRadPerSec.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_CalcEnergyIncrement.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_ConvertDirection.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_IsFiniteLReal.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_Interpolate1D.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_ValidateCalibration.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_ValidateJoinProgram.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_GetPrimaryEndCause.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_CalcStrokeVelocityLimit.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Functions\FC_CheckModeSourceMatrix.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_LowPassFilter.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_Debounce.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_SignalValidity.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_SetpointRamp.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_CommandHandshake.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Utility\FB_AlarmLatch.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Axis\FB_AxisCommandArbiter.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Axis\FB_RAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisExtSetpointAdapter.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Fast\PRG_CffSequence.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Fast\PRG_FastAxisControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Fast\PRG_FastMonitoring.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_ModeControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_RobotInterface.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_CommandDispatcher.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_ProgramManager.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_InitializeControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_ServiceCalibration.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_MaintenanceControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_ManualControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_AutoControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_FastenerControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_FeederControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_ClampControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_MachineMain.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_AlarmControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Main\PRG_TowerLightControl.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Slow\PRG_HmiAdsInterface.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Slow\PRG_ResultTraceability.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Slow\PRG_Statistics.TcPOU"><SubType>Code</SubType></Compile>
-    <Compile Include="POUs\Slow\PRG_Persistence.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Enums\E_OperationMode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ControlSource.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_MachineState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_InitializeState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_MaintenanceFunction.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_MaintenanceState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_CffState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_CffStep.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_StepSubPhase.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_StepPrimaryCriterion.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_SecondaryCriterionAction.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_StepEndCause.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ZCommandOwner.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ZExtSetpointState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_AlarmLevel.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_AlarmCode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_FastenerStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_FeederState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ReturnMode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_CalibrationState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_CommandExecutionState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_CommandRejectReason.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_HmiCommandCode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_RobotCommandCode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ProgramState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_InterfaceEventState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_MachineConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_MachineLimits.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ForceCalibration.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_DisplacementCalibration.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CollisionCalibration.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ZForceControlProfile.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_RAxisProfile.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_StepProceedingConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CffStepProgram.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_JoinProgramHeader.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ProcessMonitorProfile.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CffJoinProgram.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_JoiningPointAssignment.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CycleSnapshot.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ProcessActual.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ProcessFeatures.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_StepCriterionResult.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CycleResult.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_AlarmRequest.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_AlarmStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CommandMailbox.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CommandPermission.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_MaintenanceHoldRequest.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_RobotCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_RobotStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_FeederInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_FeederOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CalibrationCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CalibrationStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_FastCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_FastStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CurveSample.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_HardwareBindingStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_SensorProcessingConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_ZExtSetpointConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Const.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_IO.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Config.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Calibration.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Program.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Command.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Status.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Process.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Alarm.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_HMI.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Trace.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Persistent.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_ProjectInfo.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZForceControlInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZForceControlOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExtSetpointStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZAxisCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZAxisStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_RAxisCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_RAxisStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ContactDetectInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ContactDetectOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_StepCriterionInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_StepCriterionOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_CffSequenceCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_CffSequenceStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ProcessReferenceCommand.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ClampLReal.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ScaleLinear.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_LimitRate.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_TrapezoidIntegrate.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_RpmToRadPerSec.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_CalcEnergyIncrement.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ConvertDirection.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_IsFiniteLReal.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_Interpolate1D.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ValidateCalibration.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ValidateJoinProgram.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_GetPrimaryEndCause.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_CalcStrokeVelocityLimit.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_CheckModeSourceMatrix.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_LowPassFilter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_Debounce.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_SignalValidity.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_SetpointRamp.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_CommandHandshake.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Utility\FB_AlarmLatch.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_AxisCommandArbiter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisNcAdapter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_RAxisNcAdapter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisExtSetpointAdapter.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_BumplessProfileSwitch.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_ZForceAdmittance.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Fast\PRG_CffSequence.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Fast\PRG_FastAxisControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Fast\PRG_FastMonitoring.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_ModeControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_RobotInterface.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_CommandDispatcher.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_ProgramManager.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_InitializeControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_ServiceCalibration.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_MaintenanceControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_ManualControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_AutoControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_FastenerControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_FeederControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_ClampControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_MachineMain.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_AlarmControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Main\PRG_TowerLightControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Slow\PRG_HmiAdsInterface.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Slow\PRG_ResultTraceability.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Slow\PRG_Statistics.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Slow\PRG_Persistence.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="DUTs" />
     <Folder Include="GVLs" />
+    <Folder Include="POUs\FunctionBlocks\Control" />
     <Folder Include="VISUs" />
     <Folder Include="POUs" />
     <Folder Include="DUTs\Interfaces" />

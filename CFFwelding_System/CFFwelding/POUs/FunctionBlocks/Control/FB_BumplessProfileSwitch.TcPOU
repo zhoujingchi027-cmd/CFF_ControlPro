@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_BumplessProfileSwitch" Id="{B5000000-0000-4000-8000-000000000001}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_BumplessProfileSwitch
+VAR_INPUT
+    (* 无扰计算许可；FALSE时清除脉冲历史和输出状态。 *)
+    bEnable : BOOL;
+    (* 清除脉冲历史、接受状态和积分预置。 *)
+    bReset : BOOL;
+    (* Contact接管或Profile变化的单扫描请求。 *)
+    bSwitchPulse : BOOL;
+    (* 切换前连续速度命令，向下为正，单位mm/s。 *)
+    rPreviousVelocity_mm_s : LREAL;
+    (* 新Profile速度前馈，向下为正，单位mm/s。 *)
+    rVelocityFeedForward_mm_s : LREAL;
+    (* 新Profile比例增益，单位mm/s/kN。 *)
+    rProportionalGain_mm_s_per_kN : LREAL;
+    (* 新Profile起始目标力，单位kN。 *)
+    rForceSet_kN : LREAL;
+    (* 当前ForceControl实际力，单位kN。 *)
+    rForceActual_kN : LREAL;
+    (* 新Profile积分项绝对限幅，单位mm/s。 *)
+    rIntegralLimit_mm_s : LREAL;
+END_VAR
+VAR_OUTPUT
+    (* 限幅后的新积分初值，单位mm/s。 *)
+    rIntegralPreload_mm_s : LREAL;
+    (* 当前扫描成功接受一个切换上升沿。 *)
+    bAccepted : BOOL;
+    (* 全部输入有限且参数范围有效。 *)
+    bValid : BOOL;
+    (* 切换脉冲到来时输入无效。 *)
+    bError : BOOL;
+    (* 确定性的无扰切换错误编号，0表示无错误。 *)
+    nErrorId : UDINT;
+END_VAR
+VAR
+    (* 上一扫描的切换请求，用于只接受上升沿。 *)
+    bPreviousSwitchPulse : BOOL;
+    (* 当前扫描检测到切换上升沿。 *)
+    bSwitchRise : BOOL;
+    (* 限幅前的积分预置，单位mm/s。 *)
+    rRawIntegralPreload_mm_s : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[IF bReset THEN
+    rIntegralPreload_mm_s := 0.0;
+    bAccepted := FALSE;
+    bValid := FALSE;
+    bError := FALSE;
+    nErrorId := 0;
+    bPreviousSwitchPulse := FALSE;
+    RETURN;
+END_IF
+
+bAccepted := FALSE;
+IF NOT bEnable THEN
+    bValid := FALSE;
+    bPreviousSwitchPulse := FALSE;
+    RETURN;
+END_IF
+
+IF bError THEN
+    (* 无效无扰预置必须由显式Reset清除，禁止下一扫描自动恢复。 *)
+    RETURN;
+END_IF
+
+bSwitchRise := bSwitchPulse AND NOT bPreviousSwitchPulse;
+bPreviousSwitchPulse := bSwitchPulse;
+
+bValid := FC_IsFiniteLReal(rValue := rPreviousVelocity_mm_s)
+    AND FC_IsFiniteLReal(rValue := rVelocityFeedForward_mm_s)
+    AND FC_IsFiniteLReal(rValue := rProportionalGain_mm_s_per_kN)
+    AND FC_IsFiniteLReal(rValue := rForceSet_kN)
+    AND FC_IsFiniteLReal(rValue := rForceActual_kN)
+    AND FC_IsFiniteLReal(rValue := rIntegralLimit_mm_s)
+    AND (rProportionalGain_mm_s_per_kN >= 0.0)
+    AND (rIntegralLimit_mm_s >= 0.0);
+
+IF bSwitchRise THEN
+    IF NOT bValid THEN
+        bError := TRUE;
+        nErrorId := 16#00008001;
+    ELSE
+        (* 用新Profile重算积分，使切换前后速度命令连续。 *)
+        rRawIntegralPreload_mm_s := rPreviousVelocity_mm_s
+            - rVelocityFeedForward_mm_s
+            - rProportionalGain_mm_s_per_kN * (rForceSet_kN - rForceActual_kN);
+        IF NOT FC_IsFiniteLReal(rValue := rRawIntegralPreload_mm_s) THEN
+            bError := TRUE;
+            nErrorId := 16#00008002;
+        ELSE
+            rIntegralPreload_mm_s := FC_ClampLReal(
+                rValue := rRawIntegralPreload_mm_s,
+                rMinimum := -ABS(rIntegralLimit_mm_s),
+                rMaximum := ABS(rIntegralLimit_mm_s));
+            IF NOT FC_IsFiniteLReal(rValue := rIntegralPreload_mm_s) THEN
+                bError := TRUE;
+                nErrorId := 16#00008003;
+            ELSE
+                bAccepted := TRUE;
+                bError := FALSE;
+                nErrorId := 0;
+            END_IF
+        END_IF
+    END_IF
+END_IF]]></ST></Implementation></POU></TcPlcObject>

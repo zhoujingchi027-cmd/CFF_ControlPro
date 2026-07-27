@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZForceControlProfile" Id="{D3100000-0000-4000-8000-000000000006}"><Declaration><![CDATA[TYPE ST_ZForceControlProfile : STRUCT
-    (* 比例增益。 *)
+    (* Profile修订号；变化时必须执行积分无扰预置。 *)
+    nRevision : UDINT;
+    (* 速度前馈，向下为正，单位毫米每秒。 *)
+    fVelocityFeedForwardMmS : LREAL;
+    (* 比例增益，单位毫米每秒每千牛。 *)
     fKp : LREAL;
-    (* 积分增益。 *)
+    (* 积分增益，单位毫米每二次方秒每千牛。 *)
     fKi : LREAL;
-    (* 抗积分饱和增益。 *)
+    (* 抗积分饱和回算增益，单位每秒。 *)
     fKaw : LREAL;
-    (* 积分项绝对限幅。 *)
+    (* 积分项绝对限幅，单位毫米每秒。 *)
     fIntegralLimit : LREAL;
     (* 向上最大速度，单位毫米每秒。 *)
     fMaxUpVelocityMmS : LREAL;

@@ -23,6 +23,22 @@ STRUCT
     eEndCause : E_StepEndCause;
     (* 当前流程目标轴向力，单位千牛。 *)
     rForceSet_kN : LREAL;
+    (* 请求Fast轴层运行导纳力控；Phase 10实现前保持FALSE。 *)
+    bForceControlEnable : BOOL;
+    (* Contact接管或Profile变化时请求一次积分无扰预置。 *)
+    bForceProfileTransfer : BOOL;
+    (* 无扰预置使用的切换前Z轴速度，向下为正，单位mm/s。 *)
+    rForceTransferVelocity_mm_s : LREAL;
+    (* 当前步骤的目标累计S_rel，向下为正，单位mm。 *)
+    rTargetRelativePosition_mm : LREAL;
+    (* 当前步骤不得突破的累计S_rel硬上限，单位mm。 *)
+    rHardMaximumRelativePosition_mm : LREAL;
+    (* Hard Force或Secondary硬边界要求禁止继续向下。 *)
+    bForceHardLimitActive : BOOL;
+    (* Secondary或机器累计S_rel硬边界要求禁止继续向下。 *)
+    bStrokeHardLimitActive : BOOL;
+    (* Collision边界要求禁止继续向下。 *)
+    bCollisionLimitActive : BOOL;
     (* 当前流程目标主轴速度，单位转每分钟。 *)
     rSpeedSet_rpm : LREAL;
 END_STRUCT

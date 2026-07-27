@@ -5,10 +5,24 @@ STRUCT
     rVelocityCommand_mm_s : LREAL;
     (* PI积分分量，单位mm/s，用于诊断Anti-windup。 *)
     rIntegralTerm_mm_s : LREAL;
+    (* 斜坡后的目标力，单位kN。 *)
+    rForceSetRamped_kN : LREAL;
+    (* 目标力减ForceControl实际力，单位kN。 *)
+    rForceError_kN : LREAL;
+    (* 前馈、比例和积分相加后的未饱和速度，单位mm/s。 *)
+    rUnsaturatedVelocity_mm_s : LREAL;
+    (* 固定边界、加速度和最终S_rel包络限幅后的速度，单位mm/s。 *)
+    rSaturatedVelocity_mm_s : LREAL;
+    (* 当前S_rel剩余行程对应的向下制动速度上限，单位mm/s。 *)
+    rStrokeVelocityLimit_mm_s : LREAL;
     (* 算法已使能并正在计算输出。 *)
     bActive : BOOL;
     (* 输出受到速度、位移、加速度或硬边界限制。 *)
     bLimited : BOOL;
+    (* 当前周期按门控或硬边界冻结积分。 *)
+    bAntiWindupFrozen : BOOL;
+    (* Hard Force、Hard S_rel或Collision边界当前有效。 *)
+    bHardLimitActive : BOOL;
     (* 算法输入无效或内部诊断失败。 *)
     bFault : BOOL;
     (* 算法故障编号，0表示无故障。 *)

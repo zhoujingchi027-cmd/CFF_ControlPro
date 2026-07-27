@@ -5,12 +5,34 @@ STRUCT
     bEnable : BOOL;
     (* 力控制复位请求，仅用于清除算法内部状态。 *)
     bReset : BOOL;
+    (* Z轴Owner已经由仲裁器授予Force Process。 *)
+    bOwnerGranted : BOOL;
+    (* External Setpoint已经由NC确认Active。 *)
+    bExternalActive : BOOL;
+    (* ForceControl测量链和标定均有效。 *)
+    bForceValid : BOOL;
+    (* 外部位移、Contact参考点和SRelSensor均有效。 *)
+    bRelativePositionValid : BOOL;
+    (* 请求用切换前速度对新Profile执行积分无扰预置。 *)
+    bBumplessTransfer : BOOL;
+    (* 实际力已到达机器硬力边界。 *)
+    bHardForceActive : BOOL;
+    (* Secondary或机器硬位移边界已经到达。 *)
+    bHardStrokeActive : BOOL;
+    (* Collision边界已经到达，禁止继续向下。 *)
+    bCollisionLimitActive : BOOL;
     (* 当前步骤的压向目标力，单位kN。 *)
     rForceSet_kN : LREAL;
     (* 低延迟压向实际力，单位kN。 *)
     rForceActual_kN : LREAL;
     (* 从Contact起累计的工艺相对位移，向下为正，单位mm。 *)
     rRelativePosition_mm : LREAL;
+    (* 当前Profile的目标累计相对位移，向下为正，单位mm。 *)
+    rTargetRelativePosition_mm : LREAL;
+    (* 本周期不得突破的累计相对位移硬上限，单位mm。 *)
+    rHardMaximumRelativePosition_mm : LREAL;
+    (* Contact或Profile切换前的连续速度，向下为正，单位mm/s。 *)
+    rTransferVelocity_mm_s : LREAL;
     (* 本次算法调用的实际周期，单位s。 *)
     rCycleTime_s : LREAL;
 END_STRUCT
