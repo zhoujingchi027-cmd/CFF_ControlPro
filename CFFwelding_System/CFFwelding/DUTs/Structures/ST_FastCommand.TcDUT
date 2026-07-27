@@ -8,6 +8,8 @@
     stSequence : ST_CffSequenceCommand;
     (* Z 轴命令。 *)
     stZAxis : ST_ZAxisCommand;
+    (* Z轴External Setpoint生命周期和P/V/A/Direction命令。 *)
+    stZExtSetpoint : ST_ZExtSetpointCommand;
     (* R 轴命令。 *)
     stRAxis : ST_RAxisCommand;
 END_STRUCT

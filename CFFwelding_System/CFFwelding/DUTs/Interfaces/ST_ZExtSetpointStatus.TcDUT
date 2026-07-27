@@ -7,12 +7,18 @@ STRUCT
     bBusy : BOOL;
     (* 本次生命周期正常完成。 *)
     bDone : BOOL;
+    (* 当前扫描成功写入P/V/A/Direction。 *)
+    bFeedAccepted : BOOL;
+    (* External已完整退出，允许Owner转交标准NC。 *)
+    bReleaseOwner : BOOL;
     (* 运动控制接口或生命周期诊断报告错误。 *)
     bError : BOOL;
     (* 运动控制错误编号，零表示无错误。 *)
     nErrorId : UDINT;
     (* 外部设定值生命周期状态。 *)
     eState : E_ZExtSetpointState;
+    (* 已执行的External Feed周期计数。 *)
+    udiFeedCycleCounter : UDINT;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

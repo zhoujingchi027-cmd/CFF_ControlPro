@@ -87,6 +87,7 @@
     <Compile Include="DUTs\Structures\ST_CurveSample.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Structures\ST_HardwareBindingStatus.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="DUTs\Structures\ST_SensorProcessingConfig.TcDUT"><SubType>Code</SubType></Compile>
+    <Compile Include="DUTs\Structures\ST_ZExtSetpointConfig.TcDUT"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_Const.TcGVL"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_IO.TcGVL"><SubType>Code</SubType></Compile>
     <Compile Include="GVLs\GVL_Config.TcGVL"><SubType>Code</SubType></Compile>
@@ -138,6 +139,7 @@
     <Compile Include="POUs\FunctionBlocks\Axis\FB_AxisCommandArbiter.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\FunctionBlocks\Axis\FB_RAxisNcAdapter.TcPOU"><SubType>Code</SubType></Compile>
+    <Compile Include="POUs\FunctionBlocks\Axis\FB_ZAxisExtSetpointAdapter.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_CffSequence.TcPOU"><SubType>Code</SubType></Compile>
     <Compile Include="POUs\Fast\PRG_FastAxisControl.TcPOU"><SubType>Code</SubType></Compile>

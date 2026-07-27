@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZExtSetpointCommand" Id="{D2000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[TYPE ST_ZExtSetpointCommand :
 STRUCT
+    (* 请求清除已完成或未激活生命周期的错误状态。 *)
+    bReset : BOOL;
     (* 请求进入External Setpoint生命周期。 *)
     bEnable : BOOL;
     (* 请求在当前周期发送P/V/A/Direction设定值。 *)

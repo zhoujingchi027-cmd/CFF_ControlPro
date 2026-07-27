@@ -10,6 +10,8 @@
     stSequence : ST_CffSequenceStatus;
     (* Z 轴状态。 *)
     stZAxis : ST_ZAxisStatus;
+    (* Z轴External Setpoint生命周期状态。 *)
+    stZExtSetpoint : ST_ZExtSetpointStatus;
     (* R 轴状态。 *)
     stRAxis : ST_RAxisStatus;
     (* 快速过程实际值。 *)

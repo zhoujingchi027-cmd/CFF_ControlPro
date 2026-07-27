@@ -11,5 +11,7 @@ VAR_GLOBAL
     stRAxis : ST_RAxisProfile;
     (* 当前快速传感器滤波、范围和诊断参数。 *)
     stSensorProcessing : ST_SensorProcessingConfig;
+    (* Z轴External Setpoint超时、连续性和退出保持参数。 *)
+    stZExtSetpoint : ST_ZExtSetpointConfig;
 END_VAR
 ]]></Declaration></GVL></TcPlcObject>

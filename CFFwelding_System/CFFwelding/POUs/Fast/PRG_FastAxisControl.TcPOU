@@ -18,6 +18,14 @@ VAR
        --------------------------------------------------------- *)
     fbZAxisNc : FB_ZAxisNcAdapter;
     (* ---------------------------------------------------------
+       Z轴External Setpoint适配实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
+       输入：Force Process Owner、真实驱动状态、周期、限值和P/V/A/Direction。
+       输出：External生命周期状态；Reset后仍须完成Disable和后保持才释放Owner。
+       生命周期：每Fast扫描调用，未绑定驱动或未获Owner时禁止Enable。
+       --------------------------------------------------------- *)
+    fbZExtSetpoint : FB_ZAxisExtSetpointAdapter;
+    (* ---------------------------------------------------------
        R轴标准NC适配实例。
        所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
        输入：RPM命令、命令编号、R轴AXIS_REF和真实驱动绑定状态。
@@ -38,6 +46,10 @@ VAR
     stRetractCommand : ST_ZAxisCommand;
     (* Owner输出与轴复位请求合并后的标准Z轴命令。 *)
     stSelectedZCommand : ST_ZAxisCommand;
+    (* External未完成Disabled和后保持时，禁止标准MC命令接管同一AXIS_REF。 *)
+    bExternalCommandChannelBusy : BOOL;
+    (* External退出期间冻结标准Adapter事务编号，退出后再交付挂起命令。 *)
+    udiZStandardCommandId : UDINT;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
    快速轴控制状态。
@@ -76,7 +88,9 @@ fbZAxisArbiter(
     bReset := GVL_Command.stFast.stZAxis.bReset,
     bFaultStopRequest := GVL_Command.stFast.stZAxis.eOwnerRequest
         = E_ZCommandOwner.Z_OWNER_FAULT_STOP,
-    bForceProcessExitComplete := NOT GVL_Command.stFast.stZAxis.bUseExternalSetpoint,
+    bForceProcessExitComplete := (NOT GVL_Command.stFast.stZAxis.bUseExternalSetpoint
+        AND fbZExtSetpoint.stStatus.eState = E_ZExtSetpointState.Z_EXT_IDLE)
+        OR fbZExtSetpoint.stStatus.bReleaseOwner,
     stHomeCommand := stHomeCommand,
     stManualCommand := stManualCommand,
     stApproachCommand := stApproachCommand,
@@ -87,12 +101,61 @@ fbZAxisArbiter(
 stSelectedZCommand := fbZAxisArbiter.stCommand;
 stSelectedZCommand.bReset := GVL_Command.stFast.stZAxis.bReset;
 
+(* Fault Stop或Reset可以撤销逻辑Owner，但不能与活动External通道并发发MC命令。 *)
+bExternalCommandChannelBusy := (fbZExtSetpoint.stStatus.eState
+    <> E_ZExtSetpointState.Z_EXT_IDLE)
+    AND NOT fbZExtSetpoint.stStatus.bReleaseOwner;
+IF bExternalCommandChannelBusy THEN
+    stSelectedZCommand.bEnable := TRUE;
+    stSelectedZCommand.bReset := FALSE;
+    stSelectedZCommand.bStop := FALSE;
+    stSelectedZCommand.bHome := FALSE;
+    stSelectedZCommand.bMoveAbsolute := FALSE;
+    stSelectedZCommand.bMoveVelocity := FALSE;
+    stSelectedZCommand.bUseExternalSetpoint := TRUE;
+    udiZStandardCommandId := fbZAxisNc.udiAcceptedCommandId;
+ELSE
+    udiZStandardCommandId := GVL_Command.stFast.nRequestId;
+END_IF
+
 fbZAxisNc(
     Axis := GVL_IO.Z_axis,
     bDriveLinked := GVL_Status.stHardwareBinding.bZAxisDriveLinked,
-    udiCommandId := GVL_Command.stFast.nRequestId,
+    udiCommandId := udiZStandardCommandId,
     stCommand := stSelectedZCommand);
 GVL_Status.stFast.stZAxis := fbZAxisNc.stStatus;
+
+fbZExtSetpoint(
+    Axis := GVL_IO.Z_axis,
+    bDriveLinked := GVL_Status.stHardwareBinding.bZAxisDriveLinked,
+    bOwnerGranted := fbZAxisArbiter.eActiveOwner
+        = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS,
+    bLimitsValid := GVL_Config.stLimits.bValid,
+    bAxisReady := fbZAxisNc.stStatus.bReady,
+    bAxisError := fbZAxisNc.stStatus.bError,
+    rCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001,
+    rMinimumPosition_mm := GVL_Config.stLimits.fZMinPositionMm,
+    rMaximumPosition_mm := GVL_Config.stLimits.fZMaxPositionMm,
+    rMaximumVelocity_mm_s := GVL_Config.stLimits.fZMaxVelocityMmS,
+    rMaximumAcceleration_mm_s2 := GVL_Config.stLimits.fZMaxAccelerationMmS2,
+    stConfig := GVL_Config.stZExtSetpoint,
+    stCommand := GVL_Command.stFast.stZExtSetpoint);
+
+GVL_Status.stFast.stZExtSetpoint := fbZExtSetpoint.stStatus;
+GVL_Status.stFast.stZAxis.bExternalSetpointActive := fbZExtSetpoint.stStatus.bEnabled;
+GVL_Status.stFast.stZAxis.eActiveOwner := fbZAxisArbiter.eActiveOwner;
+IF fbZExtSetpoint.stStatus.bError THEN
+    GVL_Status.stFast.stZAxis.bError := TRUE;
+    GVL_Status.stFast.stZAxis.nErrorId := fbZExtSetpoint.stStatus.nErrorId;
+END_IF
+
+(* External Setpoint使用固定唯一报警槽7；文本翻译由上位层按TextId完成。 *)
+GVL_Alarm.astRequests[7].eCode := E_AlarmCode.ALARM_EXTERNAL_SETPOINT_FAULT;
+GVL_Alarm.astRequests[7].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
+GVL_Alarm.astRequests[7].nTextId := 2200;
+GVL_Alarm.astRequests[7].nSourceId := 7;
+GVL_Alarm.astRequests[7].bLatch := TRUE;
+GVL_Alarm.astRequests[7].bActive := fbZExtSetpoint.stStatus.bError;
 
 fbRAxisNc(
     Axis := GVL_IO.R_axis,

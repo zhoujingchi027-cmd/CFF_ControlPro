@@ -1767,18 +1767,15 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{3B1364E2-6C34-4CB9-BD73-174C89442C9B}" Name="CFFwelding" PrjFilePath="CFFwelding\CFFwelding.plcproj" TmcFilePath="CFFwelding\CFFwelding.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{65FB00D1-829D-9B13-5312-3759CD5911E5}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{EAAA3C8E-4FAE-0868-90B9-DB6FE4F1BB5F}">
 					<Name>CFFwelding Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
 						<Name>Task_CffFast Inputs</Name>
 						<Var>
-							<Name>GVL_IO.Z_axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>GVL_IO.R_axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
+							<Name>GVL_IO.bForceChannelError</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道错误状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
 						</Var>
 						<Var>
 							<Name>GVL_IO.nForceChannelRaw</Name>
@@ -1786,9 +1783,12 @@ External Setpoint Generation:
 							<Type>INT</Type>
 						</Var>
 						<Var>
-							<Name>GVL_IO.bForceChannelError</Name>
-							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道错误状态，当前未映射。 ]]></Comment>
-							<Type>BOOL</Type>
+							<Name>GVL_IO.Z_axis.NcToPlc</Name>
+							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.R_axis.NcToPlc</Name>
+							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
 							<Name>GVL_IO.bForceChannelOverrange</Name>
@@ -1801,14 +1801,14 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>GVL_IO.bDisplacementChannelError</Name>
-							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道错误状态，当前未映射。 ]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
 							<Name>GVL_IO.nDisplacementChannelRaw</Name>
 							<Comment><![CDATA[ TODO_HW_MAP：位移传感器原始输入通道，当前未映射。 ]]></Comment>
 							<Type>INT</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.bDisplacementChannelError</Name>
+							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道错误状态，当前未映射。 ]]></Comment>
+							<Type>BOOL</Type>
 						</Var>
 						<Var>
 							<Name>GVL_IO.bDisplacementChannelOverrange</Name>

@@ -131,7 +131,7 @@ if (Test-Path -LiteralPath $sequencePath -PathType Leaf) {
 $allPouFiles = @(Get-ChildItem -LiteralPath (Join-Path $plcRoot 'POUs') -Recurse -File -Filter '*.TcPOU')
 foreach ($pouFile in $allPouFiles) {
     $pouText = Get-Content -LiteralPath $pouFile.FullName -Raw -Encoding UTF8
-    if ($pouText -match 'VAR_IN_OUT[\s\S]{0,300}AXIS_REF' -and $pouFile.BaseName -notin @('FB_ZAxisNcAdapter', 'FB_RAxisNcAdapter')) {
+    if ($pouText -match 'VAR_IN_OUT[\s\S]{0,300}AXIS_REF' -and $pouFile.BaseName -notin @('FB_ZAxisNcAdapter', 'FB_ZAxisExtSetpointAdapter', 'FB_RAxisNcAdapter')) {
         Fail "AXIS_REF VAR_IN_OUT escaped the Phase 6 adapters: $($pouFile.Name)"
     }
 }

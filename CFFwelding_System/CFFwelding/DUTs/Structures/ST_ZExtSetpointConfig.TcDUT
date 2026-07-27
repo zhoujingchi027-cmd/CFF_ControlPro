@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZExtSetpointConfig" Id="{D3100000-0000-4000-8000-000000000036}"><Declaration><![CDATA[TYPE ST_ZExtSetpointConfig : STRUCT
+    (* External Setpoint配置已经过受控确认；默认FALSE禁止使能。 *)
+    bValid : BOOL;
+    (* 等待NC确认使能的最大时间。 *)
+    tEnableTimeout : TIME;
+    (* 等待NC确认禁用的最大时间。 *)
+    tDisableTimeout : TIME;
+    (* 判定速度已受控归零的绝对阈值，单位毫米每秒。 *)
+    rStandstillVelocity_mm_s : LREAL;
+    (* 相邻Feed允许的位置偏差上限，单位毫米。 *)
+    rMaximumPositionDeviation_mm : LREAL;
+    (* 相邻Feed允许的速度变化上限，单位毫米每秒。 *)
+    rMaximumVelocityStep_mm_s : LREAL;
+    (* 速度归零后保持最后非零Direction的Fast周期数，至少1。 *)
+    nDirectionHoldCycles : UINT;
+    (* Disable确认后继续保持零Feed的Fast周期数，至少1。 *)
+    nPostDisableHoldCycles : UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>
