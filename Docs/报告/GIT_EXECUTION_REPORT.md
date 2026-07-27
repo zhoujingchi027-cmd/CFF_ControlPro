@@ -49,7 +49,8 @@
 | Phase 4 | `7be809a2284b67f42c931df15ad8ae52738f09cc` | `feat(plc): add reusable functions and utility blocks` | Phase 1/2/3回归、Phase 4验收、20个POU XML、真实XAE Build、`LastBuildInfo=0`、分层边界、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
 | Phase 5 | `5aa37a6f2394f899f4115aebd7f5e25e9b013f22` | `feat(sensor): add force displacement and collision interfaces` | Phase 1–4回归、Phase 5验收、真实XAE Build、`LastBuildInfo=0`、无真实I/O/Drive/Safety、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
 | Phase 6 | `566ae2d9e9bafcb6f649a7ba5c4c643bd934079b` | `feat(motion): add Phase 6 NC adapters and owner arbitration` | Phase 1–6回归、真实XAE Build、`LastBuildInfo=0`、MC调用边界、Owner唯一性、未绑定Ready门控、凭据模式、暂存差异 | GitHub网络此前不可达；主Commit与报告Commit保留本地待Push |
-| Phase 7 source | `4f1bfa8de7a3117558993ce07f655d59ccddcd74` | `feat(motion): add external setpoint lifecycle` | Phase 1–6回归、Phase 7除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、MC边界、Owner退出、安全审查 | 待本报告提交后一次Push |
+| Phase 7 source | `4f1bfa8de7a3117558993ce07f655d59ccddcd74` | `feat(motion): add external setpoint lifecycle` | Phase 1–6回归、Phase 7除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、MC边界、Owner退出、安全审查 | 已随Phase 7报告Push |
+| Phase 7 report | `962b3303e0ab0ff5109fc606cb5f638a891d2e37` | `docs(report): record Phase 7 external setpoint verification` | Phase 1–7回归、真实XAE Build、`LastBuildInfo=0`、报告闸门和差异检查 | 已Push并复核远端SHA |
 
 ## 保护检查
 
@@ -156,4 +157,16 @@ Regression: Phase 1 through Phase 6 PASS
 XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
 Hardware operations: none
 Push: pending until report verification and report commit
+```
+
+## Phase 7最终Push状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Source commit: 4f1bfa8de7a3117558993ce07f655d59ccddcd74
+Report commit: 962b3303e0ab0ff5109fc606cb5f638a891d2e37
+Push result: success
+Remote verified SHA: 962b3303e0ab0ff5109fc606cb5f638a891d2e37
+Remote-only / Local-only before push: 0 / 13
+Credentials recorded: none
 ```
