@@ -2,7 +2,7 @@
 
 ## 构建环境
 
-- 日期：2026-07-22
+- 日期：2026-07-26
 - TwinCAT：`3.1.4024.64`
 - XAE Shell：`15.0.0.0`
 - Automation COM：`TcXaeShell.DTE.15.0`
@@ -19,6 +19,7 @@
 | Phase 4 | `Release\|TwinCAT RT (x64)` | 已执行 | 14个FC和6个通用FB加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 5 | `Release\|TwinCAT RT (x64)` | 已执行 | Force/Displacement/S_rel/Collision处理加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 6 | `Release\|TwinCAT RT (x64)` | 已执行 | Z/R标准NC Adapter与Owner仲裁加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 7 | `Release\|TwinCAT RT (x64)` | 已执行 | External Setpoint完整生命周期加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -52,7 +53,7 @@ LastBuildInfo: 0
 
 - 真实I/O或PDO映射有效；
 - 真实驱动、编码器或物理轴配置有效；
-- External Setpoint调用已验证；
+- 真实轴External Setpoint POC或时序已验证；
 - 安全功能、工艺参数或Production Ready状态已验证。
 
 构建脚本不激活配置、不下载工程、不启动或重启TwinCAT Runtime。
@@ -147,3 +148,24 @@ LastBuildInfo: 0
 ```
 
 该Build只证明标准运动对象与当前库版本可编译。`bZAxisDriveLinked`和`bRAxisDriveLinked`仍为`FALSE`，因此Adapter的Power、运动Execute和Ready均被硬门控；没有进行配置激活、下载、Runtime登录或物理轴动作。
+
+## Phase 7执行记录
+
+Phase 7加入Z轴External Setpoint命令/状态/配置契约、唯一`FB_ZAxisExtSetpointAdapter`实例、Owner保持和固定报警槽。生命周期覆盖初值预装、Enable确认、每2 ms Feed、降速归零、Direction保持与清零、Disable确认、附加Feed周期和Post-disable hold。
+
+本机PLC工程固定使用`Tc2_MC2 3.3.65.0`。本机类型库和最小编译探针证明`MC_ExtSetPointGenEnable`使用四参数旧签名，不包含当前在线文档中的`Options`或`ST_ExtSetPointEnableOptions`。工程因此按本机签名构建，并禁止`MC_ExtSetPointGenFeedWithTorque`，不提供Torque Offset。
+
+最终控制台证据：
+
+```text
+Phase 7 external setpoint test: PASSED
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+源码Commit：`4f1bfa8de7a3117558993ce07f655d59ccddcd74`。
+
+该Build只证明固定本机库版本下的离线编译结果。未扫描设备、未激活配置、未下载、未登录Runtime、未使能物理轴；External POC、真实驱动关联、抖动测量、硬件映射和工艺资格均未完成。

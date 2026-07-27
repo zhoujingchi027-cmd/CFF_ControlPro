@@ -45,11 +45,15 @@
 
 ### `ST_ZExtSetpointCommand`
 
-提供Enable/Feed/Disable生命周期请求和P/V/A/Direction设定值。方向只允许`-1/0/1`，位置、速度、加速度分别使用`mm`、`mm/s`、`mm/s2`。
+提供Reset/Enable/Feed/Disable生命周期请求和P/V/A/Direction设定值。方向只允许`-1/0/1`，位置、速度、加速度分别使用`mm`、`mm/s`、`mm/s2`。直接`+1/-1`反向被拒绝并触发受控退出。
 
 ### `ST_ZExtSetpointStatus`
 
-发布Enabled、Busy、Done、Error、ErrorId和生命周期状态。状态数值后续替换为`E_ZExtSetpointState`。
+发布Enabled、Busy、Done、FeedAccepted、ReleaseOwner、Error、ErrorId、`E_ZExtSetpointState`生命周期状态和Feed周期计数。`ReleaseOwner`只在NC确认Disabled并完成附加Feed/Post-disable hold后成立。
+
+### `ST_ZExtSetpointConfig`
+
+发布配置有效位、Enable/Disable超时、静止速度阈值、位置连续性上限、速度步阶上限、Direction保持周期和Disable后保持周期。配置默认无效，必须由后续批准的调试流程写入经确认值；Phase 7没有伪造有效配置。
 
 ## R轴接口
 
@@ -169,7 +173,8 @@
 - 14个接口DUT已经加入PLC工程，并在Phase 3完成枚举类型化。
 - Phase 4加入14个纯计算FC和6个通用FB；当前只定义可复用类型，不提前声明业务实例。
 - Phase 5加入传感器处理与Contact参考点契约，并由`PRG_FastInputs`唯一写入快速过程实际值。
-- Phase 6加入`FB_AxisCommandArbiter`、`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`。只有两个Adapter持有`AXIS_REF`及MC实例；`PRG_FastAxisControl`只负责候选拆分、调用和状态发布。
+- Phase 6加入`FB_AxisCommandArbiter`、`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`；Phase 7加入唯一`FB_ZAxisExtSetpointAdapter`。只有这三个轴Adapter持有`AXIS_REF`及MC实例；`PRG_FastAxisControl`只负责候选拆分、调用和状态发布。
 - 标准运动以`ST_FastCommand.nRequestId`作为事务编号；Adapter只在编号变化时产生一次MC `Execute`上升沿，活动速度命令使用双实例交替以允许新事务按`MC_Aborting`替换。
-- 数据DUT只定义契约；Phase 6 MC命令仅由两个轴Adapter生成，真实驱动未关联时不生成执行沿且Ready保持FALSE。
+- External命令在Force Process Owner授予后才允许Enable，ACTIVE每个2 ms周期Feed；Owner在完整Disable和后保持完成前不转交标准NC通道。
+- 数据DUT只定义契约；Phase 6/7 MC命令仅由三个轴Adapter生成，真实驱动未关联时不生成执行沿且Ready保持FALSE。
 - PROGRAM骨架没有跨PROGRAM局部变量访问。

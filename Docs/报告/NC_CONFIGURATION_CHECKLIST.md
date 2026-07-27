@@ -57,3 +57,18 @@
 - [ ] 在更改 SAF 周期时先运行 `Sync-CffweldingPhase3FastTask.ps1`，然后重新构建并复查映射。
 - [ ] 任何真实驱动/编码器链接必须经过双人复核、低能量测试和变更记录。
 - [ ] 激活、下载和运行时登录不属于 Phase 3，必须在单独授权的上线步骤中执行。
+
+## 7. Phase 7 External Setpoint离线核对
+
+- [x] `Task_CffFast`和`NC_Cff SAF`继续保持2 ms周期一致。
+- [x] External Enable/Feed/Disable只由唯一`FB_ZAxisExtSetpointAdapter`调用。
+- [x] 本机`Tc2_MC2 3.3.65.0`四参数Enable签名已经类型库、编译探针和Release Build确认。
+- [x] 未调用`MC_ExtSetPointGenFeedWithTorque`，当前阶段不提供Torque Offset。
+- [x] 初始P/V/A来自NC Set值并执行有限值、硬限值和连续性检查。
+- [x] Disable需同时确认轴和两个FB均未启用，并完成至少一个附加Feed周期及Post-disable hold后才释放Owner。
+- [ ] 在批准真实驱动上完成低能量External Setpoint Enable/Feed/Disable POC。
+- [ ] 用实际目标IPC记录Fast/SAF同步、最大执行时间、抖动和连续Feed计数。
+- [ ] 以故障注入验证Owner撤销、Fault Stop、驱动断链、Enable/Disable超时和方向反转退出。
+- [ ] 冻结并双人复核External速度、加速度、位置连续性、超时和保持周期参数。
+
+以上勾选项仅是离线工程核对；没有执行Scan、Activate、Download、Runtime登录或物理轴动作。

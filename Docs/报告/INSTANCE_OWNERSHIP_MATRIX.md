@@ -25,7 +25,7 @@
 | `fbForceDecline` | `FB_ForceDeclineObserver` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | Force、dForce/dt、RPM、S_rel窗口 | Decline Arm/Confirm和锁存结果 | 每个Decline步骤进入时复位 |
 | `fbZAxisArbiter` | `FB_AxisCommandArbiter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 初始化、维护、手动、自动和流程命令 | 唯一Z轴Owner与`ST_ZAxisCommand` | Owner释放、Stop或Reset时复位 |
 | `fbZAxisNc` | `FB_ZAxisNcAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 标准Z轴命令、Z轴`AXIS_REF` | `ST_ZAxisStatus` | 轴Reset或Owner释放时复位 |
-| `fbZExtSetpoint` | `FB_ZAxisExtSetpointAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_ZExtSetpointCommand`、Z轴`AXIS_REF` | `ST_ZExtSetpointStatus` | Disable完成、轴Reset或Owner释放时复位 |
+| `fbZExtSetpoint` | `FB_ZAxisExtSetpointAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_ZExtSetpointCommand`、配置、Owner授予、Z轴`AXIS_REF` | `ST_ZExtSetpointStatus` | 完整Disable、附加Feed和Post-disable hold后才释放Owner；Reset按状态清错或重试Disable |
 | `fbRAxisNc` | `FB_RAxisNcAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_RAxisCommand`、R轴`AXIS_REF` | `ST_RAxisStatus` | 轴Reset或Owner释放时复位 |
 | `fbZForceAdmittance` | `FB_ZForceAdmittance` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_ZForceControlInput` | `ST_ZForceControlOutput` | Contact前、步骤结束、Stop或Reset时复位积分项 |
 | `fbForceSetpointRamp` | `FB_SetpointRamp` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 当前和下一Force Profile | 无扰力目标 | 新循环或硬Fault时复位 |
@@ -57,10 +57,11 @@
 
 `PRG_HmiAdsInterface`、`PRG_ResultTraceability`、`PRG_Statistics`和`PRG_Persistence`在Phase 2不声明FB实例。后续若引入队列、握手或持久化FB，必须先在本矩阵中分配唯一Owner，且不得把字符串、文件、数据库或ADS大数组搬运放入`Task_CffFast`。
 
-## Phase 6核对
+## Phase 7核对
 
 - `PRG_FastInputs`已按本矩阵唯一声明力滤波数组、力/位移有效性、位移滤波和Collision去抖实例；其他PROGRAM没有重复声明。
-- `PRG_FastAxisControl`已唯一声明`fbZAxisArbiter`、`fbZAxisNc`和`fbRAxisNc`；每个实例均有用途、任务、Owner、输入、输出和Reset/生命周期中文块注释。
+- `PRG_FastAxisControl`已唯一声明`fbZAxisArbiter`、`fbZAxisNc`、`fbZExtSetpoint`和`fbRAxisNc`；每个实例均有用途、任务、Owner、输入、输出和Reset/生命周期中文块注释。
 - 当前不存在`GVL_Instance`。
 - 除上述Phase 5/6实例外，其余计划实例仍处于“已分配Owner、尚未声明”状态。
-- 只有`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`使用`VAR_IN_OUT AXIS_REF`；Owner仲裁、流程PROGRAM和算法FB均不访问轴引用。
+- 只有`FB_ZAxisNcAdapter`、`FB_ZAxisExtSetpointAdapter`和`FB_RAxisNcAdapter`使用`VAR_IN_OUT AXIS_REF`；Owner仲裁、流程PROGRAM和算法FB均不访问轴引用。
+- `fbZExtSetpoint`是External Enable/Feed/Disable API的唯一调用者；Force Process Owner在Adapter发布`bReleaseOwner`前保持占用，标准Z轴Adapter不会并发执行运动命令。
