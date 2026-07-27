@@ -51,7 +51,8 @@
 | Phase 6 | `566ae2d9e9bafcb6f649a7ba5c4c643bd934079b` | `feat(motion): add Phase 6 NC adapters and owner arbitration` | Phase 1–6回归、真实XAE Build、`LastBuildInfo=0`、MC调用边界、Owner唯一性、未绑定Ready门控、凭据模式、暂存差异 | GitHub网络此前不可达；主Commit与报告Commit保留本地待Push |
 | Phase 7 source | `4f1bfa8de7a3117558993ce07f655d59ccddcd74` | `feat(motion): add external setpoint lifecycle` | Phase 1–6回归、Phase 7除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、MC边界、Owner退出、安全审查 | 已随Phase 7报告Push |
 | Phase 7 report | `962b3303e0ab0ff5109fc606cb5f638a891d2e37` | `docs(report): record Phase 7 external setpoint verification` | Phase 1–7回归、真实XAE Build、`LastBuildInfo=0`、报告闸门和差异检查 | 已Push并复核远端SHA |
-| Phase 8 source | `2b9a470e215962d7696cae4036224284f36f66ce` | `feat(control): add Phase 8 force admittance` | Phase 1–7回归、Phase 8除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、两轮审查和边界检查 | 报告提交前待Push |
+| Phase 8 source | `2b9a470e215962d7696cae4036224284f36f66ce` | `feat(control): add Phase 8 force admittance` | Phase 1–7回归、Phase 8除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、两轮审查和边界检查 | 已随Phase 8报告Push |
+| Phase 8 report | `2b73107c8e43ccc858fedcea9007b846ab4b1b0b` | `docs(report): record Phase 8 force control verification` | Phase 1–8回归、真实XAE Build、`LastBuildInfo=0`、143个工程XML和报告闸门 | 已Push并复核远端SHA |
 
 ## 保护检查
 
@@ -158,6 +159,18 @@ Regression: Phase 1 through Phase 6 PASS
 XAE build: PASS (Release|TwinCAT RT (x64), LastBuildInfo=0)
 Hardware operations: none
 Push: pending until report verification and report commit
+```
+
+## Phase 8最终Push状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Source commit: 2b9a470e215962d7696cae4036224284f36f66ce
+Report commit: 2b73107c8e43ccc858fedcea9007b846ab4b1b0b
+Push result: success
+Remote verified SHA: 2b73107c8e43ccc858fedcea9007b846ab4b1b0b
+Remote-only / Local-only before push: 0 / 2
+Credentials recorded: none
 ```
 
 ## Phase 7最终Push状态
