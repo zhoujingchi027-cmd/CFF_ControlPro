@@ -1,4 +1,4 @@
-# AGENTS.md — CFFwelding TwinCAT 3 全新工程最终规则 V3.3
+# AGENTS.md — CFFwelding TwinCAT 3 全新工程最终规则 V3.7
 
 ## 1. 项目身份
 
@@ -476,7 +476,7 @@ Codex必须遵守：
 完整规则见：
 
 ```text
-Docs/06_Codex实施/15_GitHub仓库与提交推送策略_FINAL_V3.3.md
+Docs/06_Codex实施/15_GitHub仓库与提交推送策略_FINAL_V3.7.md
 ```
 
 ## 13. Git和交付

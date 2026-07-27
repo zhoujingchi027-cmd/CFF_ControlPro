@@ -1,4 +1,4 @@
-# CFFwelding 最终设计决策登记表 V3.3
+# CFFwelding 最终设计决策登记表 V3.7
 
 本文件是冲突规则的最高优先级裁决表。
 
@@ -59,3 +59,42 @@
 | D-053 | Git工作分支 | `codex/cffwelding-greenfield-final-v3.3` |
 | D-054 | 人工认证 | Push可暂停让用户通过GCM/浏览器/PAT认证；不得保存凭据 |
 | D-055 | HTTPS密码 | GitHub账户密码不可用于Git Push；Password提示输入PAT |
+| D-056 | 硬接线IO范围 | 仅Z/R AXIS_REF、力Raw、位移Raw、Z Home/正负限位、三位模式、Local/Robot、三色灯 |
+| D-057 | 机器人通讯 | Profinet；逻辑契约由PLC预布置，实际角色/GSDML/PDO后期人工配置 |
+| D-058 | 送钉系统通讯 | 送钉阀岛使用EtherCAT；实际ESI/PDO和阀位后期人工配置 |
+| D-059 | 枪头模块通讯 | 枪头模块使用EtherCAT；侦钉和气缸状态通过该总线 |
+| D-060 | IO-Link边界 | IO-Link模块属于外围子系统内部实现，CFF主逻辑不直接依赖品牌设备对象 |
+| D-061 | Collision输入 | 不属于硬接线IO；只有枪头EtherCAT实际提供时才启用，否则CalibrationValid保持FALSE |
+| D-062 | Clamp对象 | 当前不要求PRG_ClampControl，不编造独立夹具硬件 |
+| D-063 | 总线分层 | 原始过程映像GVL→总线Adapter FB→归一化状态/命令→业务PROGRAM |
+| D-064 | 映射责任 | Codex创建结构和占位，用户后期Scan后人工完成Profinet/EtherCAT/PDO映射 |
+| D-065 | Collision来源 | 无独立IO/总线传感器；由外部位移进入标定窗口触发Teach |
+| D-066 | Collision标定结果 | 同时保存位移参考值和NC轴位置，多次重复并验证极差 |
+| D-067 | Runtime Collision | 外部位移剩余距离为主，NC轴剩余距离为冗余和一致性检查 |
+| D-068 | 枪头馈送模块 | 独立EtherCAT模块，3输入2输出，独立Adapter/PROGRAM/Request/Status |
+| D-069 | 弹夹模块 | 独立EtherCAT模块，8输入5输出，独立Adapter/PROGRAM/Request/Status |
+| D-070 | 供钉站模块 | 独立EtherCAT模块，10输入7输出，独立PROGRAM/Action/Request/Status |
+| D-071 | 供钉站输出 | 拉钉气缸、减压馈送吹气、正常馈送吹气、振动盘、三吹气、轨道头吹气、仓门气缸 |
+| D-072 | 外围协调 | PRG_FastenerSupplyCoordinator只通过模块Request/Status编排 |
+| D-073 | 模块耦合 | 模块不得访问其他模块原始GVL、局部变量或FB内部变量 |
+| D-074 | Collision旧字段 | 删除枪头CollisionReferenceAvailable/CollisionReference字段 |
+| D-075 | 外部映射程序 | 新增PRG_IO_Config，外部过程映像与内部模块接口只能在此映射 |
+| D-076 | 内部模块接口 | 新增GVL_ModuleInterface，模块不得直接访问GVL_ExternalIO |
+| D-077 | 核心握手 | 固定为上游bFastenerReadyToSend、下游bReadyToReceive |
+| D-078 | 弹夹路径 | Fastener Station→Magazine→Gun Head Feed→Gun Head |
+| D-079 | 直吹路径 | Fastener Station→Gun Head Feed→Gun Head |
+| D-080 | 模块协调器 | PRG_FastenerTransportCoordinator只路由模式和握手，不控制执行器 |
+| D-081 | 模块自动逻辑 | Codex只创建PROGRAM/Action安全骨架，自动流程由用户人工编写 |
+| D-082 | 气缸FB | 双电控、单电控和定时吹气分别使用通用FB |
+| D-083 | 维修点动 | 通过模块PROGRAM和气缸FB执行，带模式、Owner和Heartbeat |
+| D-084 | Robot字节映射 | 保留20字节外部接口，布局未定义时不解码、不允许Auto Ready |
+| D-085 | 外部符号名 | robot_to_plc/plc_to_robot/bsensor/bactuaor/SMCBOX_*/gunBOX_*按图保留 |
+| D-086 | Legacy拼写 | ST_actuaor、Ousint、OUT_BOOL_TO_USINT、passsingal等外部名不自动修正 |
+| D-087 | 外部映射Owner | PRG_IO_Config是Legacy过程映像唯一读写者 |
+| D-088 | Z Home/Limit来源 | gunBOX_bullIn经IO_Config映射到内部GVL_IO干净BOOL |
+| D-089 | Union布局 | ST_USINT与DUT_USINT必须为1字节，业务模块不得直接使用Union |
+| D-090 | 气缸FB | 统一使用新版FB_Actuator，不再使用两个独立单双控FB |
+| D-091 | 单双控选择 | ST_ActuatorConfig.bDoubleSolenoid变量切换 |
+| D-092 | FB边界 | Manual/Auto仲裁在模块PROGRAM；FB_Actuator无全局依赖且不修改输入 |
+| D-093 | 气缸实例 | 枪头1、弹夹3、供钉站2，共6个FB_Actuator实例 |
+| D-094 | 映射确认 | Raw bit/byte对应未人工确认前MappingValid与Production Ready保持FALSE |

@@ -325,3 +325,20 @@ Docs/报告/HARDWARE_MANUAL_BINDING_CHECKLIST.md
 - [ ] NC轴未关联实际驱动/编码器。
 - [ ] 未绑定时生产Ready保持FALSE。
 - [ ] 已生成完整人工绑定清单。
+
+
+## 12. 总线接口补充
+
+本项目必须分别预留：
+
+```text
+Robot Profinet
+Feeder EtherCAT
+Gun Head EtherCAT
+```
+
+外部总线过程数据不得混入`GVL_IO`。
+
+`GVL_IO`只保留最新硬接线清单。
+
+实际Profinet/EtherCAT配置、GSDML、ESI、PDO和设备树全部由用户后期人工完成。

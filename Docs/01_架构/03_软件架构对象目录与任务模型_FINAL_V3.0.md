@@ -52,7 +52,7 @@
 - Curve Recorder；
 - Alarm Request。
 
-## 2. Task_CffMain
+## 2. Task_CffMain（建议只调用PRG_MainTask）
 
 建议10 ms，最终以实际配置为准。
 
@@ -66,9 +66,11 @@
 7. PRG_MaintenanceControl
 8. PRG_ManualControl
 9. PRG_AutoControl
-10. PRG_FastenerControl
-11. PRG_FeederControl
-12. PRG_ClampControl
+10. PRG_FastenerSupplyCoordinator
+11. PRG_GunHeadFeedModule
+PRG_MagazineModule
+PRG_FastenerStationModule
+12. PRG_GunHeadFeedModule
 13. PRG_MachineMain
 14. PRG_AlarmControl
 15. PRG_TowerLightControl
@@ -141,9 +143,11 @@ PRG_ServiceCalibration
 PRG_MaintenanceControl
 PRG_ManualControl
 PRG_AutoControl
-PRG_FastenerControl
-PRG_FeederControl
-PRG_ClampControl
+PRG_FastenerSupplyCoordinator
+PRG_GunHeadFeedModule
+PRG_MagazineModule
+PRG_FastenerStationModule
+PRG_GunHeadFeedModule
 PRG_MachineMain
 PRG_AlarmControl
 PRG_TowerLightControl
@@ -163,6 +167,10 @@ FB_AxisCommandArbiter
 FB_ZAxisNcAdapter
 FB_ZAxisExtSetpointAdapter
 FB_RAxisNcAdapter
+FB_RobotProfinetAdapter
+FB_MagazineEtherCATAdapter
+FB_FastenerStationEtherCATAdapter
+FB_GunHeadFeedEtherCATAdapter
 ```
 
 ### Control
@@ -193,7 +201,7 @@ FB_AlarmLatch
 ### Calibration
 
 ```text
-FB_CollisionReferenceTeach
+FB_CollisionDisplacementTeach
 FB_ForceMeasurementCalibration
 FB_DisplacementCalibration
 FB_ExtSetpointCommissioning
@@ -317,6 +325,11 @@ GVL_HMI
 GVL_Trace
 GVL_Persistent
 GVL_ProjectInfo
+GVL_RobotProfinet
+GVL_MagazineEtherCAT
+GVL_FastenerStationEtherCAT
+GVL_GunHeadFeedEtherCAT
+GVL_Device
 ```
 
 全部：
@@ -324,3 +337,74 @@ GVL_ProjectInfo
 ```pascal
 {attribute 'qualified_only'}
 ```
+
+
+## 10. 总线DUT补充
+
+```text
+ST_RobotProfinetInput
+ST_RobotProfinetOutput
+ST_MagazineBusInput
+ST_FastenerStationBusInput
+ST_MagazineBusOutput
+ST_GunHeadFeedBusInput
+ST_GunHeadFeedBusOutput
+ST_FeederRequest
+ST_FeederStatus
+ST_GunHeadRequest
+ST_GunHeadStatus
+```
+
+业务PROGRAM只能读写归一化Request/Status，不得直接依赖具体PDO偏移。
+
+
+## 11. MainTask调度器和IO_Config
+
+新增：
+
+```text
+PRG_MainTask
+PRG_IO_Config
+PRG_FastenerTransportCoordinator
+```
+
+`PRG_MainTask`负责调用：
+
+```text
+IO Input Actions
+→ 主控和模块PROGRAM
+→ IO Output Actions
+```
+
+模块PROGRAM：
+
+```text
+PRG_GunHeadFeedModule
+PRG_MagazineModule
+PRG_FastenerStationModule
+PRG_RobotInterface
+```
+
+每个模块内部创建Actions，自动Action保留为人工待编写安全骨架。
+
+
+## 12. Legacy外部接口与执行器对象
+
+```text
+GVL_ExternalIO
+PRG_IO_Config
+
+ST_sensor
+ST_actuaor
+DUT_USINT
+ST_USINT
+stGunbox_byteIN
+
+FB_Actuator
+ST_ActuatorConfig
+E_ActuatorCommand
+E_ActuatorState
+E_ActuatorFaultCode
+```
+
+所有气缸统一使用FB_Actuator。

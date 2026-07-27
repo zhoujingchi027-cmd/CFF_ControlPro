@@ -1,4 +1,5 @@
-Task ID: CFFWELDING-GREENFIELD-FINAL-V3.3
+
+Task ID: CFFWELDING-GREENFIELD-FINAL-V3.7
 
 不要修改任何旧工程。
 
@@ -17,37 +18,80 @@ Task ID: CFFWELDING-GREENFIELD-FINAL-V3.3
 6. Docs/01_架构/03_软件架构对象目录与任务模型_FINAL_V3.0.md
 7. Docs/01_架构/04_数据所有权与命令邮箱_FINAL_V3.0.md
 8. Docs/01_架构/05_内部实例接口与无外部硬件绑定规则_FINAL_V3.1.md
-18. Docs/02_核心工艺/05_CFF流程与推进准则_FINAL_V3.0.md
-18. Docs/02_核心工艺/06_Z轴导纳力控与ExternalSetpoint_FINAL_V3.0.md
-18. Docs/02_核心工艺/07_R轴扭矩能量与过程观察_FINAL_V3.0.md
-18. Docs/03_主控与外围/08_主状态机模式按钮与维修_FINAL_V3.0.md
-18. Docs/03_主控与外围/09_Program连接点送料机器人报警_FINAL_V3.0.md
+9. Docs/01_架构/06_硬接线IO与外部接口边界_FINAL_V3.7.md
+10. Docs/01_架构/07_位移碰撞点标定与外围模块解耦_FINAL_V3.7.md
+11. Docs/01_架构/08_IO_Config模块PROGRAM与Action骨架_FINAL_V3.7.md
+12. Docs/01_架构/09_确定外部接口与通用FB_Actuator_FINAL_V3.7.md
+13. Docs/02_核心工艺/05_CFF流程与推进准则_FINAL_V3.0.md
+14. Docs/02_核心工艺/06_Z轴导纳力控与ExternalSetpoint_FINAL_V3.0.md
+15. Docs/02_核心工艺/07_R轴扭矩能量与过程观察_FINAL_V3.0.md
+16. Docs/03_主控与外围/08_主状态机模式按钮与维修_FINAL_V3.0.md
+17. Docs/03_主控与外围/09_Program连接点送料机器人报警_FINAL_V3.0.md
 18. Docs/04_标定与联调/10_整机标定联调与工艺资格_FINAL_V3.0.md
-18. Docs/05_ADS与追溯/11_PLC_ADS契约与WPF预布置_FINAL_V3.0.md
-18. Docs/06_Codex实施/12_分阶段实施计划_FINAL_V3.3.md
-18. Docs/06_Codex实施/13_CODEX直接执行总任务_FINAL_V3.3.md
-18. Docs/06_Codex实施/14_最终验收与代码审查_FINAL_V3.3.md
-19. Docs/06_Codex实施/15_GitHub仓库与提交推送策略_FINAL_V3.3.md
+19. Docs/05_ADS与追溯/11_PLC_ADS契约与WPF预布置_FINAL_V3.0.md
+20. Docs/06_Codex实施/12_分阶段实施计划_FINAL_V3.7.md
+21. Docs/06_Codex实施/13_CODEX直接执行总任务_FINAL_V3.7.md
+22. Docs/06_Codex实施/14_最终验收与代码审查_FINAL_V3.7.md
+23. Docs/06_Codex实施/15_GitHub仓库与提交推送策略_FINAL_V3.7.md
+
+如项目资料目录中存在`FB_Actuator.TcPOU`，必须只读分析其接口和经验，不得直接复制旧实现。
 
 执行原则：
-- 所有关键变量、FB输入输出、实例声明、状态和关键算法必须使用中文独立行注释。
-- 每个关键FB实例必须有唯一Owner和明确Input/Output接口，不得跨对象访问内部变量。
-- 本轮不要扫描或关联任何外部硬件。
-- 不得执行Scan Devices、Scan Boxes、Scan Motors。
-- 不得添加或链接真实EP3174、IO-Link、AX5000、编码器、机器人或送料PDO。
-- GVL_IO只保留AT %I* / AT %Q*或普通变量占位。
-- 可以建立PLC AXIS_REF与未绑定实际驱动的NC轴对象之间的内部关联；不得关联NC轴与真实驱动/编码器。
-- 未完成硬件人工映射时，生产Ready和硬件有效状态必须保持FALSE。
-- 必须生成实例所有权、内部接口目录和人工硬件绑定清单。
+
+A. 固定Legacy外部过程映像
+- 创建并保留以下外部变量名：
+  robot_to_plc、plc_to_robot、bsensor、bactuaor、
+  SMCBOX_bullfOut、SMCBOX_bullfIn、SMCBOX_portDo、
+  gunBOX_bullIn、gunBOX_byteIn。
+- 使用AT %I*/AT %Q*占位；XAE不允许结构通配时改为普通变量并加TODO_HW_MAP。
+- Legacy名称和拼写不得改名。
+- 创建ST_sensor、ST_actuaor、DUT_USINT、ST_USINT、stGunbox_byteIN。
+- ST_USINT和DUT_USINT必须验证为1字节。
+- 只有PRG_IO_Config可以访问这些Legacy变量。
+- 输出每周期先清零Raw结构，再写有效内部输出，并清零未使用bit。
+- bit/byte对应由用户后期人工调整；未确认前MappingValid和Ready保持FALSE。
+
+B. 模块PROGRAM和IO_Config
+- 创建GVL_ModuleInterface和PRG_IO_Config。
+- 外部过程映像与内部模块接口分离。
+- 创建PRG_MainTask或编译验证过的输入前置/输出后置等效结构。
+- 创建PRG_GunHeadFeedModule、PRG_MagazineModule、
+  PRG_FastenerStationModule、PRG_RobotInterface。
+- 创建PRG_FastenerTransportCoordinator，只路由Magazine/Direct Blow路径和两路握手。
+- 两路握手固定为bFastenerReadyToSend、bReadyToReceive。
+- 模块之间不得访问其他模块Raw GVL、局部变量或FB内部变量。
+- 模块自动主逻辑只创建ACT_Automatic_TODO安全骨架，由用户后续人工编写。
+
+C. 通用FB_Actuator
+- 只创建一个新版FB_Actuator。
+- 单电控/双电控通过ST_ActuatorConfig.bDoubleSolenoid切换。
+- 新FB必须具备Work/Basic反馈滤波、超时、方向切换死区、
+  输出互锁、Done、Fault、State和Reset。
+- 不复制旧FB中的MainSysState、全局Reset、alarmstring、HMI按钮、
+  WSTRING、VAR_INPUT自修改和时间模拟到位。
+- Manual/Automatic Owner由模块PROGRAM仲裁，FB只接收最终E_ActuatorCommand。
+- 实例化：
+  fbDetectionCylinder
+  fbThreePositionCylinder
+  fbFullCheckCylinderA
+  fbFullCheckCylinderB
+  fbPullPinCylinder
+  fbBinDoorCylinder
+- Maintenance点动必须经过模块PROGRAM和FB_Actuator。
+- 吹气继续使用FB_TimedAirValve。
+- Robot 20字节布局未知时只创建TODO Codec，Automatic Ready保持FALSE。
+
+D. 核心CFF控制
 - 新工程唯一写入；旧工程只读。
 - 流程和可调试状态机放PROGRAM POU。
 - 算法、可复用有状态逻辑和轴/硬件适配放FB。
 - 无状态纯计算放FC。
-- 标识符英文ASCII；关键变量、状态、算法使用中文独立行注释。
+- 标识符英文ASCII；关键变量、状态、实例和算法使用中文独立行注释。
 - 保持TwinCAT XML UTF-8。
 - 不创建TwinSAFE、仿真、虚拟轴、假IO、模糊控制、MPC、WPF或数据库。
 - Kistler 4574A→4709A→EP3174为Z轴真实力反馈。
 - 12 mm外部位移为累计SRelSensor主反馈。
+- 碰撞点通过外部位移窗口Teach，不使用Collision IO。
 - Z轴采用导纳力PI输出速度并通过External Setpoint执行。
 - R轴采用RPM控制。
 - Primary只允许Relative Distance、Step Time、Decline of Force To。
@@ -59,9 +103,15 @@ Task ID: CFFWELDING-GREENFIELD-FINAL-V3.3
 - 模式为Maintenance/Manual/Automatic，控制源为Local/Robot。
 - Test Mode合并到Maintenance。
 - WPF Start/Stop/Initialize/Reset采用CommandId/Ack。
-- 维修点动采用Hold-to-Run+Heartbeat。
 - WPF只访问GVL_HMI。
 - 曲线使用PLC双缓冲和分页。
+
+E. 外部硬件边界
+- 不得执行Scan Devices、Scan Boxes、Scan Motors。
+- 不得添加或链接真实EP3174、IO-Link、AX5000、编码器、
+  Robot、Gun Head、Magazine或Fastener Station PDO。
+- 可以建立PLC AXIS_REF与未绑定实际驱动的NC轴对象之间的内部关联。
+- 未完成人工硬件映射时，Production Ready和硬件有效状态保持FALSE。
 
 GitHub固定信息：
 - Web: https://github.com/zhoujingchi027-cmd/CFF_ControlPro
@@ -69,8 +119,7 @@ GitHub固定信息：
 - Remote: origin
 - Default Branch: main
 - Work Branch: codex/cffwelding-greenfield-final-v3.3
-- 该仓库在任务包生成时已验证为Public、空仓库，并具有Admin/Push权限。
-- 本机仍需执行git ls-remote复核。
+- 本机执行git ls-remote复核。
 - 首次push如果需要认证，暂停并让用户人工完成GCM/浏览器/PAT认证。
 - GitHub账户密码不能用于HTTPS Git；Password提示应输入PAT。
 - 不得读取、记录、回显或保存PAT/密码。
@@ -85,4 +134,5 @@ GitHub固定信息：
 7. 关键阻塞项；
 8. Git身份、Remote访问状态、远程默认分支和计划工作分支。
 
-每个Phase后执行Build、审查和Git提交。无XAE时生成完整可导入源码，不得声称编译通过。
+每个Phase后执行Build、审查和Git提交。
+无XAE时生成完整可导入源码，不得声称编译通过。

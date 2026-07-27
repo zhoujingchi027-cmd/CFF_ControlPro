@@ -174,19 +174,38 @@ RejectReason
 
 必须使用Sequence/Ack防重复。
 
-## 9. Clamp接口
+## 9. 模块化供钉外围
 
-结构化：
+当前外围模块：
 
 ```text
-ST_ClampInput
-ST_ClampOutput
-ST_ClampStatus
+PRG_GunHeadFeedModule
+PRG_MagazineModule
+PRG_FastenerStationModule
+PRG_FastenerTransportCoordinator
 ```
 
-实际PDO未确认时保留TODO，不填假值。
+原始外部接口只由`PRG_IO_Config`访问。
+
+`PRG_FastenerTransportCoordinator`只负责：
+
+```text
+Magazine / Direct Blow路径
+bFastenerReadyToSend
+bReadyToReceive
+模块Ready/Fault汇总
+```
+
+不得直接控制气缸、吹气、振动盘或Raw总线输出。
+
+各模块PROGRAM是本模块执行器唯一Owner，并通过新版`FB_Actuator`
+和`FB_TimedAirValve`执行Maintenance动作。
+
+实际ESI、PDO、IO-Link端口和Robot字节布局由用户后期人工配置。
 
 ## 10. 报警分级
+
+
 
 ```text
 Warning
@@ -220,7 +239,7 @@ Fault
 3000 Contact/CFF
 3100 Criterion
 4000 Fastener/Feeder
-5000 Robot/Clamp/IO-Link
+5000 Robot/Feeder/GunHead
 6000 ADS/Trace
 ```
 
@@ -251,3 +270,120 @@ Reset前检查源故障消失。
 结果=Abort
 禁止自动续焊
 ```
+
+## 8A. 外围供钉模块最终分层
+
+模块：
+
+```text
+PRG_GunHeadFeedModule
+PRG_MagazineModule
+PRG_FastenerStationModule
+PRG_FastenerSupplyCoordinator
+```
+
+`PRG_FastenerSupplyCoordinator`只使用模块Request/Status。
+
+### Gun Head Feed
+
+输入：
+
+```text
+CylinderDetection1
+CylinderDetection2
+FastenerPassDetected
+```
+
+输出：
+
+```text
+DetectionCylinderExtend
+DetectionCylinderRetract
+```
+
+### Magazine
+
+输入：
+
+```text
+ThreePositionCylinderExtended
+ThreePositionCylinderRetracted
+ThreePositionCylinderFastenerDetected
+FullCheckCylinderAExtended
+FullCheckCylinderARetracted
+FullCheckCylinderBExtended
+FullCheckCylinderBRetracted
+MagazineDoorDetected
+```
+
+输出：
+
+```text
+ThreePositionCylinderExtend
+ThreePositionCylinderRetract
+FullCheckCylinder1
+FullCheckCylinder2
+FeedAirBlow
+```
+
+### Fastener Station
+
+输入：
+
+```text
+PullFastenerExtended
+PullFastenerRetracted
+TrackDetected
+OutletDetected
+TrayDetected
+ColumnAFastenerPassDetected
+ColumnBFastenerPassDetected
+BinDoorCylinderExtended
+BinDoorCylinderRetracted
+BinDoorDockingDetected3
+```
+
+
+## 8B. 模块耦合限制
+
+- 模块不访问其他模块原始总线GVL；
+- 模块不访问其他PROGRAM局部变量；
+- Coordinator不直接写物理输出；
+- 各模块输出只有一个Owner；
+- 模块通过RequestId/Ack、Ready/Busy/Done/Fault通信；
+- Module-local Timeout和Fault在本模块处理；
+- 集中报警只接收Alarm Request。
+
+
+## 8C. 两路握手和路径模式
+
+模块间只使用：
+
+```text
+bFastenerReadyToSend
+bReadyToReceive
+```
+
+### Magazine
+
+```text
+Station → Magazine → GunHeadFeed
+```
+
+### Direct Blow
+
+```text
+Station → GunHeadFeed
+```
+
+`PRG_FastenerTransportCoordinator`只连接握手和路径，不控制气缸。
+
+模块PROGRAM自动逻辑由用户在`ACT_Automatic_TODO`中人工完成。
+
+## 8D. PRG_IO_Config
+
+所有外部过程映像先映射到内部模块接口。
+
+模块输出经`PRG_IO_Config`统一写回外部接口。
+
+模块不得直接访问`GVL_ExternalIO`。

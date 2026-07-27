@@ -34,23 +34,55 @@ External Setpoint POC
 - Stop阈值；
 - BrakeTime。
 
-## 4. Collision Reference
+## 4. 位移窗口碰撞点标定
+
+本项目没有Collision IO传感器。
+
+标定使用：
+
+```text
+外部位移传感器实际值
++
+Z轴NC实际位置
+```
+
+流程：
 
 ```text
 Maintenance+Local
 → Z Home
+→ 外部位移有效
+→ 移动到安全接近位置
+→ 确认位移在碰撞窗口外
 → 固定方向低速接近
-→ Sensor 0→1去抖
-→ 锁存Z位置
+→ 位移进入[WindowMin, WindowMax]
+→ 速度/方向合格并持续Debounce
+→ 锁存位移和NC位置
 → 退回
-→ 重复至少3次
-→ 均值/极差
-→ 保存Revision
+→ 重复N次
+→ 评估位移/轴位置极差
+→ 保存Calibration Revision
 ```
 
-运行中意外触发为Fault。
+运行时：
+
+```text
+CollisionDistanceSensor =
+ReferenceDisplacement - CurrentDisplacement
+
+CollisionDistanceAxis =
+ReferenceAxisPosition - CurrentAxisPosition
+```
+
+方向由配置统一转换。
+
+位移距离为主，NC距离为冗余。
+
+不得使用Home、Limit、Force Contact或固定理论值替代碰撞参考。
 
 ## 5. 力测量链
+
+
 
 ```text
 4574A→4709A→EP3174

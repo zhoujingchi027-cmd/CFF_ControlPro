@@ -26,3 +26,24 @@
 - [ ] 检查PDO类型、方向、单位和状态位
 - [ ] 完成轴、力、位移、Collision和External标定
 - [ ] 人工确认Production Hardware Binding Complete
+
+
+## 最新总线边界
+
+- [ ] Robot Profinet角色确认
+- [ ] Robot GSDML/PDO映射
+- [ ] Feeder EtherCAT Scan/ESI/PDO
+- [ ] Gun Head EtherCAT Scan/ESI/PDO
+- [ ] 确认枪头是否提供Collision Reference
+- [ ] 确认无额外硬接线IO
+
+
+## 外围模块V3.5
+
+- [ ] Gun Head Feed 3输入2输出映射
+- [ ] Magazine 8输入5输出映射
+- [ ] Fastener Station 10输入映射
+- [ ] 核对Fastener Station 7个输出与实际PDO
+- [ ] Robot Profinet映射
+- [ ] Collision位移窗口机械确认
+- [ ] Collision位移窗口重复Teach

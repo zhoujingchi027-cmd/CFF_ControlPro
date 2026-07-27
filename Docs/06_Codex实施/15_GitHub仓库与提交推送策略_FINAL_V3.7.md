@@ -1,5 +1,5 @@
 
-# GitHub仓库、分支、Commit和Push策略 FINAL V3.3
+# GitHub仓库、分支、Commit和Push策略 FINAL V3.7
 
 ## 1. 固定GitHub仓库
 

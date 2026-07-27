@@ -15,8 +15,17 @@
 | MaintenanceState | `PRG_MaintenanceControl` |
 | 报警锁存 | `PRG_AlarmControl` |
 | 三色灯输出 | `PRG_TowerLightControl` |
-| 送料输出 | `PRG_FeederControl` |
-| 夹具输出 | `PRG_ClampControl` |
+| 弹夹EtherCAT输出 | `PRG_MagazineModule` |
+| 枪头馈送EtherCAT输出 | `PRG_GunHeadFeedModule` |
+| 弹夹EtherCAT输出 | `PRG_MagazineModule` |
+| 供钉站EtherCAT输出 | 暂无Owner；输出定义未提供 |
+| 机器人Profinet输出 | `PRG_RobotInterface` |
+| 枪头馈送EtherCAT输出 | `PRG_GunHeadFeedModule` |
+| 弹夹EtherCAT输出 | `PRG_MagazineModule` |
+| 供钉站EtherCAT输出 | 暂无Owner；输出定义未提供 |
+| Legacy外部过程映像 | `PRG_IO_Config` |
+| Legacy位/字节解码和编码 | `PRG_IO_Config` |
+| 路径模式和模块握手路由 | `PRG_FastenerTransportCoordinator` |
 | GVL_HMI公开结构 | `PRG_HmiAdsInterface` |
 | 结果记录 | `PRG_ResultTraceability` |
 

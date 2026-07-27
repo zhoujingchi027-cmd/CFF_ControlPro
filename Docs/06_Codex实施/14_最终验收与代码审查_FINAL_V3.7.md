@@ -145,6 +145,72 @@
 - [ ] 状态五要素注释。
 - [ ] 无无关XML重写。
 
+## IO与通讯
+
+- [ ] GVL_IO只有冻结的直接IO和AXIS_REF。
+- [ ] 没有额外硬接线气缸、夹具、送料或Collision变量。
+- [ ] Robot通讯仅通过Profinet契约。
+- [ ] Feeder通讯仅通过EtherCAT契约。
+- [ ] Gun Head通讯仅通过EtherCAT契约。
+- [ ] 三个总线分别有GVL、DUT、Adapter和唯一业务Owner。
+- [ ] 没有创建PRG_ClampControl。
+- [ ] Collision只在枪头总线明确提供时有效。
+- [ ] 未扫描或关联实际Profinet/EtherCAT设备。
+- [ ] 未编造GSDML、ESI、PDO、阀号和字节偏移。
+- [ ] 已生成Direct IO、Bus Interface和人工映射报告。
+
+## 位移碰撞点与外围模块
+
+- [ ] 不存在Collision硬接线或总线输入。
+- [ ] Collision Teach只使用外部位移窗口。
+- [ ] Teach锁存外部位移和NC位置。
+- [ ] 支持多次样本和重复性校验。
+- [ ] Runtime位移碰撞距离为主、NC距离为冗余。
+- [ ] Gun Head Feed严格为3输入2输出。
+- [ ] Magazine严格为8输入5输出。
+- [ ] Fastener Station严格为10个已知输入。
+- [ ] 没有编造Fastener Station输出。
+- [ ] Fastener Station输出定义不完整时Production Ready为FALSE。
+- [ ] 四个外部模块分别有独立接口和Owner。
+- [ ] Coordinator不访问原始总线GVL。
+- [ ] Module PROGRAM不访问其他模块局部或FB内部变量。
+- [ ] 已更新模块接口和单一写入者报告。
+
+## IO_Config、Action和气缸FB
+
+- [ ] GVL_ExternalIO与GVL_ModuleInterface分离。
+- [ ] 只有PRG_IO_Config访问外部过程映像。
+- [ ] 输入映射在模块运行前，输出映射在模块运行后。
+- [ ] 有PRG_MainTask或编译验证的等效调度。
+- [ ] 两路握手变量名称和Owner正确。
+- [ ] Magazine和Direct Blow路径连接正确。
+- [ ] Coordinator不控制执行器。
+- [ ] 三个模块均有PROGRAM和Actions。
+- [ ] ACT_Automatic_TODO当前不产生动作。
+- [ ] 有双电控、单电控和吹气FB。
+- [ ] 维修点动带Heartbeat并经过FB。
+- [ ] 输出互锁有效。
+- [ ] Robot字节布局没有被猜测。
+- [ ] 已生成IO映射、Action、Cylinder和Handshake报告。
+
+## Legacy接口与FB_Actuator
+
+- [ ] 所有固定外部符号按图存在。
+- [ ] Legacy名称没有自动修正。
+- [ ] ST_USINT/DUT_USINT尺寸为1字节。
+- [ ] stGunbox_byteIN字段按图保留。
+- [ ] 只有PRG_IO_Config访问Raw接口。
+- [ ] 输出先清零后写入，未使用bit清零。
+- [ ] 映射未确认时Ready为FALSE。
+- [ ] 只有一个通用FB_Actuator类型。
+- [ ] 单控/双控通过配置变量切换。
+- [ ] FB不依赖MainSysState、全局Reset、alarmstring或HMI按钮。
+- [ ] FB不修改VAR_INPUT。
+- [ ] FB不使用时间模拟生产到位。
+- [ ] 6个气缸实例全部存在且Owner唯一。
+- [ ] Maintenance点动经过模块和FB。
+- [ ] 已生成Raw接口、映射和实例报告。
+
 ## GitHub和Commit
 
 - [ ] Remote URL严格为`https://github.com/zhoujingchi027-cmd/CFF_ControlPro.git`。

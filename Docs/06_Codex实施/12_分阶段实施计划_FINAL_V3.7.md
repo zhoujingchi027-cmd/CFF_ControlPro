@@ -1,4 +1,4 @@
-# Codex分阶段实施计划 FINAL V3.3
+# Codex分阶段实施计划 FINAL V3.7
 
 每个Phase必须Build、审查、Commit；远程访问可用时随后Push规定工作分支。
 
@@ -149,6 +149,70 @@ XAE不可用：
 - Process Window；
 - Double Buffer；
 - Build。
+
+## Phase 11A：硬接线IO和总线通讯契约
+
+- [ ] GVL_IO仅创建冻结的13个应用接口和2个AXIS_REF。
+- [ ] 创建Robot Profinet DUT/GVL/Adapter。
+- [ ] 创建Feeder EtherCAT DUT/GVL/Adapter。
+- [ ] 创建Gun Head EtherCAT DUT/GVL/Adapter。
+- [ ] 删除/不创建PRG_ClampControl。
+- [ ] Fastener流程只通过Request/Status协调Feeder与GunHead。
+- [ ] Collision不作为硬接线输入。
+- [ ] 不扫描或关联实际总线设备。
+- [ ] 生成Direct IO Catalog、Bus Interface Catalog和Manual Mapping Checklist。
+- [ ] Build。
+- [ ] Commit：`feat(io): add hardwired and bus communication contracts`
+
+## Phase 11B：位移碰撞点和模块化供钉
+
+- [ ] 删除所有Collision IO/总线字段。
+- [ ] 创建FB_CollisionDisplacementTeach。
+- [ ] 创建碰撞位移窗口Config和Calibration结构。
+- [ ] 多次Teach、位移/NC双锁存、极差评价。
+- [ ] Runtime计算Sensor/Axis两套碰撞距离和Mismatch。
+- [ ] 创建Gun Head Feed模块全部DUT/GVL/Adapter/PROGRAM。
+- [ ] 创建Magazine模块全部DUT/GVL/Adapter/PROGRAM。
+- [ ] 创建Fastener Station输入DUT/GVL/Adapter/PROGRAM骨架。
+- [ ] 不创建Fastener Station物理输出。
+- [ ] 创建PRG_FastenerSupplyCoordinator。
+- [ ] 模块只通过Request/Status交互。
+- [ ] 更新One Writer和Module Interface报告。
+- [ ] Build。
+- [ ] Commit：`feat(peripheral): modularize gun head magazine and fastener station`
+
+## Phase 11C：IO_Config、模块PROGRAM和Action骨架
+
+- [ ] 创建GVL_ExternalIO。
+- [ ] 创建GVL_ModuleInterface。
+- [ ] 创建PRG_IO_Config及输入/输出映射Actions。
+- [ ] 创建PRG_MainTask或编译验证的等效调度。
+- [ ] 创建Gun Head Feed、Magazine、Fastener Station模块PROGRAM Actions。
+- [ ] 创建PRG_FastenerTransportCoordinator。
+- [ ] 实现Magazine/Direct Blow握手路由。
+- [ ] 创建双电控气缸、单电控气缸和定时吹气FB。
+- [ ] 创建Maintenance Hold-to-Run接口。
+- [ ] ACT_Automatic_TODO保持安全默认。
+- [ ] Robot Codec布局保持TODO。
+- [ ] 生成IO Config、Action、Cylinder和Handshake报告。
+- [ ] Build。
+- [ ] Commit：`feat(peripheral): add IO config module actions and cylinder interfaces`
+
+## Phase 11D：确定外部接口和通用FB_Actuator
+
+- [ ] 创建固定Legacy外部变量和类型。
+- [ ] 检查ST_USINT/DUT_USINT为1字节。
+- [ ] 创建IO_Config Raw Input/Output Actions。
+- [ ] 创建Mapping Confirmation状态。
+- [ ] Z Home/Limit改为gunBOX_bullIn映射。
+- [ ] 创建FC_GetBitFromByte。
+- [ ] 创建新版FB_Actuator和配置/状态/故障枚举。
+- [ ] 不复制旧FB的全局依赖和HMI逻辑。
+- [ ] 实例化全部6个气缸。
+- [ ] Maintenance点动接入全部实例。
+- [ ] 创建Actuator Instance和Raw Interface报告。
+- [ ] Build。
+- [ ] Commit：`feat(io): add legacy interface mapping and unified actuator block`
 
 ## Phase 12：模式、命令和主状态
 

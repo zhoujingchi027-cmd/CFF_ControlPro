@@ -1,4 +1,4 @@
-# CODEX直接执行总任务 FINAL V3.3
+# CODEX直接执行总任务 FINAL V3.7
 
 ## Task ID
 
@@ -234,6 +234,223 @@ git ls-remote --symref https://github.com/zhoujingchi027-cmd/CFF_ControlPro.git 
 - 不自动Merge、Tag、Release或删除分支。
 - Push不可用时继续本地Commit，并在Git报告中记录待推送Commit。
 - 最终生成`Docs/报告/GIT_EXECUTION_REPORT.md`。
+
+## 最终IO和总线任务
+
+### GVL_IO
+
+只允许：
+
+```text
+Z_axis
+R_axis
+nZForceRaw
+nZDisplacementRaw
+bZHomeSwitch
+bZLimitPositiveSwitch
+bZLimitNegativeSwitch
+bModeManualSwitch
+bModeAutomaticSwitch
+bModeMaintenanceSwitch
+bControlLocalSwitch
+bControlRobotSwitch
+qLampRed
+qLampYellow
+qLampGreen
+```
+
+不得增加其他硬接线变量。
+
+### Robot
+
+```text
+Profinet
+GVL_RobotProfinet
+ST_RobotProfinetInput/Output
+FB_RobotProfinetAdapter
+PRG_RobotInterface
+```
+
+
+## 碰撞标定与外围模块最终任务
+
+### Collision
+
+- 不创建任何Collision IO。
+- 创建FB_CollisionDisplacementTeach。
+- 只使用外部位移进入配置窗口作为Teach触发。
+- Teach同时锁存位移和Z轴NC位置。
+- 至少支持N次样本、平均值、极差和有效性。
+- Runtime以位移碰撞距离为主，NC距离为冗余。
+- 不得用Home、Limit、Force或枪头总线信号替代。
+
+### Gun Head Feed EtherCAT
+
+输入：
+
+```text
+CylinderDetection1
+CylinderDetection2
+FastenerPassDetected
+```
+
+输出：
+
+```text
+DetectionCylinderExtend
+DetectionCylinderRetract
+```
+
+创建独立GVL、Adapter、PROGRAM、Request、Status、Config、State和Alarm。
+
+### Magazine EtherCAT
+
+输入8项、输出5项，严格按最终模块文档创建。
+
+### Fastener Station EtherCAT
+
+只创建用户提供的10项输入。
+
+当前没有物理输出列表：
+
+- 不创建输出PDO；
+- 不编造动作；
+- Module Output Definition Complete保持FALSE；
+- 自动供钉和Production Ready保持FALSE。
+
+### Coordinator
+
+创建PRG_FastenerSupplyCoordinator。
+
+只通过三个模块Request/Status协调，不访问原始总线GVL。
+
+### High Cohesion / Low Coupling
+
+- 每模块唯一输出Owner；
+- 模块不访问其他模块局部变量/FB内部变量；
+- Adapter只做总线适配；
+- Module PROGRAM做本地状态机；
+- Coordinator只做跨模块编排；
+- Alarm通过ST_AlarmRequest集中上报。
+
+## IO_Config与模块Action执行要求
+
+创建：
+
+```text
+GVL_ExternalIO
+GVL_ModuleInterface
+PRG_IO_Config
+PRG_MainTask
+PRG_FastenerTransportCoordinator
+
+FB_Actuator
+FB_Actuator
+FB_TimedAirValve
+```
+
+每个模块创建：
+
+```text
+PROGRAM
+Physical Input/Output
+Request/Status/Config
+Actions
+Cylinder/Air instances
+Maintenance interface
+Alarm request
+```
+
+Actions至少：
+
+```text
+ACT_ResetTransient
+ACT_EvaluateInputs
+ACT_UpdateHandshake
+ACT_Automatic_TODO
+ACT_MaintenanceJog
+ACT_ApplyInterlocks
+ACT_UpdateStatus
+ACT_RaiseAlarms
+ACT_CommitOutputs
+```
+
+`ACT_Automatic_TODO`只写安全默认和人工待编写说明，不生成自动动作。
+
+路径：
+
+```text
+Magazine:
+Station→Magazine→GunHeadFeed
+
+Direct Blow:
+Station→GunHeadFeed
+```
+
+握手固定：
+
+```text
+bFastenerReadyToSend
+bReadyToReceive
+```
+
+外部过程映像只由PRG_IO_Config读写。
+
+Robot原始20字节布局未知时，不得猜测，Auto Ready保持FALSE。
+
+## 固定Legacy接口和FB_Actuator执行任务
+
+严格创建：
+
+```text
+robot_to_plc AT %I* : ARRAY[1..20] OF BYTE
+plc_to_robot AT %Q* : ARRAY[1..20] OF BYTE
+bsensor AT %I* : ST_sensor
+bactuaor AT %Q* : ST_actuaor
+SMCBOX_bullfOut AT %Q* : ST_USINT
+SMCBOX_bullfIn AT %I* : ST_USINT
+SMCBOX_portDo AT %Q* : ST_USINT
+gunBOX_bullIn AT %I* : ST_USINT
+gunBOX_byteIn AT %I* : stGunbox_byteIN
+```
+
+名称不改。
+
+只允许PRG_IO_Config访问。
+
+创建新版FB_Actuator：
+
+- bDoubleSolenoid切换单/双控；
+- Work/Basic反馈和滤波；
+- 超时；
+- 方向切换死区；
+- 输出互锁；
+- Done/Fault/State；
+- 无全局依赖；
+- 不修改VAR_INPUT；
+- 不包含Manual/Auto Mode；
+- 不使用时间模拟到位。
+
+实例：
+
+```text
+fbDetectionCylinder
+fbThreePositionCylinder
+fbFullCheckCylinderA
+fbFullCheckCylinderB
+fbPullPinCylinder
+fbBinDoorCylinder
+```
+
+Maintenance请求通过模块PROGRAM产生最终E_ActuatorCommand。
+
+创建报告：
+
+```text
+RAW_EXTERNAL_INTERFACE_CATALOG.md
+IO_CONFIG_ASSIGNMENT_REVIEW.md
+ACTUATOR_INSTANCE_MATRIX.md
+```
 
 ## 6. 编译策略
 
