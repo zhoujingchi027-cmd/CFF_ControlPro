@@ -20,6 +20,7 @@
 | Phase 5 | `Release\|TwinCAT RT (x64)` | 已执行 | Force/Displacement/S_rel/Collision处理加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 6 | `Release\|TwinCAT RT (x64)` | 已执行 | Z/R标准NC Adapter与Owner仲裁加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 7 | `Release\|TwinCAT RT (x64)` | 已执行 | External Setpoint完整生命周期加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 8 | `Release\|TwinCAT RT (x64)` | 已执行 | 导纳PI、无扰切换、S_rel制动和机器限值快照加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -54,6 +55,7 @@ LastBuildInfo: 0
 - 真实I/O或PDO映射有效；
 - 真实驱动、编码器或物理轴配置有效；
 - 真实轴External Setpoint POC或时序已验证；
+- 导纳力控在真实Runtime、真实传感器和真实机械上的响应已验证；
 - 安全功能、工艺参数或Production Ready状态已验证。
 
 构建脚本不激活配置、不下载工程、不启动或重启TwinCAT Runtime。
@@ -169,3 +171,22 @@ LastBuildInfo: 0
 源码Commit：`4f1bfa8de7a3117558993ce07f655d59ccddcd74`。
 
 该Build只证明固定本机库版本下的离线编译结果。未扫描设备、未激活配置、未下载、未登录Runtime、未使能物理轴；External POC、真实驱动关联、抖动测量、硬件映射和工艺资格均未完成。
+
+## Phase 8执行记录
+
+Phase 8加入纯算法`FB_BumplessProfileSwitch`和`FB_ZForceAdmittance`，由`PRG_FastAxisControl`唯一实例化。实现覆盖力设定斜坡、速度前馈、PI、Back-calculation Anti-windup、Profile/机器双向速度与有效加速度、S_rel制动、硬力/行程/Collision边界、Profile及机器限值快照和故障锁存。
+
+最终控制台证据：
+
+```text
+Phase 8 force admittance test: PASSED
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+源码Commit：`2b9a470e215962d7696cae4036224284f36f66ce`。
+
+该Build只证明本机固定库版本下离线工程可编译。Phase 8默认不使能，不写External P/V/A/Direction；未进行Runtime算法执行、设备扫描、配置激活、下载、物理轴动作、周期抖动测量或工艺资格验证。

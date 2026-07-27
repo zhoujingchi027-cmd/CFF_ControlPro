@@ -17,9 +17,20 @@
 |---|---|---|---|
 | `bEnable` | `BOOL` | - | 力控制使能请求 |
 | `bReset` | `BOOL` | - | 清除算法内部状态 |
+| `bOwnerGranted` | `BOOL` | - | Force Process Owner已授予 |
+| `bExternalActive` | `BOOL` | - | Phase 7 External通道已确认Enabled |
+| `bForceValid` | `BOOL` | - | ForceControl及目标斜坡有效 |
+| `bRelativePositionValid` | `BOOL` | - | 位移、Contact参考点和Axis/Sensor一致性有效 |
+| `bBumplessTransfer` | `BOOL` | - | 当前扫描要求无扰Profile提交 |
+| `bHardForceActive` | `BOOL` | - | 上层硬力边界生效 |
+| `bHardStrokeActive` | `BOOL` | - | 上层硬S_rel边界生效 |
+| `bCollisionLimitActive` | `BOOL` | - | Collision边界生效 |
 | `rForceSet_kN` | `LREAL` | kN | 当前步骤压向目标力 |
 | `rForceActual_kN` | `LREAL` | kN | 低延迟压向实际力 |
 | `rRelativePosition_mm` | `LREAL` | mm | Contact起累计S_rel，向下为正 |
+| `rTargetRelativePosition_mm` | `LREAL` | mm | 当前Profile制动目标S_rel |
+| `rHardMaximumRelativePosition_mm` | `LREAL` | mm | 当前Profile硬最大S_rel |
+| `rTransferVelocity_mm_s` | `LREAL` | mm/s | Profile切换前的连续速度 |
 | `rCycleTime_s` | `LREAL` | s | 实际算法调用周期 |
 
 ### `ST_ZForceControlOutput`
@@ -28,8 +39,15 @@
 |---|---|---|---|
 | `rVelocityCommand_mm_s` | `LREAL` | mm/s | 导纳控制Z速度命令，向下为正 |
 | `rIntegralTerm_mm_s` | `LREAL` | mm/s | PI积分诊断值 |
+| `rForceSetRamped_kN` | `LREAL` | kN | 通过有限性和范围检查的Ramp目标力 |
+| `rForceError_kN` | `LREAL` | kN | Ramp目标与ForceControl之差 |
+| `rUnsaturatedVelocity_mm_s` | `LREAL` | mm/s | 限幅前PI速度 |
+| `rSaturatedVelocity_mm_s` | `LREAL` | mm/s | 速度、行程和加速度限幅后的诊断速度 |
+| `rStrokeVelocityLimit_mm_s` | `LREAL` | mm/s | S_rel制动允许的最大向下速度 |
 | `bActive` | `BOOL` | - | 算法正在计算 |
 | `bLimited` | `BOOL` | - | 速度、位移、加速度或硬边界限幅 |
+| `bAntiWindupFrozen` | `BOOL` | - | 当前扫描冻结积分 |
+| `bHardLimitActive` | `BOOL` | - | 硬力、硬行程或Collision边界有效 |
 | `bFault` | `BOOL` | - | 输入或算法诊断失败 |
 | `nFaultId` | `UDINT` | - | 故障编号 |
 
@@ -93,14 +111,14 @@
 
 ### `ST_CffSequenceStatus`
 
-发布AcceptedCommandId、Busy、Done、Aborted、Error、ErrorId、State、Step、SubPhase、EndCause，以及当前Force/RPM目标。状态数值将在Phase 3替换为显式枚举。
+发布AcceptedCommandId、Busy、Done、Aborted、Error、ErrorId、类型化State/Step/SubPhase/EndCause，以及当前Force/RPM目标。Phase 8增加力控Enable、Profile Transfer、切换速度、目标/硬S_rel和硬力/硬行程/Collision边界请求；`PRG_CffSequence`仍为骨架，不会提前置位这些请求。
 
 ## Writer/Reader边界
 
 | 接口 | 唯一写入者 | 主要读取者 |
 |---|---|---|
 | `ST_ZForceControlInput` | `PRG_FastAxisControl`调用准备区 | `FB_ZForceAdmittance` |
-| `ST_ZForceControlOutput` | `FB_ZForceAdmittance` | `PRG_FastAxisControl`轴命令合成 |
+| `ST_ZForceControlOutput` | `FB_ZForceAdmittance` | `PRG_FastAxisControl`发布到`ST_FastStatus`；Phase 10轨迹合成读取 |
 | `ST_ZExtSetpointCommand` | `PRG_FastAxisControl` | `FB_ZAxisExtSetpointAdapter` |
 | `ST_ZExtSetpointStatus` | `FB_ZAxisExtSetpointAdapter` | `PRG_FastAxisControl`、状态发布层 |
 | `ST_ZAxisCommand` | `FB_AxisCommandArbiter` | Z轴Adapter |
@@ -174,7 +192,9 @@
 - Phase 4加入14个纯计算FC和6个通用FB；当前只定义可复用类型，不提前声明业务实例。
 - Phase 5加入传感器处理与Contact参考点契约，并由`PRG_FastInputs`唯一写入快速过程实际值。
 - Phase 6加入`FB_AxisCommandArbiter`、`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`；Phase 7加入唯一`FB_ZAxisExtSetpointAdapter`。只有这三个轴Adapter持有`AXIS_REF`及MC实例；`PRG_FastAxisControl`只负责候选拆分、调用和状态发布。
+- Phase 8加入纯算法`FB_BumplessProfileSwitch`和`FB_ZForceAdmittance`，并由`PRG_FastAxisControl`唯一实例化；Profile、S_rel目标和机器Z/Force限值以一次无扰提交形成快照。
 - 标准运动以`ST_FastCommand.nRequestId`作为事务编号；Adapter只在编号变化时产生一次MC `Execute`上升沿，活动速度命令使用双实例交替以允许新事务按`MC_Aborting`替换。
 - External命令在Force Process Owner授予后才允许Enable，ACTIVE每个2 ms周期Feed；Owner在完整Disable和后保持完成前不转交标准NC通道。
-- 数据DUT只定义契约；Phase 6/7 MC命令仅由三个轴Adapter生成，真实驱动未关联时不生成执行沿且Ready保持FALSE。
+- Phase 8导纳输出只进入Fast状态，不覆盖External P/V/A/Direction；Sequence Error/Aborted、Owner/External/传感器有效性缺失、硬边界或算法故障均禁止可消费的活动输出。
+- 数据DUT只定义契约；Phase 6/7 MC命令仅由三个轴Adapter生成，Phase 8算法不调用MC，真实驱动未关联时不生成执行沿且Ready保持FALSE。
 - PROGRAM骨架没有跨PROGRAM局部变量访问。

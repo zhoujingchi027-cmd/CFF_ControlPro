@@ -27,10 +27,10 @@
 | `fbZAxisNc` | `FB_ZAxisNcAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 标准Z轴命令、Z轴`AXIS_REF` | `ST_ZAxisStatus` | 轴Reset或Owner释放时复位 |
 | `fbZExtSetpoint` | `FB_ZAxisExtSetpointAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_ZExtSetpointCommand`、配置、Owner授予、Z轴`AXIS_REF` | `ST_ZExtSetpointStatus` | 完整Disable、附加Feed和Post-disable hold后才释放Owner；Reset按状态清错或重试Disable |
 | `fbRAxisNc` | `FB_RAxisNcAdapter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_RAxisCommand`、R轴`AXIS_REF` | `ST_RAxisStatus` | 轴Reset或Owner释放时复位 |
-| `fbZForceAdmittance` | `FB_ZForceAdmittance` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | `ST_ZForceControlInput` | `ST_ZForceControlOutput` | Contact前、步骤结束、Stop或Reset时复位积分项 |
-| `fbForceSetpointRamp` | `FB_SetpointRamp` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 当前和下一Force Profile | 无扰力目标 | 新循环或硬Fault时复位 |
+| `fbZForceAdmittance` | `FB_ZForceAdmittance` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 类型化输入、Profile/机器限值、Ramp目标和积分预置 | `ST_ZForceControlOutput`并发布到Fast状态 | Disable清动态状态；显式轴/Sequence Reset清故障；重新使能必须重提Profile |
+| `fbForceSetpointRamp` | `FB_SetpointRamp` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | ForceControl实际值、Sequence目标和Profile斜率 | 连续目标力 | 力控禁止、Sequence Reset或轴Reset时重置到实际力 |
 | `fbRSpeedRamp` | `FB_SetpointRamp` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 当前和下一R轴Profile | 无扰RPM目标 | 新循环或硬Fault时复位 |
-| `fbZProfileSwitch` | `FB_BumplessProfileSwitch` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 步骤切换和Profile | 连续的控制参数 | 新循环或Reset时复位 |
+| `fbZProfileSwitch` | `FB_BumplessProfileSwitch` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | Sequence切换脉冲/Revision变化、切换速度和候选Profile | 单扫描积分预置及Accepted | 错误锁存；显式Sequence/轴Reset清除 |
 | `fbForceTorqueFeedForward` | `FB_ForceTorqueFeedForward` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 通过验证的材料/过程输入 | 可选前馈项 | 默认关闭；Reset时清零 |
 | `fbEnergy` | `FB_EnergyCalculator` | `PRG_FastMonitoring` | `PRG_FastMonitoring.VAR` | RPM、Torque、实际周期 | Power和Energy | Contact或新循环时复位 |
 | `fbForceStatistics` | `FB_ForceStepStatistics` | `PRG_FastMonitoring` | `PRG_FastMonitoring.VAR` | Force与步骤窗口 | Min/Max/Mean等步骤统计 | 每步骤进入时复位 |
@@ -65,3 +65,11 @@
 - 除上述Phase 5/6实例外，其余计划实例仍处于“已分配Owner、尚未声明”状态。
 - 只有`FB_ZAxisNcAdapter`、`FB_ZAxisExtSetpointAdapter`和`FB_RAxisNcAdapter`使用`VAR_IN_OUT AXIS_REF`；Owner仲裁、流程PROGRAM和算法FB均不访问轴引用。
 - `fbZExtSetpoint`是External Enable/Feed/Disable API的唯一调用者；Force Process Owner在Adapter发布`bReleaseOwner`前保持占用，标准Z轴Adapter不会并发执行运动命令。
+
+## Phase 8核对
+
+- `PRG_FastAxisControl`新增并唯一声明`fbForceSetpointRamp`、`fbZProfileSwitch`和`fbZForceAdmittance`；其他PROGRAM没有重复实例。
+- 两个Control算法FB不包含`AXIS_REF`、MC、GVL或跨PROGRAM局部访问；三个轴Adapter仍是轴引用和MC实例的唯一边界。
+- Phase 8只发布`ST_ZForceControlOutput`，不写`ST_ZExtSetpointCommand`的P/V/A/Direction；轨迹合成保留给Phase 10。
+- Profile、目标/硬S_rel和机器Z/Force限值只在成功无扰预置时提交；未授权变化、非有限值、越界切换速度或最终包络冲突均锁存故障并输出零。
+- `PRG_CffSequence`尚未实现正式力控使能，且Sequence Error/Aborted会显式禁止控制链，因此Phase 8默认Inactive。
