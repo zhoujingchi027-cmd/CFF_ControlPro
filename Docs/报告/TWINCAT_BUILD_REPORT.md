@@ -190,3 +190,22 @@ LastBuildInfo: 0
 源码Commit：`2b9a470e215962d7696cae4036224284f36f66ce`。
 
 该Build只证明本机固定库版本下离线工程可编译。Phase 8默认不使能，不写External P/V/A/Direction；未进行Runtime算法执行、设备扫描、配置激活、下载、物理轴动作、周期抖动测量或工艺资格验证。
+
+## Phase 9执行记录
+
+Phase 9加入纯算法`FB_ContactDetect`、`FB_ForceDeclineObserver`和`FB_StepProceedingCriterion`，由`PRG_CffSequence`唯一实例化并保持全部Enable为`FALSE`。实现覆盖Contact回差/去抖/候选位置锁存、Decline Arm/负下降率/窗口/回差、Primary/Secondary、StepMin/Max、EndCause和完整四步骤Program Validation。
+
+最终控制台证据：
+
+```text
+Phase 9 contact and criterion test: PASSED
+Starting TwinCAT XAE Shell build: TcXaeShell.DTE.15.0
+Building project 'CFFwelding_System\CFFwelding_System.tsproj' with 'Release|TwinCAT RT (x64)'.
+CFFwelding XAE build: PASSED
+Configuration: Release|TwinCAT RT (x64)
+LastBuildInfo: 0
+```
+
+源码Commit：`35d564de70170579e5e718ac5a69caa088ba74cc`。
+
+该Build只证明本机固定库版本下离线工程可编译。Phase 9不写Contact RequestId、Force Control Enable或External P/V/A/Direction；未进行Runtime算法执行、设备扫描、配置激活、下载、物理轴动作、周期抖动测量或工艺资格验证。

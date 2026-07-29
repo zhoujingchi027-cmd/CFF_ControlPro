@@ -111,7 +111,7 @@
 
 ### `ST_CffSequenceStatus`
 
-发布AcceptedCommandId、Busy、Done、Aborted、Error、ErrorId、类型化State/Step/SubPhase/EndCause，以及当前Force/RPM目标。Phase 8增加力控Enable、Profile Transfer、切换速度、目标/硬S_rel和硬力/硬行程/Collision边界请求；`PRG_CffSequence`仍为骨架，不会提前置位这些请求。
+发布AcceptedCommandId、Busy、Done、Aborted、Error、ErrorId、类型化State/Step/SubPhase/EndCause，以及当前Force/RPM目标。Phase 8增加力控Enable、Profile Transfer、切换速度、目标/硬S_rel和硬力/硬行程/Collision边界请求；Phase 9增加Contact、Force Decline和Step Criterion嵌套诊断。`PRG_CffSequence`仍为骨架，不会提前置位流程请求。
 
 ## Writer/Reader边界
 
@@ -127,6 +127,8 @@
 | `ST_RAxisStatus` | `FB_RAxisNcAdapter` | 流程、监控和诊断发布层 |
 | `ST_ContactDetectInput` | `PRG_CffSequence`调用准备区 | `FB_ContactDetect` |
 | `ST_ContactDetectOutput` | `FB_ContactDetect` | `PRG_CffSequence` |
+| `ST_ForceDeclineInput` | `PRG_CffSequence`调用准备区 | `FB_ForceDeclineObserver` |
+| `ST_ForceDeclineOutput` | `FB_ForceDeclineObserver` | `PRG_CffSequence` |
 | `ST_StepCriterionInput` | `PRG_CffSequence`调用准备区 | `FB_StepProceedingCriterion` |
 | `ST_StepCriterionOutput` | `FB_StepProceedingCriterion` | `PRG_CffSequence` |
 | `ST_CffSequenceCommand` | `PRG_CommandDispatcher`/跨任务发布契约 | `PRG_CffSequence` |
@@ -172,7 +174,7 @@
 
 ### `ST_ProcessReferenceCommand`
 
-`PRG_CffSequence`后续通过`udiContactReferenceRequestId`事务请求锁存或清除Contact参考点；`PRG_FastInputs`只在编号变化时处理一次。步骤切换不得递增清除请求，因此四个CFF步骤共享同一Contact零点。
+`PRG_CffSequence`后续通过`udiContactReferenceRequestId`事务请求锁存或清除Contact参考点；`PRG_FastInputs`只在编号变化时处理一次。Phase 9增加确认时Axis/Sensor候选位置字段，使用候选模式时先检查有限性和配置范围，再精确锁存Contact检测时的位置。步骤切换不得递增清除请求，因此四个CFF步骤共享同一Contact零点。
 
 ### `ST_ProcessActual`
 
@@ -193,6 +195,7 @@
 - Phase 5加入传感器处理与Contact参考点契约，并由`PRG_FastInputs`唯一写入快速过程实际值。
 - Phase 6加入`FB_AxisCommandArbiter`、`FB_ZAxisNcAdapter`和`FB_RAxisNcAdapter`；Phase 7加入唯一`FB_ZAxisExtSetpointAdapter`。只有这三个轴Adapter持有`AXIS_REF`及MC实例；`PRG_FastAxisControl`只负责候选拆分、调用和状态发布。
 - Phase 8加入纯算法`FB_BumplessProfileSwitch`和`FB_ZForceAdmittance`，并由`PRG_FastAxisControl`唯一实例化；Profile、S_rel目标和机器Z/Force限值以一次无扰提交形成快照。
+- Phase 9加入纯算法`FB_ContactDetect`、`FB_ForceDeclineObserver`和`FB_StepProceedingCriterion`，并由`PRG_CffSequence`唯一实例化；三者当前Enable保持FALSE，正式状态机接线保留给Phase 10。
 - 标准运动以`ST_FastCommand.nRequestId`作为事务编号；Adapter只在编号变化时产生一次MC `Execute`上升沿，活动速度命令使用双实例交替以允许新事务按`MC_Aborting`替换。
 - External命令在Force Process Owner授予后才允许Enable，ACTIVE每个2 ms周期Feed；Owner在完整Disable和后保持完成前不转交标准NC通道。
 - Phase 8导纳输出只进入Fast状态，不覆盖External P/V/A/Direction；Sequence Error/Aborted、Owner/External/传感器有效性缺失、硬边界或算法故障均禁止可消费的活动输出。

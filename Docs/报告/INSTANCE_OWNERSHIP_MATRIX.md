@@ -20,7 +20,6 @@
 | `fbDisplacementSignalValidity` | `FB_SignalValidity` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | 位移工程量与诊断 | 位移有效状态 | Reset或诊断恢复后重建窗口 |
 | `fbCollisionDebounce` | `FB_Debounce` | `PRG_FastInputs` | `PRG_FastInputs.VAR` | Collision Reference Sensor占位输入与人工映射状态 | 稳定Collision传感器诊断 | 输入未映射或Reset时复位 |
 | `fbContactDetect` | `FB_ContactDetect` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | `ST_ContactDetectInput` | `ST_ContactDetectOutput` | 新循环或Reset复位；Contact只确认一次 |
-| `fbContactDebounce` | `FB_Debounce` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | Contact候选条件 | Contact确认条件 | 新循环或Reset复位 |
 | `fbStepCriterion` | `FB_StepProceedingCriterion` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | `ST_StepCriterionInput` | `ST_StepCriterionOutput` | 每步骤进入时复位 |
 | `fbForceDecline` | `FB_ForceDeclineObserver` | `PRG_CffSequence` | `PRG_CffSequence.VAR` | Force、dForce/dt、RPM、S_rel窗口 | Decline Arm/Confirm和锁存结果 | 每个Decline步骤进入时复位 |
 | `fbZAxisArbiter` | `FB_AxisCommandArbiter` | `PRG_FastAxisControl` | `PRG_FastAxisControl.VAR` | 初始化、维护、手动、自动和流程命令 | 唯一Z轴Owner与`ST_ZAxisCommand` | Owner释放、Stop或Reset时复位 |
@@ -73,3 +72,11 @@
 - Phase 8只发布`ST_ZForceControlOutput`，不写`ST_ZExtSetpointCommand`的P/V/A/Direction；轨迹合成保留给Phase 10。
 - Profile、目标/硬S_rel和机器Z/Force限值只在成功无扰预置时提交；未授权变化、非有限值、越界切换速度或最终包络冲突均锁存故障并输出零。
 - `PRG_CffSequence`尚未实现正式力控使能，且Sequence Error/Aborted会显式禁止控制链，因此Phase 8默认Inactive。
+
+## Phase 9核对
+
+- `PRG_CffSequence`新增并唯一声明`fbContactDetect`、`fbForceDecline`和`fbStepCriterion`；其他PROGRAM没有重复实例。
+- Contact去抖和Force Decline去抖是对应算法FB的内部确定性状态，不再额外声明`fbContactDebounce`实例。
+- 三个算法FB不包含`AXIS_REF`、MC、GVL、字符串或跨PROGRAM局部访问。
+- Phase 9全部算法Enable显式为`FALSE`，只发布类型化诊断和固定报警槽9；不写Contact RequestId、Force Control Enable或External P/V/A/Direction。
+- Contact候选时锁存的Axis/Sensor位置通过类型化参考点命令传递；事务编号和正式状态机接线保留给Phase 10。
