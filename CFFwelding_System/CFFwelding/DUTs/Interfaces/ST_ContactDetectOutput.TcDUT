@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ContactDetectOutput" Id="{D2000000-0000-4000-8000-000000000010}"><Declaration><![CDATA[TYPE ST_ContactDetectOutput :
 STRUCT
+    (* Force On已经形成尚未确认的Contact候选。 *)
+    bCandidate : BOOL;
     (* Contact已经防抖确认。 *)
     bDetected : BOOL;
+    (* Contact候选时锁存的压向力，单位kN。 *)
+    rCandidateForce_kN : LREAL;
+    (* Contact候选时锁存的Z轴绝对位置，单位mm。 *)
+    rCandidateAxisPosition_mm : LREAL;
+    (* Contact候选时锁存的外部位移绝对位置，单位mm。 *)
+    rCandidateSensorPosition_mm : LREAL;
     (* Contact确认时锁存的压向力，单位kN。 *)
     rDetectedForce_kN : LREAL;
-    (* Contact确认时锁存的Z轴位置，单位mm。 *)
-    rDetectedPosition_mm : LREAL;
-    (* Contact确认后S_rel只允许清零一次。 *)
-    bRelativePositionResetRequest : BOOL;
+    (* Contact确认时锁存的Z轴绝对位置，单位mm。 *)
+    rDetectedAxisPosition_mm : LREAL;
+    (* Contact确认时锁存的外部位移绝对位置，单位mm。 *)
+    rDetectedSensorPosition_mm : LREAL;
+    (* Contact确认时仅一个扫描周期的参考点锁存请求。 *)
+    bReferenceLatchRequest : BOOL;
     (* 输入无效或检测窗口异常。 *)
     bFault : BOOL;
     (* Contact故障编号，0表示无故障。 *)

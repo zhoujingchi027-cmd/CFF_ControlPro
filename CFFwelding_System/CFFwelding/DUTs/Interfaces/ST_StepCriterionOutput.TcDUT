@@ -9,6 +9,16 @@ STRUCT
     bSecondaryLimitReached : BOOL;
     (* 当前步骤结束已经防抖确认。 *)
     bEndConfirmed : BOOL;
+    (* Primary满足时步骤时间低于StepMin。 *)
+    bTooShort : BOOL;
+    (* 当前结束原因要求周期或步骤判为不合格。 *)
+    bNok : BOOL;
+    (* Secondary AdvanceAndNok允许进入下一步骤。 *)
+    bAdvanceRequested : BOOL;
+    (* Secondary、StepMax或硬原因要求受控退出。 *)
+    bControlledExitRequested : BOOL;
+    (* 当前结束原因要求立即禁止继续向下。 *)
+    bDownwardMotionInhibited : BOOL;
     (* 步骤实际结束原因。 *)
     eEndCause : E_StepEndCause;
     (* 结束确认时锁存的轴向力，单位千牛。 *)
@@ -17,6 +27,10 @@ STRUCT
     rLatchedRelativePosition_mm : LREAL;
     (* 结束确认时锁存的步骤时间，单位秒。 *)
     rLatchedStepTime_s : LREAL;
+    (* 输入、配置或未知枚举故障。 *)
+    bFault : BOOL;
+    (* 确定性故障编号，零表示无故障。 *)
+    nFaultId : UDINT;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

@@ -1,11 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><POU Name="PRG_CffSequence" Id="{A2000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[PROGRAM PRG_CffSequence
 VAR
+    (* ---------------------------------------------------------
+       Contact检测实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
+       输入：ForceCriterion、Axis/Sensor绝对位置、窗口、速度和周期。
+       输出：Contact候选、确认、双位置锁存和单扫描参考点请求。
+       Reset：新Cycle或Sequence Reset；Phase 10接入状态机前Enable保持FALSE。
+       --------------------------------------------------------- *)
+    fbContactDetect : FB_ContactDetect;
+    (* ---------------------------------------------------------
+       Force Decline观察实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
+       输入：ForceCriterion、RPM、S_rel、速度、Arm/Decline窗口和周期。
+       输出：Armed、负下降率、候选、确认和锁存诊断。
+       Reset：每步骤进入或Sequence Reset；确认前不请求关闭PI。
+       --------------------------------------------------------- *)
+    fbForceDecline : FB_ForceDeclineObserver;
+    (* ---------------------------------------------------------
+       步骤推进判据实例。
+       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
+       输入：唯一Primary、Secondary、StepMin/Max、硬原因和Decline事实。
+       输出：EndCause、NOK、Advance/ControlledExit和锁存结果。
+       Reset：每步骤进入或Sequence Reset；Phase 10接入状态机前Enable保持FALSE。
+       --------------------------------------------------------- *)
+    fbStepCriterion : FB_StepProceedingCriterion;
+    (* Contact调用前完整赋值的类型化输入。 *)
+    stContactInput : ST_ContactDetectInput;
+    (* Force Decline调用前完整赋值的类型化输入。 *)
+    stForceDeclineInput : ST_ForceDeclineInput;
+    (* 步骤判据调用前完整赋值的类型化输入。 *)
+    stStepCriterionInput : ST_StepCriterionInput;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
-   程序骨架：CFF Contact、四步骤、制动压缩过渡与返回流程。
-   所属任务：Task_CffFast，调用顺序2。
-   唯一Owner：PRG_CffSequence。
-   当前阶段：不调用MC功能块，不执行任何流程转换。
-   后续实现：Primary、Secondary、Force Decline和EndCause。
-   --------------------------------------------------------- *)]]></ST></Implementation></POU></TcPlcObject>
+   CFF Contact、四步骤、制动压缩过渡与返回流程。
+   所属任务：Task_CffFast，调用顺序2；唯一Owner：PRG_CffSequence。
+   当前阶段：调用Phase 9算法并发布诊断，但所有Enable显式保持FALSE。
+   后续实现：Phase 10状态转换、参考点事务、力控和External轨迹接线。
+   --------------------------------------------------------- *)
+
+(* Phase 9只验证Contact算法接线；Phase 10状态机才允许使能。 *)
+stContactInput.bEnable := FALSE;
+stContactInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
+stContactInput.rForceActual_kN := GVL_Process.stActual.fForceCriterionN * 0.001;
+stContactInput.rForceOn_kN :=
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactForceOnN * 0.001;
+stContactInput.rForceOff_kN :=
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactForceOffN * 0.001;
+stContactInput.rAxisPosition_mm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
+stContactInput.rSensorPosition_mm := GVL_Process.stActual.fExternalDisplacementMm;
+stContactInput.rAxisPositionMinimum_mm := GVL_Config.stLimits.fZMinPositionMm;
+stContactInput.rAxisPositionMaximum_mm := GVL_Config.stLimits.fZMaxPositionMm;
+stContactInput.rSensorPositionMinimum_mm :=
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSensorMinimumMm;
+stContactInput.rSensorPositionMaximum_mm :=
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSensorMaximumMm;
+stContactInput.rAxisVelocity_mm_s := GVL_Status.stFast.stZAxis.rActualVelocity_mm_s;
+stContactInput.rCaptureMaximumVelocity_mm_s :=
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS;
+stContactInput.rDebounceTime_s := UDINT_TO_LREAL(
+    GVL_Program.stCycleSnapshot.stProgram.stHeader.nContactDebounceMs) * 0.001;
+stContactInput.rCycleTime_s :=
+    UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+stContactInput.bSignalValid := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Status.stFast.stZAxis.bReady
+    AND GVL_Program.stCycleSnapshot.bValid;
+fbContactDetect(stInput := stContactInput);
+
+(* Phase 9只验证Decline接口和对象生命周期，步骤参数由Phase 10选择。 *)
+stForceDeclineInput.bEnable := FALSE;
+stForceDeclineInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
+stForceDeclineInput.bSignalValid := FALSE;
+stForceDeclineInput.rForceActual_kN := 0.0;
+stForceDeclineInput.rSpeed_rpm := 0.0;
+stForceDeclineInput.rRelativePosition_mm := 0.0;
+stForceDeclineInput.rAxisVelocity_mm_s := 0.0;
+stForceDeclineInput.rStepTime_s := 0.0;
+stForceDeclineInput.rArmForce_kN := 0.0;
+stForceDeclineInput.rDeclineTo_kN := 0.0;
+stForceDeclineInput.rHysteresis_kN := 0.0;
+stForceDeclineInput.rMinimumDeclineRate_kN_s := 0.0;
+stForceDeclineInput.rCriterionSRelMinimum_mm := 0.0;
+stForceDeclineInput.rCriterionSRelMaximum_mm := 0.0;
+stForceDeclineInput.rCriterionRpmMinimum := 0.0;
+stForceDeclineInput.rCaptureMaximumVelocity_mm_s := 0.0;
+stForceDeclineInput.rDebounceTime_s := 0.0;
+stForceDeclineInput.rCycleTime_s :=
+    UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+fbForceDecline(stInput := stForceDeclineInput);
+
+(* Phase 9不推进任何步骤，Phase 10将从冻结Program快照完整赋值。 *)
+stStepCriterionInput.bEnable := FALSE;
+stStepCriterionInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
+stStepCriterionInput.bSignalValid := FALSE;
+stStepCriterionInput.ePrimaryCriterion := STEP_CRIT_RELATIVE_DISTANCE;
+stStepCriterionInput.eSecondaryAction := SECONDARY_ADVANCE_AND_NOK;
+stStepCriterionInput.rRelativePosition_mm := 0.0;
+stStepCriterionInput.rRelativeDistanceTarget_mm := 0.0;
+stStepCriterionInput.rStepTime_s := 0.0;
+stStepCriterionInput.rStepTimeTarget_s := 0.0;
+stStepCriterionInput.rStepMinimumTime_s := 0.0;
+stStepCriterionInput.rStepMaximumTime_s := 0.0;
+stStepCriterionInput.rForceActual_kN := 0.0;
+stStepCriterionInput.bForceDeclineArmed := FALSE;
+stStepCriterionInput.bForceDeclineConfirmed := FALSE;
+stStepCriterionInput.rSecondaryDistanceLimit_mm := 0.0;
+stStepCriterionInput.bHardForceActive := FALSE;
+stStepCriterionInput.bHardStrokeActive := FALSE;
+stStepCriterionInput.bSensorInvalid := FALSE;
+stStepCriterionInput.bAxisFault := FALSE;
+stStepCriterionInput.bStopRequested := FALSE;
+fbStepCriterion(stInput := stStepCriterionInput);
+
+GVL_Status.stFast.stSequence.stContact := fbContactDetect.stOutput;
+GVL_Status.stFast.stSequence.stForceDecline := fbForceDecline.stOutput;
+GVL_Status.stFast.stSequence.stStepCriterion := fbStepCriterion.stOutput;
+
+(* Phase 9算法使用固定唯一报警槽9，不与External或导纳报警混用。 *)
+GVL_Alarm.astRequests[9].eCode := E_AlarmCode.ALARM_CFF_CRITERION_FAULT;
+GVL_Alarm.astRequests[9].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
+GVL_Alarm.astRequests[9].nTextId := 3000;
+GVL_Alarm.astRequests[9].nSourceId := 9;
+GVL_Alarm.astRequests[9].bLatch := TRUE;
+GVL_Alarm.astRequests[9].bActive := fbContactDetect.stOutput.bFault
+    OR fbForceDecline.stOutput.bFault
+    OR fbStepCriterion.stOutput.bFault;]]></ST></Implementation></POU></TcPlcObject>

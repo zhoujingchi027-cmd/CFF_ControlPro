@@ -41,6 +41,12 @@ STRUCT
     bCollisionLimitActive : BOOL;
     (* 当前流程目标主轴速度，单位转每分钟。 *)
     rSpeedSet_rpm : LREAL;
+    (* Phase 9 Contact算法诊断；Phase 10接入状态机前保持未使能。 *)
+    stContact : ST_ContactDetectOutput;
+    (* Phase 9 Force Decline观察诊断；Phase 10接入步骤前保持未使能。 *)
+    stForceDecline : ST_ForceDeclineOutput;
+    (* Phase 9步骤判据诊断；Phase 10接入步骤前保持未使能。 *)
+    stStepCriterion : ST_StepCriterionOutput;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

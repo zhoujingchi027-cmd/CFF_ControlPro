@@ -7,12 +7,30 @@ STRUCT
     bReset : BOOL;
     (* 当前压向实际力，单位kN。 *)
     rForceActual_kN : LREAL;
-    (* Contact力阈值，单位kN。 *)
-    rForceThreshold_kN : LREAL;
+    (* Contact候选置位力阈值，单位kN。 *)
+    rForceOn_kN : LREAL;
+    (* Contact候选释放力阈值，单位kN。 *)
+    rForceOff_kN : LREAL;
     (* 当前Z轴位置，向下为正，单位mm。 *)
     rAxisPosition_mm : LREAL;
+    (* 当前外部位移绝对值，单位mm。 *)
+    rSensorPosition_mm : LREAL;
+    (* Contact允许的Z轴绝对位置下限，单位mm。 *)
+    rAxisPositionMinimum_mm : LREAL;
+    (* Contact允许的Z轴绝对位置上限，单位mm。 *)
+    rAxisPositionMaximum_mm : LREAL;
+    (* Contact允许的外部位移绝对位置下限，单位mm。 *)
+    rSensorPositionMinimum_mm : LREAL;
+    (* Contact允许的外部位移绝对位置上限，单位mm。 *)
+    rSensorPositionMaximum_mm : LREAL;
     (* 当前Z轴速度，向下为正，单位mm/s。 *)
     rAxisVelocity_mm_s : LREAL;
+    (* Contact捕获允许的最大速度绝对值，单位mm/s。 *)
+    rCaptureMaximumVelocity_mm_s : LREAL;
+    (* Contact连续确认时间，单位s。 *)
+    rDebounceTime_s : LREAL;
+    (* 实际调用周期，单位s。 *)
+    rCycleTime_s : LREAL;
     (* 输入采样有效。 *)
     bSignalValid : BOOL;
 END_STRUCT

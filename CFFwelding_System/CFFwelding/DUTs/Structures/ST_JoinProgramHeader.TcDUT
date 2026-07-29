@@ -8,6 +8,18 @@
     fMaterialThicknessMm : LREAL;
     (* 厚度允许偏差，单位毫米。 *)
     fThicknessToleranceMm : LREAL;
+    (* Contact候选置位力阈值，单位牛顿。 *)
+    fContactForceOnN : LREAL;
+    (* Contact候选释放力阈值，单位牛顿。 *)
+    fContactForceOffN : LREAL;
+    (* Contact连续确认时间，单位毫秒。 *)
+    nContactDebounceMs : UDINT;
+    (* Contact Search向下速度绝对值，单位毫米每秒。 *)
+    fContactSearchVelocityMmS : LREAL;
+    (* Contact外部位移绝对窗口下限，单位毫米。 *)
+    fContactSensorMinimumMm : LREAL;
+    (* Contact外部位移绝对窗口上限，单位毫米。 *)
+    fContactSensorMaximumMm : LREAL;
     (* 紧固件类型编号。 *)
     nElementTypeId : UDINT;
     (* 完成后的返回模式。 *)

@@ -6,12 +6,32 @@
     eSecondaryAction : E_SecondaryCriterionAction;
     (* 相对位移阈值，单位毫米。 *)
     fRelativeDistanceMm : LREAL;
-    (* 步骤超时时间，单位毫秒。 *)
-    nTimeoutMs : UDINT;
-    (* 力下降判据阈值，单位牛顿。 *)
-    fForceDeclineN : LREAL;
-    (* 判据稳定窗口，单位毫秒。 *)
-    nStableWindowMs : UDINT;
+    (* Step Time主判据目标，单位毫秒。 *)
+    nPrimaryStepTimeMs : UDINT;
+    (* 步骤质量最短时间，单位毫秒。 *)
+    nStepMinMs : UDINT;
+    (* Primary等待看门狗时间，单位毫秒。 *)
+    nStepMaxMs : UDINT;
+    (* Time或Decline主判据使用的累计S_rel次级边界，单位毫米。 *)
+    fSecondarySRelMm : LREAL;
+    (* 力下降确认阈值，单位牛顿。 *)
+    fDeclineToN : LREAL;
+    (* 力下降观察武装阈值，单位牛顿。 *)
+    fArmForceN : LREAL;
+    (* 力下降确认回差，单位牛顿。 *)
+    fDeclineHysteresisN : LREAL;
+    (* 力下降最小变化率绝对值，单位牛顿每秒。 *)
+    fMinimumDeclineRateNS : LREAL;
+    (* 力下降连续确认时间，单位毫秒。 *)
+    nDeclineDebounceMs : UDINT;
+    (* 力下降判据有效S_rel窗口下限，单位毫米。 *)
+    fCriterionSRelMinMm : LREAL;
+    (* 力下降判据有效S_rel窗口上限，单位毫米。 *)
+    fCriterionSRelMaxMm : LREAL;
+    (* 力下降判据最小主轴转速绝对值，单位转每分钟。 *)
+    fCriterionRpmMin : LREAL;
+    (* 判据允许的最大Z轴捕获速度绝对值，单位毫米每秒。 *)
+    fCaptureMaxVelocityMmS : LREAL;
     (* 判据配置是否有效。 *)
     bValid : BOOL;
 END_STRUCT

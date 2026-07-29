@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ForceDeclineOutput" Id="{D2000000-0000-4000-8000-000000000016}"><Declaration><![CDATA[TYPE ST_ForceDeclineOutput :
+STRUCT
+    (* 当前步骤已经达到Arm Force。 *)
+    bArmed : BOOL;
+    (* 当前处于Decline回差候选窗口。 *)
+    bCandidate : BOOL;
+    (* Force Decline已经连续确认。 *)
+    bConfirmed : BOOL;
+    (* 相邻有效样本计算的力变化率，单位kN/s。 *)
+    rForceDerivative_kN_s : LREAL;
+    (* 当前连续确认累计时间，单位s。 *)
+    rStableTime_s : LREAL;
+    (* 确认时锁存的力，单位kN。 *)
+    rLatchedForce_kN : LREAL;
+    (* 确认时锁存的累计S_rel，单位mm。 *)
+    rLatchedRelativePosition_mm : LREAL;
+    (* 确认时锁存的主轴转速，单位rpm。 *)
+    rLatchedSpeed_rpm : LREAL;
+    (* 确认时锁存的步骤时间，单位s。 *)
+    rLatchedStepTime_s : LREAL;
+    (* 输入、配置或数值计算故障。 *)
+    bFault : BOOL;
+    (* 确定性故障编号，零表示无故障。 *)
+    nFaultId : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

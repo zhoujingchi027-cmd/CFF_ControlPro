@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ForceDeclineInput" Id="{D2000000-0000-4000-8000-000000000015}"><Declaration><![CDATA[TYPE ST_ForceDeclineInput :
+STRUCT
+    (* 力下降观察使能请求。 *)
+    bEnable : BOOL;
+    (* 清除观察器内部状态和故障。 *)
+    bReset : BOOL;
+    (* Force、RPM、S_rel、速度和周期均有效。 *)
+    bSignalValid : BOOL;
+    (* 当前判据力，单位kN。 *)
+    rForceActual_kN : LREAL;
+    (* 当前主轴转速，单位rpm。 *)
+    rSpeed_rpm : LREAL;
+    (* Contact起累计S_rel，单位mm。 *)
+    rRelativePosition_mm : LREAL;
+    (* 当前Z轴速度，向下为正，单位mm/s。 *)
+    rAxisVelocity_mm_s : LREAL;
+    (* 当前步骤累计时间，单位s。 *)
+    rStepTime_s : LREAL;
+    (* 力下降观察武装阈值，单位kN。 *)
+    rArmForce_kN : LREAL;
+    (* 力下降确认阈值，单位kN。 *)
+    rDeclineTo_kN : LREAL;
+    (* 力下降确认回差，单位kN。 *)
+    rHysteresis_kN : LREAL;
+    (* 最小下降率绝对值，单位kN/s。 *)
+    rMinimumDeclineRate_kN_s : LREAL;
+    (* 有效S_rel窗口下限，单位mm。 *)
+    rCriterionSRelMinimum_mm : LREAL;
+    (* 有效S_rel窗口上限，单位mm。 *)
+    rCriterionSRelMaximum_mm : LREAL;
+    (* 有效主轴转速绝对值下限，单位rpm。 *)
+    rCriterionRpmMinimum : LREAL;
+    (* 允许确认的Z轴速度绝对值上限，单位mm/s。 *)
+    rCaptureMaximumVelocity_mm_s : LREAL;
+    (* 连续确认时间，单位s。 *)
+    rDebounceTime_s : LREAL;
+    (* 实际调用周期，单位s。 *)
+    rCycleTime_s : LREAL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

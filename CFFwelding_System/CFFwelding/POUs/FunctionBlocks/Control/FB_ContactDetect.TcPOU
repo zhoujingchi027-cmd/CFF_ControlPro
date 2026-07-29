@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_ContactDetect" Id="{B5000000-0000-4000-8000-000000000003}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_ContactDetect
+VAR_INPUT
+    (* 调用者完整赋值的Contact检测输入。 *)
+    stInput : ST_ContactDetectInput;
+END_VAR
+VAR_OUTPUT
+    (* Contact候选、确认、锁存和故障输出。 *)
+    stOutput : ST_ContactDetectOutput;
+END_VAR
+VAR
+    (* Force On已经形成候选。 *)
+    bCandidate : BOOL;
+    (* Contact已经完成连续确认。 *)
+    bDetected : BOOL;
+    (* 算法故障锁存；只有显式Reset清除。 *)
+    bFaultLatched : BOOL;
+    (* 已锁存的确定性故障编号。 *)
+    udiLatchedFaultId : UDINT;
+    (* 本扫描输入和配置均为有限合法值。 *)
+    bConfigurationValid : BOOL;
+    (* 候选双位置位于允许绝对窗口内。 *)
+    bCandidateWindowValid : BOOL;
+    (* Force Off以上的连续确认累计时间，单位s。 *)
+    rStableTime_s : LREAL;
+    (* 候选时锁存的力，单位kN。 *)
+    rCandidateForce_kN : LREAL;
+    (* 候选时锁存的Z轴绝对位置，单位mm。 *)
+    rCandidateAxisPosition_mm : LREAL;
+    (* 候选时锁存的外部位移绝对位置，单位mm。 *)
+    rCandidateSensorPosition_mm : LREAL;
+    (* 确认时锁存的力，单位kN。 *)
+    rDetectedForce_kN : LREAL;
+    (* 确认时锁存的Z轴绝对位置，单位mm。 *)
+    rDetectedAxisPosition_mm : LREAL;
+    (* 确认时锁存的外部位移绝对位置，单位mm。 *)
+    rDetectedSensorPosition_mm : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Contact检测算法。
+   进入：Contact Search状态、有效ForceCriterion、轴和位移采样。
+   动作：Force On锁存候选，Force Off提供回差，窗口和速度通过后连续去抖。
+   成功：保持Detected并只发一个扫描周期的参考点锁存请求。
+   Fault：配置、信号或数值无效时锁存故障，只有显式Reset清除。
+   --------------------------------------------------------- *)
+stOutput.bReferenceLatchRequest := FALSE;
+
+IF stInput.bReset THEN
+    bCandidate := FALSE;
+    bDetected := FALSE;
+    bFaultLatched := FALSE;
+    udiLatchedFaultId := 0;
+    rStableTime_s := 0.0;
+    rCandidateForce_kN := 0.0;
+    rCandidateAxisPosition_mm := 0.0;
+    rCandidateSensorPosition_mm := 0.0;
+    rDetectedForce_kN := 0.0;
+    rDetectedAxisPosition_mm := 0.0;
+    rDetectedSensorPosition_mm := 0.0;
+ELSIF NOT stInput.bEnable THEN
+    (* Disable只撤销未完成候选；已确认结果和故障保持到Reset。 *)
+    bCandidate := FALSE;
+    rStableTime_s := 0.0;
+ELSIF NOT bFaultLatched THEN
+    bConfigurationValid := stInput.bSignalValid
+        AND FC_IsFiniteLReal(rValue := stInput.rForceActual_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rForceOn_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rForceOff_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rAxisPosition_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rSensorPosition_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rAxisPositionMinimum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rAxisPositionMaximum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rSensorPositionMinimum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rSensorPositionMaximum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rAxisVelocity_mm_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rCaptureMaximumVelocity_mm_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rDebounceTime_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rCycleTime_s)
+        AND (stInput.rForceOff_kN >= 0.0)
+        AND (stInput.rForceOn_kN > stInput.rForceOff_kN)
+        AND (stInput.rAxisPositionMaximum_mm > stInput.rAxisPositionMinimum_mm)
+        AND (stInput.rSensorPositionMaximum_mm > stInput.rSensorPositionMinimum_mm)
+        AND (stInput.rCaptureMaximumVelocity_mm_s > 0.0)
+        AND (stInput.rDebounceTime_s > 0.0)
+        AND (stInput.rCycleTime_s > 0.0);
+
+    IF NOT bConfigurationValid THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00009001;
+    ELSIF NOT bDetected THEN
+        IF NOT bCandidate AND (stInput.rForceActual_kN >= stInput.rForceOn_kN) THEN
+            bCandidate := TRUE;
+            rStableTime_s := 0.0;
+            rCandidateForce_kN := stInput.rForceActual_kN;
+            rCandidateAxisPosition_mm := stInput.rAxisPosition_mm;
+            rCandidateSensorPosition_mm := stInput.rSensorPosition_mm;
+
+            bCandidateWindowValid := (rCandidateAxisPosition_mm >= stInput.rAxisPositionMinimum_mm)
+                AND (rCandidateAxisPosition_mm <= stInput.rAxisPositionMaximum_mm)
+                AND (rCandidateSensorPosition_mm >= stInput.rSensorPositionMinimum_mm)
+                AND (rCandidateSensorPosition_mm <= stInput.rSensorPositionMaximum_mm);
+            IF NOT bCandidateWindowValid THEN
+                bCandidate := FALSE;
+                bFaultLatched := TRUE;
+                udiLatchedFaultId := 16#00009002;
+            END_IF
+        END_IF
+
+        IF bCandidate AND NOT bFaultLatched THEN
+            IF stInput.rForceActual_kN < stInput.rForceOff_kN THEN
+                bCandidate := FALSE;
+                rStableTime_s := 0.0;
+                rCandidateForce_kN := 0.0;
+                rCandidateAxisPosition_mm := 0.0;
+                rCandidateSensorPosition_mm := 0.0;
+            ELSIF ABS(stInput.rAxisVelocity_mm_s) > ABS(stInput.rCaptureMaximumVelocity_mm_s) THEN
+                bCandidate := FALSE;
+                bFaultLatched := TRUE;
+                udiLatchedFaultId := 16#00009003;
+            ELSE
+                rStableTime_s := rStableTime_s + stInput.rCycleTime_s;
+                IF NOT FC_IsFiniteLReal(rValue := rStableTime_s) THEN
+                    bCandidate := FALSE;
+                    bFaultLatched := TRUE;
+                    udiLatchedFaultId := 16#00009004;
+                ELSIF rStableTime_s >= stInput.rDebounceTime_s THEN
+                    bCandidate := FALSE;
+                    bDetected := TRUE;
+                    rDetectedForce_kN := rCandidateForce_kN;
+                    rDetectedAxisPosition_mm := rCandidateAxisPosition_mm;
+                    rDetectedSensorPosition_mm := rCandidateSensorPosition_mm;
+                    stOutput.bReferenceLatchRequest := TRUE;
+                END_IF
+            END_IF
+        END_IF
+    END_IF
+END_IF
+
+stOutput.bCandidate := bCandidate;
+stOutput.bDetected := bDetected;
+stOutput.rCandidateForce_kN := rCandidateForce_kN;
+stOutput.rCandidateAxisPosition_mm := rCandidateAxisPosition_mm;
+stOutput.rCandidateSensorPosition_mm := rCandidateSensorPosition_mm;
+stOutput.rDetectedForce_kN := rDetectedForce_kN;
+stOutput.rDetectedAxisPosition_mm := rDetectedAxisPosition_mm;
+stOutput.rDetectedSensorPosition_mm := rDetectedSensorPosition_mm;
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;]]></ST></Implementation></POU></TcPlcObject>

@@ -11,26 +11,104 @@ VAR
     nStepIndex : INT;
     (* 当前步骤的局部副本。 *)
     stStep : ST_CffStepProgram;
+    (* 上一步骤允许到达的累计S_rel边界，单位mm。 *)
+    rPreviousStepBoundary_mm : LREAL;
+    (* 当前步骤Primary或Secondary对应的累计S_rel边界，单位mm。 *)
+    rCurrentStepBoundary_mm : LREAL;
+    (* Z轴绝对软限位跨度，作为累计S_rel程序上限，单位mm。 *)
+    rMaximumRelativeTravel_mm : LREAL;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[FC_ValidateJoinProgram := FALSE;
+rPreviousStepBoundary_mm := 0.0;
+rMaximumRelativeTravel_mm := ABS(stMachineLimits.fZMaxPositionMm
+    - stMachineLimits.fZMinPositionMm);
 
-(* 程序、机器限值和受控修订必须先有效。 *)
-IF NOT stProgram.bValid OR NOT stMachineLimits.bValid
+(* 程序、机器限值、Contact参数和受控修订必须先有效。 *)
+IF NOT stProgram.bValid OR NOT stMachineLimits.bValid OR NOT stProgram.stMonitor.bValid
     OR (stProgram.stHeader.nProgramId = 0)
     OR (stProgram.stHeader.nRevision = 0)
+    OR (stProgram.stHeader.nElementTypeId = 0)
+    OR (stProgram.stHeader.nForceProfileId = 0)
+    OR (stProgram.stHeader.nRAxisProfileId = 0)
+    OR (stProgram.stHeader.nToolId = 0)
+    OR (stProgram.stHeader.nAnvilId = 0)
     OR (stMachineLimits.fMaxForceN <= 0.0)
-    OR (stMachineLimits.fRMaxSpeedRpm <= 0.0) THEN
+    OR (stMachineLimits.fRMaxSpeedRpm <= 0.0)
+    OR (stMachineLimits.fZMaxVelocityMmS <= 0.0)
+    OR (stMachineLimits.fZMaxPositionMm <= stMachineLimits.fZMinPositionMm)
+    OR NOT FC_IsFiniteLReal(rValue := stMachineLimits.fMaxForceN)
+    OR NOT FC_IsFiniteLReal(rValue := stMachineLimits.fRMaxSpeedRpm)
+    OR NOT FC_IsFiniteLReal(rValue := stMachineLimits.fZMinPositionMm)
+    OR NOT FC_IsFiniteLReal(rValue := stMachineLimits.fZMaxPositionMm)
+    OR NOT FC_IsFiniteLReal(rValue := stMachineLimits.fZMaxVelocityMmS)
+    OR NOT FC_IsFiniteLReal(rValue := rMaximumRelativeTravel_mm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fMaterialThicknessMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fThicknessToleranceMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactForceOnN)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactForceOffN)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSearchVelocityMmS)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSensorMinimumMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSensorMaximumMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fReturnVelocityMmS)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fReturnOpeningMm)
+    OR (stProgram.stHeader.fMaterialThicknessMm <= 0.0)
+    OR (stProgram.stHeader.fThicknessToleranceMm < 0.0)
+    OR (stProgram.stHeader.fContactForceOffN < 0.0)
+    OR (stProgram.stHeader.fContactForceOnN <= stProgram.stHeader.fContactForceOffN)
+    OR (stProgram.stHeader.fContactForceOnN > stMachineLimits.fMaxForceN)
+    OR (stProgram.stHeader.nContactDebounceMs = 0)
+    OR (stProgram.stHeader.fContactSearchVelocityMmS <= 0.0)
+    OR (stProgram.stHeader.fContactSearchVelocityMmS > stMachineLimits.fZMaxVelocityMmS)
+    OR (stProgram.stHeader.fContactSensorMaximumMm
+        <= stProgram.stHeader.fContactSensorMinimumMm)
+    OR (stProgram.stHeader.fReturnVelocityMmS <= 0.0)
+    OR (stProgram.stHeader.fReturnVelocityMmS > stMachineLimits.fZMaxVelocityMmS)
+    OR (stProgram.stHeader.fReturnOpeningMm < stMachineLimits.fZMinPositionMm)
+    OR (stProgram.stHeader.fReturnOpeningMm > stMachineLimits.fZMaxPositionMm)
+    OR ((stProgram.stHeader.eReturnMode <> RETURN_MODE_LOCAL)
+        AND (stProgram.stHeader.eReturnMode <> RETURN_MODE_REFERENCE))
+    OR ((stProgram.stHeader.eState <> PROGRAM_VALID)
+        AND (stProgram.stHeader.eState <> PROGRAM_ACTIVE))
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMinForceN)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMaxForceN)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMinRelativeDistanceMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMaxRelativeDistanceMm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMinTorqueNm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMaxTorqueNm)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMinEnergyJ)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stMonitor.fMaxEnergyJ)
+    OR (stProgram.stMonitor.fMinForceN > stProgram.stMonitor.fMaxForceN)
+    OR (stProgram.stMonitor.fMaxForceN > stMachineLimits.fMaxForceN)
+    OR (stProgram.stMonitor.fMinRelativeDistanceMm
+        > stProgram.stMonitor.fMaxRelativeDistanceMm)
+    OR (stProgram.stMonitor.fMinTorqueNm > stProgram.stMonitor.fMaxTorqueNm)
+    OR (stProgram.stMonitor.fMinEnergyJ > stProgram.stMonitor.fMaxEnergyJ) THEN
     RETURN;
 END_IF
 
 FOR nStepIndex := 1 TO 4 DO
     stStep := stProgram.astSteps[nStepIndex];
     IF NOT stStep.bValid OR NOT stStep.stProceeding.bValid
+        OR NOT FC_IsFiniteLReal(rValue := stStep.fSetForceN)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.fSetSpeedRpm)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.fForceRampNS)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fRelativeDistanceMm)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fSecondarySRelMm)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fDeclineToN)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fArmForceN)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fDeclineHysteresisN)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fMinimumDeclineRateNS)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCriterionSRelMinMm)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCriterionSRelMaxMm)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCriterionRpmMin)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCaptureMaxVelocityMmS)
         OR (stStep.fSetForceN < 0.0)
         OR (stStep.fSetForceN > stMachineLimits.fMaxForceN)
         OR (ABS(stStep.fSetSpeedRpm) > stMachineLimits.fRMaxSpeedRpm)
         OR (stStep.fForceRampNS <= 0.0)
-        OR (stStep.stProceeding.nTimeoutMs = 0) THEN
+        OR (stStep.nMonitorProfileId = 0)
+        OR (stStep.stProceeding.nStepMaxMs = 0)
+        OR (stStep.stProceeding.nStepMinMs > stStep.stProceeding.nStepMaxMs) THEN
         RETURN;
     END_IF
 
@@ -44,21 +122,61 @@ FOR nStepIndex := 1 TO 4 DO
 
     CASE stStep.stProceeding.ePrimaryCriterion OF
         STEP_CRIT_RELATIVE_DISTANCE:
-            IF stStep.stProceeding.fRelativeDistanceMm <= 0.0 THEN RETURN; END_IF
-        STEP_CRIT_STEP_TIME:
-            (* 时间主判据必须配置累计相对位移次级边界。 *)
-            IF stStep.stProceeding.fRelativeDistanceMm <= 0.0 THEN RETURN; END_IF
-        STEP_CRIT_FORCE_DECLINE_TO:
-            (* 力下降主判据必须低于本步骤目标力并有去抖窗口和次级位移边界。 *)
-            IF (stStep.stProceeding.fForceDeclineN < 0.0)
-                OR (stStep.stProceeding.fForceDeclineN >= stStep.fSetForceN)
-                OR (stStep.stProceeding.nStableWindowMs = 0)
-                OR (stStep.stProceeding.fRelativeDistanceMm <= 0.0) THEN
+            IF (stStep.stProceeding.fRelativeDistanceMm <= 0.0)
+                OR (stStep.stProceeding.fSecondarySRelMm <> 0.0) THEN
                 RETURN;
             END_IF
+            rCurrentStepBoundary_mm := stStep.stProceeding.fRelativeDistanceMm;
+        STEP_CRIT_STEP_TIME:
+            IF (stStep.stProceeding.nPrimaryStepTimeMs = 0)
+                OR (stStep.stProceeding.nPrimaryStepTimeMs < stStep.stProceeding.nStepMinMs)
+                OR (stStep.stProceeding.nPrimaryStepTimeMs > stStep.stProceeding.nStepMaxMs)
+                OR (stStep.stProceeding.fSecondarySRelMm <= 0.0) THEN
+                RETURN;
+            END_IF
+            rCurrentStepBoundary_mm := stStep.stProceeding.fSecondarySRelMm;
+        STEP_CRIT_FORCE_DECLINE_TO:
+            IF (stStep.stProceeding.fDeclineToN < 0.0)
+                OR (stStep.stProceeding.fDeclineToN >= stStep.fSetForceN)
+                OR (stStep.stProceeding.fDeclineHysteresisN < 0.0)
+                OR (stStep.stProceeding.fArmForceN
+                    <= stStep.stProceeding.fDeclineToN
+                        + stStep.stProceeding.fDeclineHysteresisN)
+                OR (stStep.stProceeding.fArmForceN > stStep.fSetForceN)
+                OR (stStep.stProceeding.fMinimumDeclineRateNS <= 0.0)
+                OR (stStep.stProceeding.nDeclineDebounceMs = 0)
+                OR (stStep.stProceeding.fCriterionSRelMinMm < 0.0)
+                OR (stStep.stProceeding.fCriterionSRelMaxMm
+                    < stStep.stProceeding.fCriterionSRelMinMm)
+                OR (stStep.stProceeding.fSecondarySRelMm <= 0.0)
+                OR (stStep.stProceeding.fCriterionSRelMaxMm
+                    > stStep.stProceeding.fSecondarySRelMm)
+                OR (stStep.stProceeding.fCriterionRpmMin < 0.0)
+                OR (stStep.stProceeding.fCriterionRpmMin
+                    > stMachineLimits.fRMaxSpeedRpm)
+                OR (stStep.stProceeding.fCaptureMaxVelocityMmS <= 0.0)
+                OR (stStep.stProceeding.fCaptureMaxVelocityMmS
+                    > stMachineLimits.fZMaxVelocityMmS) THEN
+                RETURN;
+            END_IF
+            rCurrentStepBoundary_mm := stStep.stProceeding.fSecondarySRelMm;
     ELSE
         RETURN;
     END_CASE
+
+    CASE stStep.stProceeding.eSecondaryAction OF
+        SECONDARY_ADVANCE_AND_NOK:
+        SECONDARY_CONTROLLED_EXIT_NOK:
+    ELSE
+        RETURN;
+    END_CASE
+
+    (* 四步骤共用Contact零点，允许到达的累计S_rel不得回退或超过机器跨度。 *)
+    IF (rCurrentStepBoundary_mm < rPreviousStepBoundary_mm)
+        OR (rCurrentStepBoundary_mm > rMaximumRelativeTravel_mm) THEN
+        RETURN;
+    END_IF
+    rPreviousStepBoundary_mm := rCurrentStepBoundary_mm;
 END_FOR
 
 FC_ValidateJoinProgram := TRUE;]]></ST></Implementation></POU></TcPlcObject>

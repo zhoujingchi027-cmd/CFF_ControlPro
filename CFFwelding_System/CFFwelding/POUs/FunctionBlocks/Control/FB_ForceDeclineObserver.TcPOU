@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_ForceDeclineObserver" Id="{B5000000-0000-4000-8000-000000000004}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_ForceDeclineObserver
+VAR_INPUT
+    (* 调用者完整赋值的Force Decline输入。 *)
+    stInput : ST_ForceDeclineInput;
+END_VAR
+VAR_OUTPUT
+    (* Arm、候选、确认、导数、锁存和故障输出。 *)
+    stOutput : ST_ForceDeclineOutput;
+END_VAR
+VAR
+    (* 当前步骤已经达到Arm Force。 *)
+    bArmed : BOOL;
+    (* 当前保持Decline回差候选。 *)
+    bCandidate : BOOL;
+    (* Decline已经连续确认。 *)
+    bConfirmed : BOOL;
+    (* 已获得上一个有效力样本。 *)
+    bPreviousSampleValid : BOOL;
+    (* 当前扫描满足全部Decline确认条件。 *)
+    bDeclineCondition : BOOL;
+    (* 当前配置和输入均有效。 *)
+    bConfigurationValid : BOOL;
+    (* 算法故障锁存；只有显式Reset清除。 *)
+    bFaultLatched : BOOL;
+    (* 已锁存的确定性故障编号。 *)
+    udiLatchedFaultId : UDINT;
+    (* 上一个有效力样本，单位kN。 *)
+    rPreviousForce_kN : LREAL;
+    (* 相邻样本力变化率，单位kN/s。 *)
+    rForceDerivative_kN_s : LREAL;
+    (* 连续确认累计时间，单位s。 *)
+    rStableTime_s : LREAL;
+    (* 确认锁存力，单位kN。 *)
+    rLatchedForce_kN : LREAL;
+    (* 确认锁存累计S_rel，单位mm。 *)
+    rLatchedRelativePosition_mm : LREAL;
+    (* 确认锁存主轴转速，单位rpm。 *)
+    rLatchedSpeed_rpm : LREAL;
+    (* 确认锁存步骤时间，单位s。 *)
+    rLatchedStepTime_s : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Force Decline观察器。
+   进入：步骤选择Decline主判据并提供有效ForceCriterion、RPM、S_rel和速度。
+   动作：先Arm，再要求负下降率、窗口、捕获速度和连续Debounce。
+   成功：锁存确认事实；不关闭PI、不切换Profile、不写流程状态。
+   Fault：配置、信号或数值无效时锁存，只有显式Reset清除。
+   --------------------------------------------------------- *)
+IF stInput.bReset THEN
+    bArmed := FALSE;
+    bCandidate := FALSE;
+    bConfirmed := FALSE;
+    bPreviousSampleValid := FALSE;
+    bFaultLatched := FALSE;
+    udiLatchedFaultId := 0;
+    rPreviousForce_kN := 0.0;
+    rForceDerivative_kN_s := 0.0;
+    rStableTime_s := 0.0;
+    rLatchedForce_kN := 0.0;
+    rLatchedRelativePosition_mm := 0.0;
+    rLatchedSpeed_rpm := 0.0;
+    rLatchedStepTime_s := 0.0;
+ELSIF NOT stInput.bEnable THEN
+    (* Disable结束当前步骤观察窗口，但故障保持到Reset。 *)
+    bArmed := FALSE;
+    bCandidate := FALSE;
+    bConfirmed := FALSE;
+    bPreviousSampleValid := FALSE;
+    rForceDerivative_kN_s := 0.0;
+    rStableTime_s := 0.0;
+ELSIF NOT bFaultLatched AND NOT bConfirmed THEN
+    bConfigurationValid := stInput.bSignalValid
+        AND FC_IsFiniteLReal(rValue := stInput.rForceActual_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rSpeed_rpm)
+        AND FC_IsFiniteLReal(rValue := stInput.rRelativePosition_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rAxisVelocity_mm_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rStepTime_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rArmForce_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rDeclineTo_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rHysteresis_kN)
+        AND FC_IsFiniteLReal(rValue := stInput.rMinimumDeclineRate_kN_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rCriterionSRelMinimum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rCriterionSRelMaximum_mm)
+        AND FC_IsFiniteLReal(rValue := stInput.rCriterionRpmMinimum)
+        AND FC_IsFiniteLReal(rValue := stInput.rCaptureMaximumVelocity_mm_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rDebounceTime_s)
+        AND FC_IsFiniteLReal(rValue := stInput.rCycleTime_s)
+        AND (stInput.rDeclineTo_kN >= 0.0)
+        AND (stInput.rHysteresis_kN >= 0.0)
+        AND (stInput.rArmForce_kN > stInput.rDeclineTo_kN + stInput.rHysteresis_kN)
+        AND (stInput.rMinimumDeclineRate_kN_s > 0.0)
+        AND (stInput.rCriterionSRelMaximum_mm >= stInput.rCriterionSRelMinimum_mm)
+        AND (stInput.rCriterionRpmMinimum >= 0.0)
+        AND (stInput.rCaptureMaximumVelocity_mm_s > 0.0)
+        AND (stInput.rDebounceTime_s > 0.0)
+        AND (stInput.rCycleTime_s > 0.0);
+
+    IF NOT bConfigurationValid THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00009101;
+    ELSE
+        IF bPreviousSampleValid THEN
+            rForceDerivative_kN_s := (stInput.rForceActual_kN - rPreviousForce_kN)
+                / stInput.rCycleTime_s;
+            IF NOT FC_IsFiniteLReal(rValue := rForceDerivative_kN_s) THEN
+                bFaultLatched := TRUE;
+                udiLatchedFaultId := 16#00009102;
+            END_IF
+        ELSE
+            rForceDerivative_kN_s := 0.0;
+            bPreviousSampleValid := TRUE;
+        END_IF
+        rPreviousForce_kN := stInput.rForceActual_kN;
+
+        IF NOT bFaultLatched THEN
+            IF stInput.rForceActual_kN >= stInput.rArmForce_kN THEN
+                bArmed := TRUE;
+            END_IF
+
+            IF NOT bCandidate AND bArmed
+                AND (stInput.rForceActual_kN <= stInput.rDeclineTo_kN) THEN
+                bCandidate := TRUE;
+            END_IF
+
+            IF bCandidate AND (stInput.rForceActual_kN
+                > stInput.rDeclineTo_kN + stInput.rHysteresis_kN) THEN
+                bCandidate := FALSE;
+                rStableTime_s := 0.0;
+            ELSE
+                bDeclineCondition := bCandidate
+                    AND (stInput.rForceActual_kN <= stInput.rDeclineTo_kN)
+                    AND (rForceDerivative_kN_s <= -ABS(stInput.rMinimumDeclineRate_kN_s))
+                    AND (stInput.rRelativePosition_mm >= stInput.rCriterionSRelMinimum_mm)
+                    AND (stInput.rRelativePosition_mm <= stInput.rCriterionSRelMaximum_mm)
+                    AND (ABS(stInput.rSpeed_rpm) >= ABS(stInput.rCriterionRpmMinimum))
+                    AND (ABS(stInput.rAxisVelocity_mm_s) <= ABS(stInput.rCaptureMaximumVelocity_mm_s));
+
+                IF bDeclineCondition THEN
+                    rStableTime_s := rStableTime_s + stInput.rCycleTime_s;
+                    IF NOT FC_IsFiniteLReal(rValue := rStableTime_s) THEN
+                        bFaultLatched := TRUE;
+                        udiLatchedFaultId := 16#00009103;
+                    ELSIF rStableTime_s >= stInput.rDebounceTime_s THEN
+                        bCandidate := FALSE;
+                        bConfirmed := TRUE;
+                        rLatchedForce_kN := stInput.rForceActual_kN;
+                        rLatchedRelativePosition_mm := stInput.rRelativePosition_mm;
+                        rLatchedSpeed_rpm := stInput.rSpeed_rpm;
+                        rLatchedStepTime_s := stInput.rStepTime_s;
+                    END_IF
+                ELSE
+                    (* 任一连续确认条件中断均清零Debounce；候选只由Force回差释放。 *)
+                    rStableTime_s := 0.0;
+                END_IF
+            END_IF
+        END_IF
+    END_IF
+END_IF
+
+stOutput.bArmed := bArmed;
+stOutput.bCandidate := bCandidate;
+stOutput.bConfirmed := bConfirmed;
+stOutput.rForceDerivative_kN_s := rForceDerivative_kN_s;
+stOutput.rStableTime_s := rStableTime_s;
+stOutput.rLatchedForce_kN := rLatchedForce_kN;
+stOutput.rLatchedRelativePosition_mm := rLatchedRelativePosition_mm;
+stOutput.rLatchedSpeed_rpm := rLatchedSpeed_rpm;
+stOutput.rLatchedStepTime_s := rLatchedStepTime_s;
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;]]></ST></Implementation></POU></TcPlcObject>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_StepProceedingCriterion" Id="{B5000000-0000-4000-8000-000000000005}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_StepProceedingCriterion
+VAR_INPUT
+    (* 调用者完整赋值的步骤推进输入。 *)
+    stInput : ST_StepCriterionInput;
+END_VAR
+VAR_OUTPUT
+    (* 步骤结束事实、动作、锁存和故障输出。 *)
+    stOutput : ST_StepCriterionOutput;
+END_VAR
+VAR
+    (* 当前Primary已经满足。 *)
+    bPrimaryMet : BOOL;
+    (* 当前Primary需要累计S_rel Secondary。 *)
+    bSecondaryRequired : BOOL;
+    (* 本扫描输入数值和配置有效。 *)
+    bConfigurationValid : BOOL;
+    (* 算法故障锁存；只有显式Reset清除。 *)
+    bFaultLatched : BOOL;
+    (* 已锁存的确定性故障编号。 *)
+    udiLatchedFaultId : UDINT;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   步骤推进判据。
+   进入：单一Primary、可选累计S_rel Secondary、StepMin/Max和硬原因有效。
+   动作：安全原因和Secondary优先，Primary满足立即结束，StepMax只监视未满足Primary。
+   成功：锁存EndCause、Force、S_rel、时间和流程动作。
+   Fault：配置、数值或未知枚举无效时锁存，只有显式Reset清除。
+   --------------------------------------------------------- *)
+IF stInput.bReset THEN
+    stOutput.bArmed := FALSE;
+    stOutput.bPrimaryMet := FALSE;
+    stOutput.bSecondaryLimitReached := FALSE;
+    stOutput.bEndConfirmed := FALSE;
+    stOutput.bTooShort := FALSE;
+    stOutput.bNok := FALSE;
+    stOutput.bAdvanceRequested := FALSE;
+    stOutput.bControlledExitRequested := FALSE;
+    stOutput.bDownwardMotionInhibited := FALSE;
+    stOutput.eEndCause := STEP_END_NONE;
+    stOutput.rLatchedForce_kN := 0.0;
+    stOutput.rLatchedRelativePosition_mm := 0.0;
+    stOutput.rLatchedStepTime_s := 0.0;
+    stOutput.bFault := FALSE;
+    stOutput.nFaultId := 0;
+    bFaultLatched := FALSE;
+    udiLatchedFaultId := 0;
+    RETURN;
+END_IF
+
+IF NOT stInput.bEnable THEN
+    stOutput.bArmed := FALSE;
+    RETURN;
+END_IF
+
+stOutput.bArmed := stInput.bForceDeclineArmed;
+IF bFaultLatched THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bAdvanceRequested := FALSE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_NONE;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+IF stOutput.bEndConfirmed THEN
+    RETURN;
+END_IF
+
+bConfigurationValid := FC_IsFiniteLReal(rValue := stInput.rRelativePosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rRelativeDistanceTarget_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rStepTime_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rStepTimeTarget_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rStepMinimumTime_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rStepMaximumTime_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rForceActual_kN)
+    AND FC_IsFiniteLReal(rValue := stInput.rSecondaryDistanceLimit_mm)
+    AND (stInput.rStepTime_s >= 0.0)
+    AND (stInput.rStepMinimumTime_s >= 0.0)
+    AND (stInput.rStepMaximumTime_s > 0.0)
+    AND (stInput.rStepMinimumTime_s <= stInput.rStepMaximumTime_s)
+    AND NOT (stInput.bForceDeclineConfirmed AND NOT stInput.bForceDeclineArmed);
+IF NOT bConfigurationValid THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00009201;
+END_IF
+IF bFaultLatched THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bAdvanceRequested := FALSE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_NONE;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+CASE stInput.ePrimaryCriterion OF
+    STEP_CRIT_RELATIVE_DISTANCE:
+        bSecondaryRequired := FALSE;
+        bPrimaryMet := stInput.rRelativePosition_mm >= stInput.rRelativeDistanceTarget_mm;
+        IF stInput.rRelativeDistanceTarget_mm <= 0.0 THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#00009202;
+        END_IF
+    STEP_CRIT_STEP_TIME:
+        bSecondaryRequired := TRUE;
+        bPrimaryMet := stInput.rStepTime_s >= stInput.rStepTimeTarget_s;
+        IF (stInput.rStepTimeTarget_s <= 0.0)
+            OR (stInput.rStepTimeTarget_s < stInput.rStepMinimumTime_s)
+            OR (stInput.rStepTimeTarget_s > stInput.rStepMaximumTime_s)
+            OR (stInput.rSecondaryDistanceLimit_mm <= 0.0) THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#00009203;
+        END_IF
+    STEP_CRIT_FORCE_DECLINE_TO:
+        bSecondaryRequired := TRUE;
+        bPrimaryMet := stInput.bForceDeclineConfirmed;
+        IF stInput.rSecondaryDistanceLimit_mm <= 0.0 THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#00009204;
+        END_IF
+ELSE
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#00009205;
+END_CASE
+
+IF NOT bFaultLatched AND bSecondaryRequired THEN
+    CASE stInput.eSecondaryAction OF
+        SECONDARY_ADVANCE_AND_NOK:
+        SECONDARY_CONTROLLED_EXIT_NOK:
+    ELSE
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#00009206;
+    END_CASE
+END_IF
+IF bFaultLatched THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bAdvanceRequested := FALSE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_NONE;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    RETURN;
+END_IF
+
+(* EVAL_STAGE_HARD_CAUSE：Stop、轴、传感器和硬边界拥有最高优先级。 *)
+IF stInput.bStopRequested THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_STOP_REQUEST;
+ELSIF stInput.bAxisFault THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_AXIS_FAULT;
+ELSIF stInput.bSensorInvalid OR NOT stInput.bSignalValid THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_SENSOR_INVALID;
+ELSIF stInput.bHardForceActive THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_HARD_FORCE;
+ELSIF stInput.bHardStrokeActive THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_HARD_STROKE;
+END_IF
+
+(* EVAL_STAGE_SECONDARY：累计S_rel先于Primary处理并立即禁止继续向下。 *)
+IF NOT stOutput.bEndConfirmed AND bSecondaryRequired
+    AND (stInput.rRelativePosition_mm >= stInput.rSecondaryDistanceLimit_mm) THEN
+    stOutput.bSecondaryLimitReached := TRUE;
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_SECONDARY_RELATIVE_DISTANCE;
+    CASE stInput.eSecondaryAction OF
+        SECONDARY_ADVANCE_AND_NOK:
+            stOutput.bAdvanceRequested := TRUE;
+        SECONDARY_CONTROLLED_EXIT_NOK:
+            stOutput.bControlledExitRequested := TRUE;
+    END_CASE
+END_IF
+
+(* EVAL_STAGE_PRIMARY：Primary一旦满足立即结束，StepMin只判质量。 *)
+IF NOT stOutput.bEndConfirmed AND bPrimaryMet THEN
+    stOutput.bPrimaryMet := TRUE;
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bAdvanceRequested := TRUE;
+    stOutput.eEndCause := FC_GetPrimaryEndCause(ePrimaryCriterion := stInput.ePrimaryCriterion);
+    IF stInput.rStepTime_s < stInput.rStepMinimumTime_s THEN
+        stOutput.bTooShort := TRUE;
+        stOutput.bNok := TRUE;
+    END_IF
+END_IF
+
+(* EVAL_STAGE_STEP_MAX：仅在Primary未满足时触发等待看门狗。 *)
+IF NOT stOutput.bEndConfirmed AND (stInput.rStepTime_s >= stInput.rStepMaximumTime_s) THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_MAX_TIME;
+END_IF
+
+IF stOutput.bEndConfirmed THEN
+    stOutput.rLatchedForce_kN := stInput.rForceActual_kN;
+    stOutput.rLatchedRelativePosition_mm := stInput.rRelativePosition_mm;
+    stOutput.rLatchedStepTime_s := stInput.rStepTime_s;
+END_IF
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;]]></ST></Implementation></POU></TcPlcObject>

@@ -4,6 +4,12 @@
     udiContactReferenceRequestId : UDINT;
     (* TRUE时在新请求编号到达后锁存当前外部位移与NC位置。 *)
     bLatchContactReference : BOOL;
+    (* TRUE时使用Contact检测器提供的确认时刻位置，而不是请求到达时的当前值。 *)
+    bUseProvidedContactReference : BOOL;
+    (* Contact确认时锁存的外部传感器绝对位置，单位毫米。 *)
+    rProvidedContactSensorPosition_mm : LREAL;
+    (* Contact确认时锁存的Z轴绝对位置，单位毫米。 *)
+    rProvidedContactAxisPosition_mm : LREAL;
     (* TRUE时在新请求编号到达后清除Contact参考点。 *)
     bResetContactReference : BOOL;
 END_STRUCT

@@ -5,8 +5,12 @@ STRUCT
     bEnable : BOOL;
     (* 当前步骤判据锁存复位请求。 *)
     bReset : BOOL;
+    (* 当前步骤全部输入和配置有效。 *)
+    bSignalValid : BOOL;
     (* 当前步骤唯一主结束判据。 *)
     ePrimaryCriterion : E_StepPrimaryCriterion;
+    (* 次级累计S_rel触发后的流程动作。 *)
+    eSecondaryAction : E_SecondaryCriterionAction;
     (* 从接触点起累计的工艺相对位移，单位毫米。 *)
     rRelativePosition_mm : LREAL;
     (* 相对位移主判据目标，单位毫米。 *)
@@ -15,18 +19,28 @@ STRUCT
     rStepTime_s : LREAL;
     (* 时间主判据目标，单位秒。 *)
     rStepTimeTarget_s : LREAL;
+    (* StepMin质量下限，单位s。 *)
+    rStepMinimumTime_s : LREAL;
+    (* StepMax等待看门狗，单位s。 *)
+    rStepMaximumTime_s : LREAL;
     (* 当前步骤实际轴向力，单位千牛。 *)
     rForceActual_kN : LREAL;
-    (* 力下降结束阈值，单位千牛。 *)
-    rDeclineTo_kN : LREAL;
-    (* 力下降预装配阈值，单位千牛。 *)
-    rArmForce_kN : LREAL;
-    (* 力变化率，下降为负，单位千牛每秒。 *)
-    rForceDerivative_kN_s : LREAL;
+    (* Force Decline观察器已经武装。 *)
+    bForceDeclineArmed : BOOL;
+    (* Force Decline观察器已经连续确认。 *)
+    bForceDeclineConfirmed : BOOL;
     (* 非位移主判据使用的次级相对位移硬限制，单位毫米。 *)
     rSecondaryDistanceLimit_mm : LREAL;
-    (* 转速、相对位移和采样窗口均有效。 *)
-    bWindowValid : BOOL;
+    (* Hard Force边界已经触发。 *)
+    bHardForceActive : BOOL;
+    (* Hard S_rel边界已经触发。 *)
+    bHardStrokeActive : BOOL;
+    (* 必需传感器或参考点无效。 *)
+    bSensorInvalid : BOOL;
+    (* 轴状态或External通道故障。 *)
+    bAxisFault : BOOL;
+    (* 上层请求受控停止。 *)
+    bStopRequested : BOOL;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

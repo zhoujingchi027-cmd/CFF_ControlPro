@@ -213,11 +213,36 @@ IF GVL_Command.stProcessReference.udiContactReferenceRequestId
     ELSIF GVL_Command.stProcessReference.bLatchContactReference THEN
         IF GVL_Process.stActual.bForceValid AND GVL_Process.stActual.bDisplacementValid
             AND bAxisPositionValid THEN
-            GVL_Process.stActual.fContactSensorPositionMm := GVL_Process.stActual.fExternalDisplacementMm;
-            GVL_Process.stActual.fContactAxisPositionMm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
-            GVL_Process.stActual.bContactReferenceValid := TRUE;
+            IF GVL_Command.stProcessReference.bUseProvidedContactReference THEN
+                IF FC_IsFiniteLReal(rValue :=
+                        GVL_Command.stProcessReference.rProvidedContactSensorPosition_mm)
+                    AND FC_IsFiniteLReal(rValue :=
+                        GVL_Command.stProcessReference.rProvidedContactAxisPosition_mm)
+                    AND (GVL_Command.stProcessReference.rProvidedContactSensorPosition_mm
+                        >= GVL_Config.stSensorProcessing.rDisplacementMinimumMm)
+                    AND (GVL_Command.stProcessReference.rProvidedContactSensorPosition_mm
+                        <= GVL_Config.stSensorProcessing.rDisplacementMaximumMm)
+                    AND (GVL_Command.stProcessReference.rProvidedContactAxisPosition_mm
+                        >= GVL_Config.stLimits.fZMinPositionMm)
+                    AND (GVL_Command.stProcessReference.rProvidedContactAxisPosition_mm
+                        <= GVL_Config.stLimits.fZMaxPositionMm) THEN
+                    GVL_Process.stActual.fContactSensorPositionMm := GVL_Command.stProcessReference.rProvidedContactSensorPosition_mm;
+                    GVL_Process.stActual.fContactAxisPositionMm := GVL_Command.stProcessReference.rProvidedContactAxisPosition_mm;
+                    GVL_Process.stActual.bContactReferenceValid := TRUE;
+                ELSE
+                    GVL_Process.stActual.bContactReferenceValid := FALSE;
+                    GVL_Process.stActual.fContactSensorPositionMm := 0.0;
+                    GVL_Process.stActual.fContactAxisPositionMm := 0.0;
+                END_IF
+            ELSE
+                GVL_Process.stActual.fContactSensorPositionMm := GVL_Process.stActual.fExternalDisplacementMm;
+                GVL_Process.stActual.fContactAxisPositionMm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
+                GVL_Process.stActual.bContactReferenceValid := TRUE;
+            END_IF
         ELSE
             GVL_Process.stActual.bContactReferenceValid := FALSE;
+            GVL_Process.stActual.fContactSensorPositionMm := 0.0;
+            GVL_Process.stActual.fContactAxisPositionMm := 0.0;
         END_IF
     END_IF
 END_IF

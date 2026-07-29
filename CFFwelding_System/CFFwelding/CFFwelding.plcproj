@@ -279,6 +279,12 @@
     <Compile Include="DUTs\Interfaces\ST_ContactDetectOutput.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ForceDeclineInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ForceDeclineOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\Interfaces\ST_StepCriterionInput.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -370,6 +376,15 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FunctionBlocks\Control\FB_ZForceAdmittance.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_ContactDetect.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_ForceDeclineObserver.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_StepProceedingCriterion.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU">
