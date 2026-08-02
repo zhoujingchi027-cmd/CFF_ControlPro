@@ -121,9 +121,11 @@ Phase 10不得生成虚假的Torque、Energy、Observer或Curve结果。Evaluate
 - `tUnloadStandstillConfirm`
 - `tRAxisStopTimeout`
 - `tReturnTimeout`
+- `fStandardMoveAccelerationMmS2`
+- `fStandardMoveDecelerationMmS2`
 - `bValid`
 
-全部时间必须大于零；`bValid`默认保持`FALSE`。该结构加入`GVL_Config`，但Phase 10不写入合格值。
+全部时间、标准定位加速度和标准定位减速度必须大于零；两个标准定位斜率还必须为有限值且不超过有效机器Z轴最大加速度。`bValid`默认保持`FALSE`。该结构加入`GVL_Config`，但Phase 10不写入合格值。
 
 ### 4.2 扩展Program Header
 
@@ -159,7 +161,9 @@ Sequence通过嵌套意图发布动作，不直接写Adapter命令邮箱：
 - R轴过程占用标志、命令事务号和`ST_RAxisCommand`候选；
 - Force Process退出完成标志。
 
-该结构作为`ST_CffSequenceStatus`的成员发布。现有Force目标、RPM目标、步骤和算法诊断字段继续保留，便于ADS诊断。
+该结构作为`ST_CffSequenceStatus`的成员发布。`ST_CffSequenceStatus`还发布当前步骤的`rForceRamp_kN_s`，由FastAxis以“步骤斜率与已验证Force Profile最大斜率中的较小值”驱动力设定斜坡；不得继续固定使用活的全局Profile斜率而忽略步骤配方。现有Force目标、RPM目标、步骤和算法诊断字段继续保留，便于ADS诊断。
+
+FastAxis必须把“命令源+源事务号”的变化转换为独立、单调的Adapter事务号，并在`ST_FastStatus`发布Sequence Z/R源事务的接受号。普通命令与Sequence命令即使数值相同，切换命令源也必须产生一次且仅一次新Adapter事务。
 
 ### 4.5 扩展External Adapter状态
 
@@ -170,7 +174,7 @@ Sequence通过嵌套意图发布动作，不直接写Adapter命令邮箱：
 - Acceleration；
 - Direction。
 
-这些值在Precheck取得NC初值后即发布，并在每次Feed接受后更新。轨迹FB只以这些已接受值作为下一周期积分基准，不以“期望已发送”代替“Adapter已接受”。
+这些值在Precheck取得NC初值后即发布，并在每次Feed接受后更新。Feed Counter达到UDINT最大值后回到1并跳过0，轨迹只以“Feed Accepted且Counter变化”推进握手。轨迹FB只以这些已接受值作为下一周期积分基准，不以“期望已发送”代替“Adapter已接受”。
 
 ### 4.6 轨迹输入输出
 
@@ -178,9 +182,10 @@ Sequence通过嵌套意图发布动作，不直接写Adapter命令邮箱：
 
 - Enable、Reset、External状态和Feed Accepted；
 - 已接受P/V/A/Direction；
+- Hard Force/Stroke/Collision正向运动禁止输入；
 - 目标速度、周期、最大速度、最大加速度和位置范围；
 - Standstill阈值和Direction Hold周期；
-- 输出P/V/A/Direction、Direction Transition、Zero Confirmed、Active、Fault和FaultId。
+- 输出P/V/A/Direction、Direction Transition、Zero Confirmed、Positive Motion Inhibited、Active、Fault和FaultId。
 
 ### 4.7 退出意图
 
@@ -190,6 +195,17 @@ Sequence通过嵌套意图发布动作，不直接写Adapter命令邮箱：
 - `NOK_RETURN`
 - `ABORT_NO_RETURN`
 - `FAULT_NO_RETURN`
+
+### 4.8 Profile身份、Revision与周期快照
+
+为使Precheck中的Profile一致性可验证：
+
+- `ST_ZForceControlProfile`新增`nProfileId`，并保留现有`nRevision`；
+- `ST_RAxisProfile`新增`nProfileId`和`nRevision`；
+- 两个Profile的`nProfileId`、`nRevision`和`bValid`必须有效，且Profile ID必须分别匹配Program Header；
+- Start事务被接受时，Sequence Config和本周期所需的Profile身份/Revision必须形成局部快照；活动周期不得因活的`GVL_Config`变化而放宽超时、运动斜率或Profile；
+- Sequence把同一Start事务冻结的Machine、Limits、External Config和Force Profile作为单一类型化Fast Config Snapshot发布，FastAxis不得自行从活GVL形成第二套周期配置；
+- Force Controller仍通过一次无扰Profile提交形成自己的应用快照，R轴命令使用Start时锁存并验证的Profile参数。
 
 ## 5. 正常状态流
 
@@ -216,7 +232,7 @@ IDLE
 
 ## 6. Precheck与事务语义
 
-只有新的Start CommandId才可启动。重复或旧CommandId不得重复产生任何动作。
+只有按UDINT半范围规则判断为更新的Start CommandId才可启动，回绕时跳过0。重复或旧CommandId不得重复产生任何动作。Main/Fast Producer写入新ID后必须保持整个Payload不变，直到Fast Accepted ID确认；FastInputs只把通过该保持合同的完整包复制到内部已接受命令GVL。
 
 Precheck至少要求：
 
@@ -238,6 +254,7 @@ Precheck至少要求：
 
 - 锁存Cycle开始时Z实际位置，供Local Return使用；
 - 以`Z_OWNER_APPROACH`向`fContactSearchStartPositionMm`发出一次标准绝对定位事务；
+- Approach速度使用已验证的`fContactSearchVelocityMmS`，加速度和减速度使用Start时锁存的`ST_CffSequenceConfig.fStandardMoveAccelerationMmS2/fStandardMoveDecelerationMmS2`；
 - 等待Adapter接受和完成；
 - Error或Timeout进入Fault，无External接管。
 
@@ -366,7 +383,7 @@ Phase 10允许且只允许以下Active内方向转换：
 ### 11.3 Fault
 
 - 第一故障原因锁存，后续派生错误不得覆盖；
-- Hard Force、Hard Stroke或Collision立即禁止正向速度，R轴受控停止；
+- Hard Force、Hard Stroke或Collision同一扫描触发硬安全覆盖：Position保持Adapter accepted值、Velocity/Acceleration立即为零、Direction保持不变；Adapter只允许该精确包绕过普通Velocity Step连续性检查，接受后立即进入Disable序列；
 - 传感器失效时禁止继续使用导纳PI，目标速度归零并退出External；
 - Z/R轴或External错误时停止发布新运动，保持Fault Stop Owner；
 - Fault退出后不得自动Return；
@@ -385,6 +402,7 @@ Phase 10允许且只允许以下Active内方向转换：
 - `RETURN_MODE_LOCAL`返回Start事务接受时锁存的Z位置；
 - `RETURN_MODE_REFERENCE`返回Program Header的`fReturnOpeningMm`；
 - 两者使用`fReturnVelocityMmS`；
+- 两者使用Start时锁存的`ST_CffSequenceConfig.fStandardMoveAccelerationMmS2/fStandardMoveDecelerationMmS2`；
 - Return前必须确认External Released、Rpm Stopped、Z/R Ready且无错误；
 - Return Error或Timeout转Fault，不得标记完成。
 
@@ -450,7 +468,8 @@ Phase 10规则：
 
 - 新DUT、FB和枚举唯一存在并加入PLC Project；
 - `FB_ZExternalTrajectory`和`fbRSpeedRamp`只在`PRG_FastAxisControl`实例化；
-- Sequence/Trajectory无`AXIS_REF`、MC、GVL或跨PROGRAM局部访问；
+- `PRG_CffSequence`无`AXIS_REF`、MC或跨PROGRAM局部访问，但可通过既有类型化GVL读取命令/快照/状态并发布唯一Writer输出；
+- `FB_ZExternalTrajectory`及其他算法FB无`AXIS_REF`、MC、GVL或跨PROGRAM局部访问；
 - 三个Adapter仍是MC和轴引用唯一Owner；
 - 报警槽和GVL Writer不冲突。
 
@@ -458,7 +477,7 @@ Phase 10规则：
 
 - 接受最小合法四步程序和合法Sequence Config；
 - 拒绝非法搜索起点、Step4非Time Primary、Qualified Hold越界、Force/RPM阈值非法和零/负Timeout；
-- 拒绝非有限值、未知枚举、硬限值越界和Revision/Profile/Tool/Anvil不一致。
+- 拒绝非法标准定位加减速度、非有限值、未知枚举、硬限值越界和Revision/Profile/Tool/Anvil不一致。
 
 ### 16.3 轨迹
 
