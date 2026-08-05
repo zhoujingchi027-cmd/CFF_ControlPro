@@ -10,6 +10,7 @@
 - 远程默认分支：`main`
 - 用户最新指定工作分支：`codex/cffwelding-greenfield-v3.3`
 - 分支偏差说明：任务包原名称含`final`；2026-07-22用户明确改为上述不含`final`的分支名。
+- 报告更新至：2026-08-04。
 
 ## Git身份
 
@@ -45,15 +46,20 @@
 | Phase 0 | `1cf77561cc09d95e28dabeb531cebee61763b9df` | `chore(repo): initialize CFFwelding greenfield repository` | 环境检测、UTF-8、凭据模式、Git差异、旧工程源文件摘要 | 已Push到工作分支 |
 | Phase 1 | `717737001cd31e960c9f6e618458830fafd722d1` | `feat(project): create empty CFFwelding TwinCAT solution` | Phase 1验收、真实XAE Build、`LastBuildInfo=0`、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
 | Phase 2 | `8780363b820c4a14da16664ad4b043d2307deebd` | `feat(architecture): add Phase 2 task and program skeletons` | Phase 1/2验收、真实XAE Build、`LastBuildInfo=0`、任务同步、中文注释、硬件边界、凭据模式、暂存差异 | 已Push到工作分支并复核远端Hash |
-| Phase 3 | `d5667d7e13238828e7bd3db65801724e5ae5b29e` | `feat(data): add Phase 3 model and offline NC bindings` | Phase 1/2/3验收、真实XAE Build、`LastBuildInfo=0`、NC SAF/Fast周期同步、4条内部轴映射、硬件边界、凭据模式、暂存差异 | GitHub 443不可达；主Commit与报告Commit保留本地待Push |
-| Phase 4 | `7be809a2284b67f42c931df15ad8ae52738f09cc` | `feat(plc): add reusable functions and utility blocks` | Phase 1/2/3回归、Phase 4验收、20个POU XML、真实XAE Build、`LastBuildInfo=0`、分层边界、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
-| Phase 5 | `5aa37a6f2394f899f4115aebd7f5e25e9b013f22` | `feat(sensor): add force displacement and collision interfaces` | Phase 1–4回归、Phase 5验收、真实XAE Build、`LastBuildInfo=0`、无真实I/O/Drive/Safety、凭据模式、暂存差异 | GitHub网络不可达；保留本地待Push |
-| Phase 6 | `566ae2d9e9bafcb6f649a7ba5c4c643bd934079b` | `feat(motion): add Phase 6 NC adapters and owner arbitration` | Phase 1–6回归、真实XAE Build、`LastBuildInfo=0`、MC调用边界、Owner唯一性、未绑定Ready门控、凭据模式、暂存差异 | GitHub网络此前不可达；主Commit与报告Commit保留本地待Push |
+| Phase 3 | `d5667d7e13238828e7bd3db65801724e5ae5b29e` | `feat(data): add Phase 3 model and offline NC bindings` | Phase 1/2/3验收、真实XAE Build、`LastBuildInfo=0`、NC SAF/Fast周期同步、4条内部轴映射、硬件边界、凭据模式、暂存差异 | 初次网络失败；已随后续累计Push |
+| Phase 4 | `7be809a2284b67f42c931df15ad8ae52738f09cc` | `feat(plc): add reusable functions and utility blocks` | Phase 1/2/3回归、Phase 4验收、20个POU XML、真实XAE Build、`LastBuildInfo=0`、分层边界、凭据模式、暂存差异 | 已随后续累计Push |
+| Phase 5 | `5aa37a6f2394f899f4115aebd7f5e25e9b013f22` | `feat(sensor): add force displacement and collision interfaces` | Phase 1–4回归、Phase 5验收、真实XAE Build、`LastBuildInfo=0`、无真实I/O/Drive/Safety、凭据模式、暂存差异 | 已随后续累计Push |
+| Phase 6 | `566ae2d9e9bafcb6f649a7ba5c4c643bd934079b` | `feat(motion): add Phase 6 NC adapters and owner arbitration` | Phase 1–6回归、真实XAE Build、`LastBuildInfo=0`、MC调用边界、Owner唯一性、未绑定Ready门控、凭据模式、暂存差异 | 已随后续累计Push |
 | Phase 7 source | `4f1bfa8de7a3117558993ce07f655d59ccddcd74` | `feat(motion): add external setpoint lifecycle` | Phase 1–6回归、Phase 7除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、MC边界、Owner退出、安全审查 | 已随Phase 7报告Push |
 | Phase 7 report | `962b3303e0ab0ff5109fc606cb5f638a891d2e37` | `docs(report): record Phase 7 external setpoint verification` | Phase 1–7回归、真实XAE Build、`LastBuildInfo=0`、报告闸门和差异检查 | 已Push并复核远端SHA |
 | Phase 8 source | `2b9a470e215962d7696cae4036224284f36f66ce` | `feat(control): add Phase 8 force admittance` | Phase 1–7回归、Phase 8除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、两轮审查和边界检查 | 已随Phase 8报告Push |
 | Phase 8 report | `2b73107c8e43ccc858fedcea9007b846ab4b1b0b` | `docs(report): record Phase 8 force control verification` | Phase 1–8回归、真实XAE Build、`LastBuildInfo=0`、143个工程XML和报告闸门 | 已Push并复核远端SHA |
-| Phase 9 source | `35d564de70170579e5e718ac5a69caa088ba74cc` | `feat(process): add contact and proceeding criteria` | Phase 1–8回归、Phase 9除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、算法边界和独立安全复核 | 待随Phase 9报告Push |
+| Phase 9 source | `35d564de70170579e5e718ac5a69caa088ba74cc` | `feat(process): add contact and proceeding criteria` | Phase 1–8回归、Phase 9除报告闸门外通过、真实XAE Build、`LastBuildInfo=0`、算法边界和独立安全复核 | 已随Phase 9报告Push |
+| Phase 9 report | `c820fab61f59e49c0e8740d785b841b6bb4c9641` | `docs(report): record Phase 9 contact and criterion verification` | Phase 1–9回归、真实XAE Build、报告闸门与Git日志复核 | 已Push，Git日志已核验 |
+| Phase 10 design | `a0e8dbe0b3d76204d61a40fae6c8653f110eda8a` | `docs(design): approve Phase 10 CFF sequence architecture` | V3.7范围、状态机、事务、安全与运行边界 | 已Push |
+| Phase 10 plan | `851c320c78a7ace818ed945e81303efa03f0c945` | `docs(plan): add Phase 10 CFF implementation plan` | 分步计划、验证矩阵、构建和交付边界 | 已Push |
+| Phase 10 source | `0d9f190b1d31f00a5d83069d5b4e122be17c5e61` | `feat(process): implement Phase 10 CFF sequence` | Phase 1–9全部PASS；Phase 10 All exit 0；Fix 3最终复审`0C/0I/0M CLEAN`；标准离线Build exit 0、`LastBuildInfo=0` | 已Push并完成本地/跟踪/远端三方SHA核验 |
+| Phase 10 reports | 提交后核验 | 最终报告Commit | 五份最终报告、报告闸门与差异检查 | 最终交付Commit/Push后核验，不自引用 |
 
 ## 保护检查
 
@@ -215,3 +221,30 @@ Hardware operations: none
 Credentials recorded: none
 Push: pending until report verification and report commit
 ```
+
+Phase 9报告Commit为`c820fab61f59e49c0e8740d785b841b6bb4c9641`，Git日志已核验；Phase 9源码与报告均已Push。
+
+## Phase 10源码最终Push状态
+
+```text
+Branch: codex/cffwelding-greenfield-v3.3
+Phase 10 source commit: 0d9f190b1d31f00a5d83069d5b4e122be17c5e61
+Local SHA: 0d9f190b1d31f00a5d83069d5b4e122be17c5e61
+Tracking SHA: 0d9f190b1d31f00a5d83069d5b4e122be17c5e61
+Remote SHA: 0d9f190b1d31f00a5d83069d5b4e122be17c5e61
+SOURCE_REMOTE_MATCH: True
+Verification: Phase 1 through Phase 9 PASS; Phase 10 All PASS (exit 0)
+Independent review: Fix 3 final rereview 0C / 0I / 0M, CLEAN
+XAE build: PASS (Release|TwinCAT RT (x64), process exit 0, LastBuildInfo=0)
+ProductionReady: FALSE
+Credentials recorded: none
+Push result: success
+```
+
+源码首次Push尝试曾因`github.com:443`网络瞬断失败；没有改写历史、Force Push或暴露认证信息。网络恢复后按计划重试成功，并完成本地、跟踪分支、远端三方SHA一致性核验。
+
+## Phase 10最终报告交付说明
+
+`PHASE_10_EXECUTION_REPORT.md`、`TWINCAT_BUILD_REPORT.md`、`INSTANCE_OWNERSHIP_MATRIX.md`、`INTERNAL_INTERFACE_CATALOG.md`和`GIT_EXECUTION_REPORT.md`计划形成一个最终报告Commit。该Commit自身SHA及Push后的最终远端SHA在Commit产生前无法写入其自身内容，否则会形成自引用不可能性。
+
+最终控制器将在报告Commit和Push后立即执行本地、upstream、`git ls-remote`三方核验并记录交付结果；不会为了把报告Commit自身SHA写回报告而创建第三个Commit。报告文件中不记录GitHub密码、PAT或其他认证信息。

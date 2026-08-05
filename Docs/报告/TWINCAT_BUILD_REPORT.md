@@ -2,9 +2,10 @@
 
 ## 构建环境
 
-- 日期：2026-07-26
-- TwinCAT：`3.1.4024.64`
-- XAE Shell：`15.0.0.0`
+- 记录更新至：2026-08-04
+- TwinCAT：TwinCAT 3.1 Build 4024，DisplayVersion `3.1.4024.64`
+- TwinCAT XAE Shell产品DisplayVersion：`1.15.0.0`
+- `TcXaeShell.exe`文件版本：`15.0.0.0`
 - Automation COM：`TcXaeShell.DTE.15.0`
 - Solution：`CFFwelding.sln`
 
@@ -21,6 +22,8 @@
 | Phase 6 | `Release\|TwinCAT RT (x64)` | 已执行 | Z/R标准NC Adapter与Owner仲裁加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 7 | `Release\|TwinCAT RT (x64)` | 已执行 | External Setpoint完整生命周期加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
 | Phase 8 | `Release\|TwinCAT RT (x64)` | 已执行 | 导纳PI、无扰切换、S_rel制动和机器限值快照加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 9 | `Release\|TwinCAT RT (x64)` | 已执行 | Contact/Decline/Step Criterion加入后 `SolutionBuild.LastBuildInfo = 0` | PASS |
+| Phase 10 | `Release\|TwinCAT RT (x64)` | 已执行 | 完整Fast侧CFF顺序控制加入后，进程exit 0且 `SolutionBuild.LastBuildInfo = 0` | PASS |
 
 ## Phase 1执行记录
 
@@ -209,3 +212,39 @@ LastBuildInfo: 0
 源码Commit：`35d564de70170579e5e718ac5a69caa088ba74cc`。
 
 该Build只证明本机固定库版本下离线工程可编译。Phase 9不写Contact RequestId、Force Control Enable或External P/V/A/Direction；未进行Runtime算法执行、设备扫描、配置激活、下载、物理轴动作、周期抖动测量或工艺资格验证。
+
+## Phase 10最终构建记录
+
+Phase 10完成Fast侧CFF顺序控制、Contact事务、Step 1–4、R轴RPM事务、External P/V/A/Direction连续输出、有效Direction切换、Force控制、受控退出与终态判定。对应源码Commit为`0d9f190b1d31f00a5d83069d5b4e122be17c5e61`。
+
+最终验证中，Phase 1–9全部PASS；`Test-Phase10CffSequence.ps1 -Scope All`为PASS且exit 0。随后使用仓库标准脚本执行离线XAE Build：
+
+```text
+Configuration: Release|TwinCAT RT (x64)
+Process exit code: 0
+SolutionBuild.LastBuildInfo: 0
+```
+
+本次DTE未暴露`ToolWindows.ErrorList`接口，因此Error和Warning的分项计数不可得，不能写成0。`LastBuildInfo = 0`只表示Solution Build没有失败项目。
+
+构建前后关键生成物保持一致：
+
+| 文件 | 构建前SHA-256 | 构建后SHA-256 | 结果 |
+|---|---|---|---|
+| `CFFwelding.tmc` | `F4D33032F40D23F412091248DB7AF09666075DC62E517FD51679EA8942D31098` | `F4D33032F40D23F412091248DB7AF09666075DC62E517FD51679EA8942D31098` | 一致 |
+| `CFFwelding_System.tsproj` | `3D212C8908206C8A1696932C3B0251C01B5DF7C6D2738E2A02AB28B906499905` | `3D212C8908206C8A1696932C3B0251C01B5DF7C6D2738E2A02AB28B906499905` | 一致 |
+
+Phase 10构建生成的关键TMC/ADS契约如下：
+
+| 对象 | BitSize | 字段数/类型 |
+|---|---:|---|
+| `ST_ZExternalTrajectoryInput` | 960 bit | 20 fields |
+| `ST_ZExternalTrajectoryOutput` | 320 bit | 11 fields |
+| `ST_CffSequenceStatus` | 5312 bit | 32 fields |
+| `ST_FastStatus` | 8768 bit | 18 fields |
+| `GVL_Config.stCffSequence` | 448 bit | `ST_CffSequenceConfig` |
+| `GVL_FastInternal.stAcceptedCommand` | 1280 bit | `ST_FastCommand` |
+
+`GVL_Status.bProductionReady`保持`FALSE`。本次仅为离线静态/生成物/构建验证；没有执行Runtime或实时测试、External POC、真实驱动、任务抖动测量、I/O映射、标定、工艺资格、Scan、Activate Configuration、Download、Login、Online Change或真实运动。
+
+临时typed Collision路径仍保留，等待Phase 11B删除/替换与双位移参考冗余设计，不能将当前结果称为最终双位移碰撞算法。Torque闭环/前馈、Energy、Power、Material Observer、Process Window、Curve Recorder和最终Result Analyzer也不在本次构建完成范围内。
