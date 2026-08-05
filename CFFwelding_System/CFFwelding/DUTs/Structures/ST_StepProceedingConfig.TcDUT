@@ -32,6 +32,12 @@
     fCriterionRpmMin : LREAL;
     (* 判据允许的最大Z轴捕获速度绝对值，单位毫米每秒。 *)
     fCaptureMaxVelocityMmS : LREAL;
+    (* 合格力带连续保持时间，单位毫秒。 *)
+    nQualifiedForceHoldMs : UDINT;
+    (* 合格力带容差，单位牛顿。 *)
+    fForceBandToleranceN : LREAL;
+    (* R轴停止阈值，单位转每分钟。 *)
+    fRpmStoppedThresholdRpm : LREAL;
     (* 判据配置是否有效。 *)
     bValid : BOOL;
 END_STRUCT

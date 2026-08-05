@@ -17,6 +17,8 @@ STRUCT
     rAcceleration_mm_s2 : LREAL;
     (* 方向命令，只允许-1、0或1。 *)
     nDirection : DINT;
+    (* 强制禁止向正方向运动。 *)
+    bPositiveMotionInhibit : BOOL;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

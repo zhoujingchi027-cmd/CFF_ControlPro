@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZExternalTrajectoryInput" Id="{AF3EC71D-1473-4A62-B1C2-1CC0D9FD548F}"><Declaration><![CDATA[TYPE ST_ZExternalTrajectoryInput : STRUCT
+    (* 轨迹发生器使能请求。 *)
+    bEnable : BOOL;
+    (* 轨迹发生器复位请求。 *)
+    bReset : BOOL;
+    (* External设定值生命周期状态。 *)
+    eExternalState : E_ZExtSetpointState;
+    (* 已接受设定值有效。 *)
+    bAcceptedSetpointValid : BOOL;
+    (* 本周期Feed已接受。 *)
+    bFeedAccepted : BOOL;
+    (* 已接受Feed周期计数。 *)
+    udiAcceptedFeedCycleCounter : UDINT;
+    (* 已接受位置，单位mm。 *)
+    rAcceptedPosition_mm : LREAL;
+    (* 已接受速度，单位mm/s。 *)
+    rAcceptedVelocity_mm_s : LREAL;
+    (* 已接受加速度，单位mm/s2。 *)
+    rAcceptedAcceleration_mm_s2 : LREAL;
+    (* 已接受方向。 *)
+    nAcceptedDirection : DINT;
+    (* 禁止向正方向运动。 *)
+    bInhibitPositiveMotion : BOOL;
+    (* 目标速度，单位mm/s。 *)
+    rTargetVelocity_mm_s : LREAL;
+    (* 快速任务周期时间，单位s。 *)
+    rCycleTime_s : LREAL;
+    (* 最小位置，单位mm。 *)
+    rMinimumPosition_mm : LREAL;
+    (* 最大位置，单位mm。 *)
+    rMaximumPosition_mm : LREAL;
+    (* 最大速度，单位mm/s。 *)
+    rMaximumVelocity_mm_s : LREAL;
+    (* 最大加速度，单位mm/s2。 *)
+    rMaximumAcceleration_mm_s2 : LREAL;
+    (* 静止速度阈值，单位mm/s。 *)
+    rStandstillVelocity_mm_s : LREAL;
+    (* 最大位置偏差，单位mm。 *)
+    rMaximumPositionDeviation_mm : LREAL;
+    (* 方向保持周期数。 *)
+    nDirectionHoldCycles : UINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

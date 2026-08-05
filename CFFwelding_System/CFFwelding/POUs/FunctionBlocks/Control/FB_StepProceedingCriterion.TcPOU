@@ -168,6 +168,12 @@ ELSIF stInput.bSensorInvalid OR NOT stInput.bSignalValid THEN
     stOutput.bControlledExitRequested := TRUE;
     stOutput.bDownwardMotionInhibited := TRUE;
     stOutput.eEndCause := STEP_END_SENSOR_INVALID;
+ELSIF stInput.bCollisionActive THEN
+    stOutput.bEndConfirmed := TRUE;
+    stOutput.bNok := TRUE;
+    stOutput.bControlledExitRequested := TRUE;
+    stOutput.bDownwardMotionInhibited := TRUE;
+    stOutput.eEndCause := STEP_END_COLLISION;
 ELSIF stInput.bHardForceActive THEN
     stOutput.bEndConfirmed := TRUE;
     stOutput.bNok := TRUE;

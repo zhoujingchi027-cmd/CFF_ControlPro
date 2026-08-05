@@ -1767,7 +1767,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{3B1364E2-6C34-4CB9-BD73-174C89442C9B}" Name="CFFwelding" PrjFilePath="CFFwelding\CFFwelding.plcproj" TmcFilePath="CFFwelding\CFFwelding.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{5B2B4259-D3A5-ECE0-B7E3-DEB9ADC3FE9B}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="CFFwelding\CFFwelding.tmc" TmcHash="{13CF573C-E7EB-3DC2-9B0F-137BEFFB6A03}">
 					<Name>CFFwelding Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -1788,14 +1788,6 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>GVL_IO.Z_axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>GVL_IO.R_axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
 							<Name>GVL_IO.bForceChannelUnderrange</Name>
 							<Comment><![CDATA[ TODO_HW_MAP：EP3174力通道下溢状态，当前未映射。 ]]></Comment>
 							<Type>BOOL</Type>
@@ -1804,6 +1796,14 @@ External Setpoint Generation:
 							<Name>GVL_IO.bDisplacementChannelError</Name>
 							<Comment><![CDATA[ TODO_HW_MAP：位移输入通道错误状态，当前未映射。 ]]></Comment>
 							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.Z_axis.NcToPlc</Name>
+							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
+						</Var>
+						<Var>
+							<Name>GVL_IO.R_axis.NcToPlc</Name>
+							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
 							<Name>GVL_IO.nDisplacementChannelRaw</Name>
@@ -1895,15 +1895,15 @@ External Setpoint Generation:
 					<Vars VarGrpType="8" ContextId="2" AreaNo="36">
 						<Name>Task_CffSlow Retains</Name>
 						<Var>
-							<Name>GVL_Persistent.nNextWeldId</Name>
-							<Comment><![CDATA[ 下一个焊接结果编号。 ]]></Comment>
-							<Type>ULINT</Type>
-							<InOut>7</InOut>
-						</Var>
-						<Var>
 							<Name>GVL_Persistent.nSchemaRevision</Name>
 							<Comment><![CDATA[ 持久化数据架构修订号。 ]]></Comment>
 							<Type>UDINT</Type>
+							<InOut>7</InOut>
+						</Var>
+						<Var>
+							<Name>GVL_Persistent.nNextWeldId</Name>
+							<Comment><![CDATA[ 下一个焊接结果编号。 ]]></Comment>
+							<Type>ULINT</Type>
 							<InOut>7</InOut>
 						</Var>
 						<Var>

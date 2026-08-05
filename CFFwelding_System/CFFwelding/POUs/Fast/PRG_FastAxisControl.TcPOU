@@ -2,114 +2,380 @@
 <TcPlcObject Version="1.1.0.1"><POU Name="PRG_FastAxisControl" Id="{A2000000-0000-4000-8000-000000000003}"><Declaration><![CDATA[PROGRAM PRG_FastAxisControl
 VAR
     (* ---------------------------------------------------------
-       Z轴命令Owner仲裁实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：主任务发布的Home/Manual/Approach/Force/Retract候选。
-       输出：唯一Z轴Owner和标准命令。
-       Reset：上层Reset清除Owner；力过程必须受控退出后才转交。
+       Z轴命令Owner仲裁实例；活动Force Owner仅在Sequence意图和
+       External Adapter均确认释放后才能转交。
        --------------------------------------------------------- *)
     fbZAxisArbiter : FB_AxisCommandArbiter;
-    (* ---------------------------------------------------------
-       Force Setpoint斜坡实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：当前ForceControl、Sequence目标力、Profile斜坡和实际周期。
-       输出：连续目标力；Reset：流程未使能、Stop、Fault或轴Reset。
-       生命周期：只在Sequence明确请求导纳力控时运行。
-       --------------------------------------------------------- *)
+    (* Force设定值、Profile无扰切换和导纳控制唯一实例。 *)
     fbForceSetpointRamp : FB_SetpointRamp;
-    (* ---------------------------------------------------------
-       Z轴Profile无扰切换实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：切换前速度、新Profile、Ramp后目标力和ForceControl。
-       输出：单扫描积分预置；Reset：流程未使能或轴Reset。
-       生命周期：只接受Contact/Profile切换上升沿。
-       --------------------------------------------------------- *)
     fbZProfileSwitch : FB_BumplessProfileSwitch;
-    (* ---------------------------------------------------------
-       Z轴导纳力控实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：Ramp后目标力、ForceControl、SRelSensor、Owner和External状态。
-       输出：受硬边界和Anti-windup约束的Z速度及诊断。
-       Reset：流程未使能、Stop、Fault或轴Reset；禁止访问AXIS_REF/MC。
-       --------------------------------------------------------- *)
     fbZForceAdmittance : FB_ZForceAdmittance;
     (* ---------------------------------------------------------
-       Z轴标准NC适配实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：仲裁命令、命令编号、Z轴AXIS_REF和真实驱动绑定状态。
-       输出：Z轴标准NC状态；Reset：事务化MC_Reset。
-       生命周期：每Fast扫描调用，未绑定驱动时Ready保持FALSE。
+       Z轴External轨迹唯一实例。
+       生命周期：只消费Adapter accepted包和当前Sequence冻结快照；
+       Reset：只允许External释放、Z/R实际静止后的安全终态Reset。
        --------------------------------------------------------- *)
+    fbZExternalTrajectory : FB_ZExternalTrajectory;
+    (* ---------------------------------------------------------
+       R轴软件速度包络唯一实例。
+       生命周期：每个新Adapter事务从实际RPM初始化一次；稳定扫描只
+       发布诊断包络，不把包络逐扫描转换成新的MC事务。
+       --------------------------------------------------------- *)
+    fbRSpeedRamp : FB_SetpointRamp;
+    (* 唯一标准NC及External API Adapter实例。 *)
     fbZAxisNc : FB_ZAxisNcAdapter;
-    (* ---------------------------------------------------------
-       Z轴External Setpoint适配实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：Force Process Owner、真实驱动状态、周期、限值和P/V/A/Direction。
-       输出：External生命周期状态；Reset后仍须完成Disable和后保持才释放Owner。
-       生命周期：每Fast扫描调用，未绑定驱动或未获Owner时禁止Enable。
-       --------------------------------------------------------- *)
-    fbZExtSetpoint : FB_ZAxisExtSetpointAdapter;
-    (* ---------------------------------------------------------
-       R轴标准NC适配实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_FastAxisControl。
-       输入：RPM命令、命令编号、R轴AXIS_REF和真实驱动绑定状态。
-       输出：R轴速度、只读Torque及MC状态；Reset：事务化MC_Reset。
-       生命周期：每Fast扫描调用，未绑定驱动时Ready保持FALSE。
-       --------------------------------------------------------- *)
+    fbZAxisExtSetpointAdapter : FB_ZAxisExtSetpointAdapter;
     fbRAxisNc : FB_RAxisNcAdapter;
 
-    (* Home候选命令。 *)
     stHomeCommand : ST_ZAxisCommand;
-    (* Manual候选命令。 *)
     stManualCommand : ST_ZAxisCommand;
-    (* Approach候选命令。 *)
     stApproachCommand : ST_ZAxisCommand;
-    (* Force Process候选命令。 *)
     stForceProcessCommand : ST_ZAxisCommand;
-    (* Retract候选命令。 *)
     stRetractCommand : ST_ZAxisCommand;
-    (* Owner输出与轴复位请求合并后的标准Z轴命令。 *)
+    stCandidateZSourceCommand : ST_ZAxisCommand;
+    stLatchedZSourceCommand : ST_ZAxisCommand;
+    stFaultStopCommand : ST_ZAxisCommand;
     stSelectedZCommand : ST_ZAxisCommand;
-    (* External未完成Disabled和后保持时，禁止标准MC命令接管同一AXIS_REF。 *)
-    bExternalCommandChannelBusy : BOOL;
-    (* External退出期间冻结标准Adapter事务编号，退出后再交付挂起命令。 *)
-    udiZStandardCommandId : UDINT;
-    (* 调用导纳FB前完整赋值的类型化输入。 *)
+    stCandidateRSourceCommand : ST_RAxisCommand;
+    stLatchedRAdapterCommand : ST_RAxisCommand;
+    stSelectedRCommand : ST_RAxisCommand;
+    stExtCommand : ST_ZExtSetpointCommand;
+    stTrajectoryInput : ST_ZExternalTrajectoryInput;
     stZForceInput : ST_ZForceControlInput;
-    (* Sequence正式请求导纳力控；Phase 10实现前保持FALSE。 *)
-    bForceLoopRequested : BOOL;
-    (* ForceControl从N换算后的控制量，单位kN。 *)
-    rForceActual_kN : LREAL;
-    (* FastTask配置周期换算值，单位s。 *)
-    rFastCycleTime_s : LREAL;
-    (* 最近成功应用无扰预置的Force Profile修订号。 *)
-    udiLastForceProfileRevision : UDINT;
-    (* 当前有效Profile修订号尚未完成无扰预置。 *)
-    bProfileRevisionChanged : BOOL;
-    (* Sequence脉冲或Revision变化合并后的无扰请求。 *)
-    bProfileTransferRequested : BOOL;
-END_VAR
-]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
-   快速轴控制状态。
-   进入：Task_CffFast在PRG_CffSequence之后每扫描调用。
-   动作：按Owner拆分候选、唯一仲裁，并调用Z/R标准NC Adapter。
-   成功：发布GVL_Status.stFast轴状态。
-   超时：由流程和命令分派层负责。
-   Fault：Fault Stop抢占；硬件未绑定时禁止Power与所有MC运动沿。
-   --------------------------------------------------------- *)
-stHomeCommand := GVL_Command.stFast.stZAxis;
-stManualCommand := GVL_Command.stFast.stZAxis;
-stApproachCommand := GVL_Command.stFast.stZAxis;
-stForceProcessCommand := GVL_Command.stFast.stZAxis;
-stRetractCommand := GVL_Command.stFast.stZAxis;
 
+    bExternalCommandChannelBusy : BOOL;
+    udiZStandardCommandId : UDINT;
+    bFastConfigSnapshotCurrent : BOOL;
+    bFastConfigSnapshotSeen : BOOL;
+    bSequenceMotionIntentPresent : BOOL;
+    bSnapshotMismatch : BOOL;
+    bFastSafetyStopEvent : BOOL;
+    bFastSafetyStopLatched : BOOL;
+    bExternalSafelyReleasedForReset : BOOL;
+    bSafeTerminalResetGatesMet : BOOL;
+    bSafeTerminalReset : BOOL;
+    bSafeTerminalResetRising : BOOL;
+    bNewSafeTerminalSequenceCommand : BOOL;
+    bNewSafeTerminalResetRequest : BOOL;
+    bSafeTerminalResetPending : BOOL;
+    bNormalZResetAllowed : BOOL;
+    bLatchedZFaultStopRequest : BOOL;
+    bForceProcessExitComplete : BOOL;
+    bForceLoopRequested : BOOL;
+    bForceInputsHealthy : BOOL;
+    bForceRampInputValid : BOOL;
+    bProfileTransferRequested : BOOL;
+    bFastConfigSnapshotChanged : BOOL;
+    bFastPathSafetyExit : BOOL;
+    bHardOverrideRequested : BOOL;
+    bHardOverrideStart : BOOL;
+    bHardOverridePending : BOOL;
+    bHardOverrideHandled : BOOL;
+    bHardOverrideAccepted : BOOL;
+    bHardOverridePackageExact : BOOL;
+    rHardOverrideExpectedPosition_mm : LREAL;
+    nHardOverrideExpectedDirection : DINT;
+    udiHardOverrideAcceptedCounter : UDINT;
+
+    bZSequenceSourceActive, bLastZSequenceSourceActive : BOOL;
+    bRSequenceSourceActive, bLastRSequenceSourceActive : BOOL;
+    udiLastZSourceCommandId, udiLastRSourceCommandId : UDINT;
+    udiZAdapterCommandId, udiRAdapterCommandId : UDINT;
+    udiCurrentSequenceZSourceId, udiCurrentSequenceRSourceId : UDINT;
+    udiCurrentZSourceCommandId, udiCurrentRSourceCommandId : UDINT;
+    udiAcceptedZSequenceSourceId, udiAcceptedRSequenceSourceId : UDINT;
+    udiPendingZSequenceSourceId, udiPendingRSequenceSourceId : UDINT;
+    udiPendingZAdapterCommandId, udiPendingRAdapterCommandId : UDINT;
+    udiCurrentSafeTerminalResetRequestId : UDINT;
+    udiLastObservedSafeTerminalSequenceCommandId : UDINT;
+    udiPendingSafeTerminalResetRequestId : UDINT;
+    udiConsumedSafeTerminalResetRequestId : UDINT;
+    udiLastAppliedFastConfigCommandId : UDINT;
+    bPendingZTransactionIsSequence, bPendingRTransactionIsSequence : BOOL;
+    bNewZAdapterTransaction, bNewRAdapterTransaction : BOOL;
+    bNewZSourceTransaction, bNewRSourceTransaction : BOOL;
+    bPostResetZNormalBarrier, bPostResetRNormalBarrier : BOOL;
+    bAcceptedFastPackageNewerThanReset : BOOL;
+    bZNormalSourceBlockedByReset, bRNormalSourceBlockedByReset : BOOL;
+    udiPostResetNormalBarrierRequestId : UDINT;
+    bPendingRDecelerationValid : BOOL;
+    bLastAcceptedRDecelerationValid : BOOL;
+    rPendingRDeceleration_rpm_s : LREAL;
+    rLastAcceptedRDeceleration_rpm_s : LREAL;
+    bRSpeedRampSafeReset : BOOL;
+
+    rForceActual_kN : LREAL;
+    rFastCycleTime_s : LREAL;
+    rEffectiveForceRamp_kN_s : LREAL;
+    rForceRampRateForFb_kN_s : LREAL;
+    rTrajectoryTargetVelocity_mm_s : LREAL;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* Task_CffFast 中轴适配、External轨迹与力控仲裁的唯一Owner：PRG_FastAxisControl。 *)
+(* ---------------------------------------------------------
+   V3.7 Fast轴接线层。
+   只消费FastInputs已接受命令和Sequence发布的一份冻结快照；
+   算法FB不访问轴，所有MC调用仍由三个Adapter唯一拥有。
+   --------------------------------------------------------- *)
+bFastConfigSnapshotCurrent :=
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.bValid
+    AND GVL_Status.stFast.stSequence.stFastConfigSnapshot.nSequenceCommandId
+        = GVL_Status.stFast.stSequence.nAcceptedCommandId;
+bNewZAdapterTransaction := FALSE;
+bNewRAdapterTransaction := FALSE;
+rFastCycleTime_s := UDINT_TO_LREAL(
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stMachine.nFastTaskCycleUs)
+    * 0.000001;
+
+(* 安全终态Reset按accepted Sequence命令全事件高水位去重。
+   命令可先锁存pending，待Release/Standstill门满足后只消费一次。 *)
+bExternalSafelyReleasedForReset := fbZAxisExtSetpointAdapter.stStatus.bReleaseOwner
+    OR (fbZAxisExtSetpointAdapter.stStatus.eState = E_ZExtSetpointState.Z_EXT_IDLE
+        AND NOT fbZAxisExtSetpointAdapter.stStatus.bEnabled);
+bSafeTerminalResetGatesMet := NOT GVL_Status.stFast.stSequence.bBusy
+    AND bExternalSafelyReleasedForReset
+    AND GVL_Status.stFast.stZAxis.bStandstill
+    AND GVL_Status.stFast.stRAxis.bStandstill;
+udiCurrentSafeTerminalResetRequestId :=
+    GVL_FastInternal.stAcceptedCommand.stSequence.nCommandId;
+bNewSafeTerminalSequenceCommand := FC_IsNewerRequestId(
+    udiCandidate := udiCurrentSafeTerminalResetRequestId,
+    udiReference := udiLastObservedSafeTerminalSequenceCommandId);
+bNewSafeTerminalResetRequest := FALSE;
+IF bNewSafeTerminalSequenceCommand THEN
+    udiLastObservedSafeTerminalSequenceCommandId :=
+        udiCurrentSafeTerminalResetRequestId;
+    IF GVL_FastInternal.stAcceptedCommand.stSequence.bResetPulse THEN
+        bNewSafeTerminalResetRequest := TRUE;
+        udiPendingSafeTerminalResetRequestId :=
+            udiCurrentSafeTerminalResetRequestId;
+        bSafeTerminalResetPending := TRUE;
+    END_IF
+END_IF
+bSafeTerminalReset := bSafeTerminalResetPending AND bSafeTerminalResetGatesMet;
+bSafeTerminalResetRising := bSafeTerminalReset;
+IF bSafeTerminalResetRising THEN
+    bSafeTerminalResetPending := FALSE;
+    udiConsumedSafeTerminalResetRequestId :=
+        udiPendingSafeTerminalResetRequestId;
+END_IF
+
+(* 上一扫描R Adapter已接受且数值有效时，才更新Safety Stop减速度。 *)
+IF bPendingRDecelerationValid
+    AND (fbRAxisNc.udiAcceptedCommandId = udiPendingRAdapterCommandId)
+    AND (udiPendingRAdapterCommandId <> 0) THEN
+    rLastAcceptedRDeceleration_rpm_s := rPendingRDeceleration_rpm_s;
+    bLastAcceptedRDecelerationValid := TRUE;
+    bPendingRDecelerationValid := FALSE;
+END_IF
+
+(* PRECHECK允许Busy但尚未发布快照；只有见过快照或出现运动意图后失配才停机。 *)
+IF bFastConfigSnapshotCurrent AND GVL_Status.stFast.stSequence.bBusy THEN
+    bFastConfigSnapshotSeen := TRUE;
+END_IF
+IF bSafeTerminalResetRising THEN
+    bFastConfigSnapshotSeen := FALSE;
+END_IF
+bSequenceMotionIntentPresent :=
+    (GVL_Status.stFast.stSequence.stMotionIntent.stZCommand.eOwnerRequest
+        <> E_ZCommandOwner.Z_OWNER_NONE)
+    OR GVL_Status.stFast.stSequence.stMotionIntent.bRAxisProcessRequested
+    OR GVL_Status.stFast.stSequence.stMotionIntent.bExternalEnableRequest
+    OR GVL_Status.stFast.stSequence.stMotionIntent.bExternalDisableRequest
+    OR GVL_Status.stFast.stSequence.bForceControlEnable;
+bSnapshotMismatch := NOT bFastConfigSnapshotCurrent
+    AND (bFastConfigSnapshotSeen OR bSequenceMotionIntentPresent);
+bFastSafetyStopEvent := bSnapshotMismatch
+    AND NOT bFastSafetyStopLatched
+    AND NOT bSafeTerminalResetRising;
+IF bFastSafetyStopEvent THEN
+    bFastSafetyStopLatched := TRUE;
+END_IF
+
+(* 普通命令候选只从已接受命令区读取；Sequence按Owner精确覆盖。 *)
+stCandidateZSourceCommand := GVL_FastInternal.stAcceptedCommand.stZAxis;
+bZSequenceSourceActive := FALSE;
+CASE GVL_Status.stFast.stSequence.stMotionIntent.stZCommand.eOwnerRequest OF
+    E_ZCommandOwner.Z_OWNER_APPROACH:
+        bZSequenceSourceActive := TRUE;
+        stCandidateZSourceCommand :=
+            GVL_Status.stFast.stSequence.stMotionIntent.stZCommand;
+    E_ZCommandOwner.Z_OWNER_FORCE_PROCESS:
+        bZSequenceSourceActive := TRUE;
+        stCandidateZSourceCommand :=
+            GVL_Status.stFast.stSequence.stMotionIntent.stZCommand;
+    E_ZCommandOwner.Z_OWNER_RETRACT:
+        bZSequenceSourceActive := TRUE;
+        stCandidateZSourceCommand :=
+            GVL_Status.stFast.stSequence.stMotionIntent.stZCommand;
+    E_ZCommandOwner.Z_OWNER_FAULT_STOP:
+        bZSequenceSourceActive := TRUE;
+        stCandidateZSourceCommand :=
+            GVL_Status.stFast.stSequence.stMotionIntent.stZCommand;
+END_CASE
+udiCurrentSequenceZSourceId :=
+    GVL_Status.stFast.stSequence.stMotionIntent.udiZCommandId;
+IF bZSequenceSourceActive THEN
+    udiCurrentZSourceCommandId := udiCurrentSequenceZSourceId;
+ELSE
+    udiCurrentZSourceCommandId := GVL_FastInternal.stAcceptedCommand.nRequestId;
+END_IF
+
+(* Resolve the current R source before any central safety transaction. *)
+bRSequenceSourceActive :=
+    GVL_Status.stFast.stSequence.stMotionIntent.bRAxisProcessRequested;
+udiCurrentSequenceRSourceId :=
+    GVL_Status.stFast.stSequence.stMotionIntent.udiRCommandId;
+IF bRSequenceSourceActive THEN
+    stCandidateRSourceCommand :=
+        GVL_Status.stFast.stSequence.stMotionIntent.stRCommand;
+    udiCurrentRSourceCommandId := udiCurrentSequenceRSourceId;
+ELSE
+    stCandidateRSourceCommand := GVL_FastInternal.stAcceptedCommand.stRAxis;
+    udiCurrentRSourceCommandId := GVL_FastInternal.stAcceptedCommand.nRequestId;
+END_IF
+
+bAcceptedFastPackageNewerThanReset := FC_IsNewerRequestId(
+    udiCandidate := GVL_FastInternal.stAcceptedCommand.nRequestId,
+    udiReference := udiPostResetNormalBarrierRequestId);
+bZNormalSourceBlockedByReset := bPostResetZNormalBarrier
+    AND NOT bAcceptedFastPackageNewerThanReset;
+bNewZSourceTransaction := (udiCurrentZSourceCommandId <> 0)
+    AND ((bZSequenceSourceActive <> bLastZSequenceSourceActive)
+        OR FC_IsNewerRequestId(
+            udiCandidate := udiCurrentZSourceCommandId,
+            udiReference := udiLastZSourceCommandId));
+IF bZNormalSourceBlockedByReset THEN
+    bNewZSourceTransaction := FALSE;
+END_IF
+bNewZAdapterTransaction := FALSE;
+IF NOT bFastSafetyStopLatched AND NOT bSafeTerminalResetRising THEN
+    bNewZAdapterTransaction := bNewZSourceTransaction;
+END_IF
+IF bNewZAdapterTransaction THEN
+    udiZAdapterCommandId := udiZAdapterCommandId + 1;
+    IF udiZAdapterCommandId = 0 THEN
+        udiZAdapterCommandId := 1;
+    END_IF
+    udiLastZSourceCommandId := udiCurrentZSourceCommandId;
+    stLatchedZSourceCommand := stCandidateZSourceCommand;
+    bLastZSequenceSourceActive := bZSequenceSourceActive;
+    udiPendingZAdapterCommandId := udiZAdapterCommandId;
+    bPendingZTransactionIsSequence := bZSequenceSourceActive;
+    IF bZSequenceSourceActive THEN
+        udiPendingZSequenceSourceId := udiCurrentSequenceZSourceId;
+    ELSE
+        udiPendingZSequenceSourceId := 0;
+    END_IF
+    IF bPostResetZNormalBarrier
+        AND NOT bZSequenceSourceActive
+        AND bAcceptedFastPackageNewerThanReset THEN
+        bPostResetZNormalBarrier := FALSE;
+    END_IF
+END_IF
+
+(* 快照失配只产生一个内部Z/R安全Stop事务；相关性恢复不得自动复动。 *)
+IF bFastSafetyStopEvent THEN
+    udiZAdapterCommandId := udiZAdapterCommandId + 1;
+    IF udiZAdapterCommandId = 0 THEN
+        udiZAdapterCommandId := 1;
+    END_IF
+    udiRAdapterCommandId := udiRAdapterCommandId + 1;
+    IF udiRAdapterCommandId = 0 THEN
+        udiRAdapterCommandId := 1;
+    END_IF
+    bNewZAdapterTransaction := TRUE;
+    bNewRAdapterTransaction := TRUE;
+    udiPendingZAdapterCommandId := udiZAdapterCommandId;
+    udiPendingRAdapterCommandId := udiRAdapterCommandId;
+    udiPendingZSequenceSourceId := 0;
+    udiPendingRSequenceSourceId := 0;
+    bPendingZTransactionIsSequence := FALSE;
+    bPendingRTransactionIsSequence := FALSE;
+    bPendingRDecelerationValid := FALSE;
+
+    (* 使用最后一次Adapter已接受的有效减速度，构造一次纯R Stop。 *)
+    stLatchedRAdapterCommand.bEnable := TRUE;
+    stLatchedRAdapterCommand.bReset := FALSE;
+    stLatchedRAdapterCommand.bStop := TRUE;
+    stLatchedRAdapterCommand.bMoveVelocity := FALSE;
+    stLatchedRAdapterCommand.rVelocity_rpm := 0.0;
+    IF bLastAcceptedRDecelerationValid THEN
+        stLatchedRAdapterCommand.rDeceleration_rpm_s :=
+            rLastAcceptedRDeceleration_rpm_s;
+    ELSE
+        stLatchedRAdapterCommand.rDeceleration_rpm_s := 0.0;
+    END_IF
+    rPendingRDeceleration_rpm_s :=
+        stLatchedRAdapterCommand.rDeceleration_rpm_s;
+    bPendingRDecelerationValid := bLastAcceptedRDecelerationValid;
+END_IF
+
+(* 安全终态Reset上升沿各产生一个纯Reset事务；持续电平不重复编号。 *)
+IF bSafeTerminalResetRising THEN
+    udiZAdapterCommandId := udiZAdapterCommandId + 1;
+    IF udiZAdapterCommandId = 0 THEN
+        udiZAdapterCommandId := 1;
+    END_IF
+    udiRAdapterCommandId := udiRAdapterCommandId + 1;
+    IF udiRAdapterCommandId = 0 THEN
+        udiRAdapterCommandId := 1;
+    END_IF
+    bNewZAdapterTransaction := TRUE;
+    bNewRAdapterTransaction := TRUE;
+    udiPendingZAdapterCommandId := udiZAdapterCommandId;
+    udiPendingRAdapterCommandId := udiRAdapterCommandId;
+    udiPendingZSequenceSourceId := 0;
+    udiPendingRSequenceSourceId := 0;
+    bPendingZTransactionIsSequence := FALSE;
+    bPendingRTransactionIsSequence := FALSE;
+    bPendingRDecelerationValid := FALSE;
+
+    stLatchedZSourceCommand.bEnable := FALSE;
+    stLatchedZSourceCommand.bReset := TRUE;
+    stLatchedZSourceCommand.bStop := FALSE;
+    stLatchedZSourceCommand.bHome := FALSE;
+    stLatchedZSourceCommand.bMoveAbsolute := FALSE;
+    stLatchedZSourceCommand.bMoveVelocity := FALSE;
+    stLatchedZSourceCommand.bUseExternalSetpoint := FALSE;
+    stLatchedZSourceCommand.rHomePosition_mm := 0.0;
+    stLatchedZSourceCommand.rPosition_mm := 0.0;
+    stLatchedZSourceCommand.rVelocity_mm_s := 0.0;
+    stLatchedZSourceCommand.rAcceleration_mm_s2 := 0.0;
+    stLatchedZSourceCommand.rDeceleration_mm_s2 := 0.0;
+    stLatchedZSourceCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
+
+    stLatchedRAdapterCommand.bEnable := FALSE;
+    stLatchedRAdapterCommand.bReset := TRUE;
+    stLatchedRAdapterCommand.bStop := FALSE;
+    stLatchedRAdapterCommand.bMoveVelocity := FALSE;
+    stLatchedRAdapterCommand.rVelocity_rpm := 0.0;
+    stLatchedRAdapterCommand.rAcceleration_rpm_s := 0.0;
+    stLatchedRAdapterCommand.rDeceleration_rpm_s := 0.0;
+
+    bFastSafetyStopLatched := FALSE;
+    bHardOverridePending := FALSE;
+    bHardOverrideHandled := FALSE;
+    bPostResetZNormalBarrier := TRUE;
+    bPostResetRNormalBarrier := TRUE;
+    udiPostResetNormalBarrierRequestId :=
+        GVL_FastInternal.stAcceptedCommand.nRequestId;
+    bLastZSequenceSourceActive := bZSequenceSourceActive;
+    bLastRSequenceSourceActive := bRSequenceSourceActive;
+    udiLastZSourceCommandId := udiCurrentZSourceCommandId;
+    udiLastRSourceCommandId := udiCurrentRSourceCommandId;
+END_IF
+
+stHomeCommand := stLatchedZSourceCommand;
+stManualCommand := stLatchedZSourceCommand;
+stApproachCommand := stLatchedZSourceCommand;
+stForceProcessCommand := stLatchedZSourceCommand;
+stRetractCommand := stLatchedZSourceCommand;
 stHomeCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
 stManualCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
 stApproachCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
 stForceProcessCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
 stRetractCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_NONE;
-
-CASE GVL_Command.stFast.stZAxis.eOwnerRequest OF
+CASE stLatchedZSourceCommand.eOwnerRequest OF
     E_ZCommandOwner.Z_OWNER_HOME:
         stHomeCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_HOME;
     E_ZCommandOwner.Z_OWNER_MANUAL:
@@ -122,107 +388,302 @@ CASE GVL_Command.stFast.stZAxis.eOwnerRequest OF
         stRetractCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_RETRACT;
 END_CASE
 
+bForceProcessExitComplete :=
+    GVL_Status.stFast.stSequence.stMotionIntent.bForceProcessExitComplete
+    AND fbZAxisExtSetpointAdapter.stStatus.bReleaseOwner;
+bNormalZResetAllowed := NOT GVL_Status.stFast.stSequence.bBusy
+    AND NOT bZSequenceSourceActive
+    AND bExternalSafelyReleasedForReset
+    AND GVL_FastInternal.stAcceptedCommand.stZAxis.bReset;
+bLatchedZFaultStopRequest :=
+    (stLatchedZSourceCommand.eOwnerRequest = E_ZCommandOwner.Z_OWNER_FAULT_STOP)
+    OR bFastSafetyStopLatched;
+stFaultStopCommand := stLatchedZSourceCommand;
 fbZAxisArbiter(
-    bReset := GVL_Command.stFast.stZAxis.bReset,
-    bFaultStopRequest := GVL_Command.stFast.stZAxis.eOwnerRequest
-        = E_ZCommandOwner.Z_OWNER_FAULT_STOP,
-    bForceProcessExitComplete := (NOT GVL_Command.stFast.stZAxis.bUseExternalSetpoint
-        AND fbZExtSetpoint.stStatus.eState = E_ZExtSetpointState.Z_EXT_IDLE)
-        OR fbZExtSetpoint.stStatus.bReleaseOwner,
+    bReset := bSafeTerminalResetRising OR bNormalZResetAllowed,
+    bFaultStopRequest := bLatchedZFaultStopRequest,
+    stFaultStopCommand := stFaultStopCommand,
+    bForceProcessExitComplete := bForceProcessExitComplete,
     stHomeCommand := stHomeCommand,
     stManualCommand := stManualCommand,
     stApproachCommand := stApproachCommand,
     stForceProcessCommand := stForceProcessCommand,
     stRetractCommand := stRetractCommand);
 
-(* ---------------------------------------------------------
-   Phase 8导纳链只消费正式Sequence状态和有效测量。
-   PRG_CffSequence尚未实现时bForceControlEnable保持FALSE，
-   因此本阶段不会生成活动力控或覆盖External P/V/A命令。
-   --------------------------------------------------------- *)
+(* Force Ramp只使用步骤斜率与冻结Profile上限。 *)
 bForceLoopRequested := GVL_Status.stFast.stSequence.bForceControlEnable
+    AND bFastConfigSnapshotCurrent
     AND NOT GVL_Status.stFast.stSequence.bError
-    AND NOT GVL_Status.stFast.stSequence.bAborted;
+    AND NOT GVL_Status.stFast.stSequence.bAborted
+    AND NOT bFastSafetyStopLatched;
 rForceActual_kN := GVL_Process.stActual.fForceControlN * 0.001;
-rFastCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
-bProfileRevisionChanged := bForceLoopRequested
-    AND (GVL_Config.stZForceControl.nRevision <> udiLastForceProfileRevision);
-bProfileTransferRequested := GVL_Status.stFast.stSequence.bForceProfileTransfer
-    OR bProfileRevisionChanged;
+rEffectiveForceRamp_kN_s := MIN(
+    GVL_Status.stFast.stSequence.rForceRamp_kN_s,
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stZForceControl.fForceRampNS
+        * 0.001);
+bForceRampInputValid :=
+    FC_IsFiniteLReal(rValue := GVL_Status.stFast.stSequence.rForceRamp_kN_s)
+    AND FC_IsFiniteLReal(rValue :=
+        GVL_Status.stFast.stSequence.stFastConfigSnapshot.stZForceControl.fForceRampNS)
+    AND (GVL_Status.stFast.stSequence.rForceRamp_kN_s > 0.0)
+    AND (GVL_Status.stFast.stSequence.stFastConfigSnapshot.stZForceControl.fForceRampNS
+        > 0.0);
+IF bForceRampInputValid THEN
+    rForceRampRateForFb_kN_s := rEffectiveForceRamp_kN_s;
+ELSE
+    rForceRampRateForFb_kN_s := -1.0;
+END_IF
+bForceInputsHealthy := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement
+    AND NOT fbZAxisNc.stStatus.bError
+    AND NOT fbZAxisExtSetpointAdapter.stStatus.bError;
+bFastConfigSnapshotChanged := bFastConfigSnapshotCurrent
+    AND (GVL_Status.stFast.stSequence.stFastConfigSnapshot.nSequenceCommandId
+        <> udiLastAppliedFastConfigCommandId);
+bProfileTransferRequested := bForceLoopRequested
+    AND (GVL_Status.stFast.stSequence.bForceProfileTransfer
+        OR bFastConfigSnapshotChanged);
 
 fbForceSetpointRamp(
-    bEnable := bForceLoopRequested,
-    bReset := GVL_Command.stFast.stZAxis.bReset
-        OR GVL_Command.stFast.stSequence.bResetPulse
-        OR NOT bForceLoopRequested,
+    bEnable := bForceLoopRequested AND bForceInputsHealthy,
+    bReset := bSafeTerminalReset,
     rInitialValue := rForceActual_kN,
     rTarget := GVL_Status.stFast.stSequence.rForceSet_kN,
-    rRateUpPer_s := GVL_Config.stZForceControl.fForceRampNS * 0.001,
-    rRateDownPer_s := GVL_Config.stZForceControl.fForceRampNS * 0.001,
+    rRateUpPer_s := rForceRampRateForFb_kN_s,
+    rRateDownPer_s := rForceRampRateForFb_kN_s,
     rCycleTime_s := rFastCycleTime_s,
     rTolerance := 0.000001);
+GVL_Status.stFast.bForceSetpointRampReached := fbForceSetpointRamp.bReached;
+GVL_Status.stFast.bForceSetpointRampValid := fbForceSetpointRamp.bValid;
 
 fbZProfileSwitch(
-    bEnable := bForceLoopRequested,
-    bReset := GVL_Command.stFast.stZAxis.bReset
-        OR GVL_Command.stFast.stSequence.bResetPulse,
+    bEnable := bForceLoopRequested AND bForceInputsHealthy,
+    bReset := bSafeTerminalReset,
     bSwitchPulse := bProfileTransferRequested,
-    rPreviousVelocity_mm_s := GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s,
-    rVelocityFeedForward_mm_s := GVL_Config.stZForceControl.fVelocityFeedForwardMmS,
-    rProportionalGain_mm_s_per_kN := GVL_Config.stZForceControl.fKp,
+    rPreviousVelocity_mm_s :=
+        GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s,
+    rVelocityFeedForward_mm_s := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stZForceControl.fVelocityFeedForwardMmS,
+    rProportionalGain_mm_s_per_kN := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stZForceControl.fKp,
     rForceSet_kN := fbForceSetpointRamp.rOutput,
     rForceActual_kN := rForceActual_kN,
-    rIntegralLimit_mm_s := GVL_Config.stZForceControl.fIntegralLimit);
+    rIntegralLimit_mm_s := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stZForceControl.fIntegralLimit);
 
-stZForceInput.bEnable := bForceLoopRequested;
-stZForceInput.bReset := GVL_Command.stFast.stZAxis.bReset
-    OR GVL_Command.stFast.stSequence.bResetPulse;
+stZForceInput.bEnable := bForceLoopRequested AND bForceInputsHealthy
+    AND NOT fbZProfileSwitch.bError;
+stZForceInput.bReset := bSafeTerminalReset;
 stZForceInput.bOwnerGranted := fbZAxisArbiter.eActiveOwner
     = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS;
-stZForceInput.bExternalActive := fbZExtSetpoint.stStatus.bEnabled;
+stZForceInput.bExternalActive := fbZAxisExtSetpointAdapter.stStatus.bEnabled;
 stZForceInput.bForceValid := GVL_Process.stActual.bForceValid
     AND fbForceSetpointRamp.bValid;
 stZForceInput.bRelativePositionValid := GVL_Process.stActual.bDisplacementValid
     AND GVL_Process.stActual.bContactReferenceValid
     AND GVL_Process.stActual.bAxisSensorAgreement;
 stZForceInput.bBumplessTransfer := bProfileTransferRequested;
-stZForceInput.bHardForceActive := GVL_Status.stFast.stSequence.bForceHardLimitActive;
-stZForceInput.bHardStrokeActive := GVL_Status.stFast.stSequence.bStrokeHardLimitActive;
-stZForceInput.bCollisionLimitActive := GVL_Status.stFast.stSequence.bCollisionLimitActive;
+stZForceInput.bHardForceActive :=
+    GVL_Status.stFast.stSequence.bForceHardLimitActive;
+stZForceInput.bHardStrokeActive :=
+    GVL_Status.stFast.stSequence.bStrokeHardLimitActive;
+stZForceInput.bCollisionLimitActive :=
+    GVL_Status.stFast.stSequence.bCollisionLimitActive;
 stZForceInput.rForceSet_kN := GVL_Status.stFast.stSequence.rForceSet_kN;
 stZForceInput.rForceActual_kN := rForceActual_kN;
 stZForceInput.rRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
-stZForceInput.rTargetRelativePosition_mm := GVL_Status.stFast.stSequence.rTargetRelativePosition_mm;
-stZForceInput.rHardMaximumRelativePosition_mm := GVL_Status.stFast.stSequence.rHardMaximumRelativePosition_mm;
-stZForceInput.rTransferVelocity_mm_s := GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s;
+stZForceInput.rTargetRelativePosition_mm :=
+    GVL_Status.stFast.stSequence.rTargetRelativePosition_mm;
+stZForceInput.rHardMaximumRelativePosition_mm :=
+    GVL_Status.stFast.stSequence.rHardMaximumRelativePosition_mm;
+stZForceInput.rTransferVelocity_mm_s :=
+    GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s;
 stZForceInput.rCycleTime_s := rFastCycleTime_s;
-
 fbZForceAdmittance(
     stInput := stZForceInput,
-    stProfile := GVL_Config.stZForceControl,
-    stLimits := GVL_Config.stLimits,
+    stProfile := GVL_Status.stFast.stSequence.stFastConfigSnapshot.stZForceControl,
+    stLimits := GVL_Status.stFast.stSequence.stFastConfigSnapshot.stLimits,
     rForceSetRamped_kN := fbForceSetpointRamp.rOutput,
     bApplyIntegralPreload := fbZProfileSwitch.bAccepted,
     rIntegralPreload_mm_s := fbZProfileSwitch.rIntegralPreload_mm_s);
 GVL_Status.stFast.stZForceControl := fbZForceAdmittance.stOutput;
-IF GVL_Command.stFast.stZAxis.bReset
-    OR GVL_Command.stFast.stSequence.bResetPulse THEN
-    (* Reset后的下一有效扫描必须重新完成Profile和限值无扰提交。 *)
-    udiLastForceProfileRevision := 0;
-ELSIF NOT bForceLoopRequested THEN
-    udiLastForceProfileRevision := 0;
-ELSIF fbZProfileSwitch.bAccepted THEN
-    udiLastForceProfileRevision := GVL_Config.stZForceControl.nRevision;
+IF fbZProfileSwitch.bAccepted THEN
+    udiLastAppliedFastConfigCommandId :=
+        GVL_Status.stFast.stSequence.stFastConfigSnapshot.nSequenceCommandId;
+ELSIF bSafeTerminalReset THEN
+    udiLastAppliedFastConfigCommandId := 0;
 END_IF
 
-(* 轴Reset不依赖Owner有效，仍以同一事务编号交给Adapter。 *)
-stSelectedZCommand := fbZAxisArbiter.stCommand;
-stSelectedZCommand.bReset := GVL_Command.stFast.stZAxis.bReset;
+(* ---------------------------------------------------------
+   Hard Override跨Error/Abort保持一包精确零速Feed，直到Adapter确认接受。
+   只在相关快照、ACTIVE生命周期和有效accepted基准下建立pending。
+   --------------------------------------------------------- *)
+bHardOverrideRequested := GVL_Status.stFast.stSequence.bForceHardLimitActive
+    OR GVL_Status.stFast.stSequence.bStrokeHardLimitActive
+    OR GVL_Status.stFast.stSequence.bCollisionLimitActive;
+bHardOverrideAccepted := bHardOverridePending
+    AND fbZAxisExtSetpointAdapter.stStatus.bFeedAccepted
+    AND (fbZAxisExtSetpointAdapter.stStatus.udiFeedCycleCounter
+        <> udiHardOverrideAcceptedCounter)
+    AND fbZAxisExtSetpointAdapter.stStatus.bAcceptedSetpointValid
+    AND (fbZAxisExtSetpointAdapter.stStatus.rAcceptedPosition_mm
+        = rHardOverrideExpectedPosition_mm)
+    AND (fbZAxisExtSetpointAdapter.stStatus.rAcceptedVelocity_mm_s = 0.0)
+    AND (fbZAxisExtSetpointAdapter.stStatus.rAcceptedAcceleration_mm_s2 = 0.0)
+    AND (fbZAxisExtSetpointAdapter.stStatus.nAcceptedDirection
+        = nHardOverrideExpectedDirection);
+IF bHardOverrideAccepted THEN
+    bHardOverridePending := FALSE;
+    bHardOverrideHandled := TRUE;
+END_IF
+IF bSafeTerminalResetRising THEN
+    bHardOverridePending := FALSE;
+    bHardOverrideHandled := FALSE;
+ELSIF NOT bHardOverrideRequested AND NOT bHardOverridePending THEN
+    bHardOverrideHandled := FALSE;
+END_IF
+bHardOverrideStart := bFastConfigSnapshotCurrent
+    AND NOT bFastSafetyStopLatched
+    AND (fbZAxisExtSetpointAdapter.stStatus.eState
+        = E_ZExtSetpointState.Z_EXT_ACTIVE)
+    AND fbZAxisExtSetpointAdapter.stStatus.bAcceptedSetpointValid
+    AND bHardOverrideRequested
+    AND NOT bHardOverridePending
+    AND NOT bHardOverrideHandled
+    AND ((fbZAxisExtSetpointAdapter.stStatus.rAcceptedVelocity_mm_s > 0.0)
+        OR (fbZExternalTrajectory.stOutput.rVelocity_mm_s > 0.0));
+IF bHardOverrideStart THEN
+    bHardOverridePending := TRUE;
+    rHardOverrideExpectedPosition_mm :=
+        fbZAxisExtSetpointAdapter.stStatus.rAcceptedPosition_mm;
+    nHardOverrideExpectedDirection :=
+        fbZAxisExtSetpointAdapter.stStatus.nAcceptedDirection;
+    udiHardOverrideAcceptedCounter :=
+        fbZAxisExtSetpointAdapter.stStatus.udiFeedCycleCounter;
+END_IF
 
-(* Fault Stop或Reset可以撤销逻辑Owner，但不能与活动External通道并发发MC命令。 *)
-bExternalCommandChannelBusy := (fbZExtSetpoint.stStatus.eState
+(* External轨迹只读Adapter accepted状态和同一冻结快照。 *)
+IF GVL_Status.stFast.stSequence.bForceControlEnable THEN
+    rTrajectoryTargetVelocity_mm_s :=
+        fbZForceAdmittance.stOutput.rVelocityCommand_mm_s;
+ELSE
+    rTrajectoryTargetVelocity_mm_s := GVL_Status.stFast.stSequence
+        .stMotionIntent.rExternalTargetVelocity_mm_s;
+END_IF
+stTrajectoryInput.bEnable := (bFastConfigSnapshotCurrent
+        AND NOT GVL_Status.stFast.stSequence.bError
+        AND NOT GVL_Status.stFast.stSequence.bAborted
+        AND NOT bFastSafetyStopLatched)
+    OR (bHardOverridePending
+        AND bFastConfigSnapshotCurrent
+        AND NOT bFastSafetyStopLatched);
+stTrajectoryInput.bReset := bSafeTerminalReset;
+stTrajectoryInput.eExternalState := fbZAxisExtSetpointAdapter.stStatus.eState;
+stTrajectoryInput.bAcceptedSetpointValid :=
+    fbZAxisExtSetpointAdapter.stStatus.bAcceptedSetpointValid;
+stTrajectoryInput.bFeedAccepted :=
+    fbZAxisExtSetpointAdapter.stStatus.bFeedAccepted;
+stTrajectoryInput.udiAcceptedFeedCycleCounter :=
+    fbZAxisExtSetpointAdapter.stStatus.udiFeedCycleCounter;
+stTrajectoryInput.rAcceptedPosition_mm :=
+    fbZAxisExtSetpointAdapter.stStatus.rAcceptedPosition_mm;
+stTrajectoryInput.rAcceptedVelocity_mm_s :=
+    fbZAxisExtSetpointAdapter.stStatus.rAcceptedVelocity_mm_s;
+stTrajectoryInput.rAcceptedAcceleration_mm_s2 :=
+    fbZAxisExtSetpointAdapter.stStatus.rAcceptedAcceleration_mm_s2;
+stTrajectoryInput.nAcceptedDirection :=
+    fbZAxisExtSetpointAdapter.stStatus.nAcceptedDirection;
+stTrajectoryInput.bInhibitPositiveMotion :=
+    GVL_Status.stFast.stSequence.bForceHardLimitActive
+    OR GVL_Status.stFast.stSequence.bStrokeHardLimitActive
+    OR GVL_Status.stFast.stSequence.bCollisionLimitActive
+    OR bHardOverridePending;
+stTrajectoryInput.rTargetVelocity_mm_s := rTrajectoryTargetVelocity_mm_s;
+stTrajectoryInput.rCycleTime_s := rFastCycleTime_s;
+stTrajectoryInput.rMinimumPosition_mm :=
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stLimits.fZMinPositionMm;
+stTrajectoryInput.rMaximumPosition_mm :=
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stLimits.fZMaxPositionMm;
+stTrajectoryInput.rMaximumVelocity_mm_s :=
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stLimits.fZMaxVelocityMmS;
+stTrajectoryInput.rMaximumAcceleration_mm_s2 :=
+    GVL_Status.stFast.stSequence.stFastConfigSnapshot.stLimits.fZMaxAccelerationMmS2;
+stTrajectoryInput.rStandstillVelocity_mm_s := GVL_Status.stFast.stSequence
+    .stFastConfigSnapshot.stZExtSetpoint.rStandstillVelocity_mm_s;
+stTrajectoryInput.rMaximumPositionDeviation_mm := GVL_Status.stFast.stSequence
+    .stFastConfigSnapshot.stZExtSetpoint.rMaximumPositionDeviation_mm;
+stTrajectoryInput.nDirectionHoldCycles := GVL_Status.stFast.stSequence
+    .stFastConfigSnapshot.stZExtSetpoint.nDirectionHoldCycles;
+fbZExternalTrajectory(stInput := stTrajectoryInput);
+GVL_Status.stFast.stZExternalTrajectory := fbZExternalTrajectory.stOutput;
+bHardOverridePackageExact := bHardOverridePending
+    AND bFastConfigSnapshotCurrent
+    AND NOT bFastSafetyStopLatched
+    AND fbZExternalTrajectory.stOutput.bActive
+    AND NOT fbZExternalTrajectory.stOutput.bFault
+    AND fbZExternalTrajectory.stOutput.bPositiveMotionInhibited
+    AND (fbZExternalTrajectory.stOutput.rPosition_mm
+        = rHardOverrideExpectedPosition_mm)
+    AND (fbZExternalTrajectory.stOutput.rVelocity_mm_s = 0.0)
+    AND (fbZExternalTrajectory.stOutput.rAcceleration_mm_s2 = 0.0)
+    AND (fbZExternalTrajectory.stOutput.nDirection
+        = nHardOverrideExpectedDirection);
+
+stExtCommand.bReset := bSafeTerminalResetRising;
+stExtCommand.bEnable :=
+    GVL_Status.stFast.stSequence.stMotionIntent.bExternalEnableRequest;
+stExtCommand.bFeed := fbZExternalTrajectory.stOutput.bActive
+    AND NOT fbZExternalTrajectory.stOutput.bFault;
+stExtCommand.bDisable :=
+    GVL_Status.stFast.stSequence.stMotionIntent.bExternalDisableRequest
+    OR fbZExternalTrajectory.stOutput.bFault;
+stExtCommand.bPositiveMotionInhibit :=
+    fbZExternalTrajectory.stOutput.bPositiveMotionInhibited;
+stExtCommand.rPosition_mm := fbZExternalTrajectory.stOutput.rPosition_mm;
+stExtCommand.rVelocity_mm_s := fbZExternalTrajectory.stOutput.rVelocity_mm_s;
+stExtCommand.rAcceleration_mm_s2 :=
+    fbZExternalTrajectory.stOutput.rAcceleration_mm_s2;
+stExtCommand.nDirection := fbZExternalTrajectory.stOutput.nDirection;
+
+bFastPathSafetyExit := NOT bFastConfigSnapshotCurrent
+    OR bFastSafetyStopLatched
+    OR GVL_Status.stFast.stSequence.bError
+    OR GVL_Status.stFast.stSequence.bAborted
+    OR fbZProfileSwitch.bError
+    OR (bForceLoopRequested AND NOT fbForceSetpointRamp.bValid)
+    OR (GVL_Status.stFast.stSequence.bForceControlEnable
+        AND (NOT bForceInputsHealthy OR fbZForceAdmittance.stOutput.bFault));
+IF bFastPathSafetyExit THEN
+    stExtCommand.bEnable := FALSE;
+    stExtCommand.bFeed := FALSE;
+    stExtCommand.bDisable := TRUE;
+END_IF
+
+(* Error/Abort不能吞掉已建立的硬覆盖包；仅精确包保留marker和Feed。 *)
+IF bHardOverrideHandled AND bHardOverrideRequested THEN
+    stExtCommand.bEnable := FALSE;
+    stExtCommand.bFeed := FALSE;
+    stExtCommand.bDisable := TRUE;
+    stExtCommand.bPositiveMotionInhibit := FALSE;
+END_IF
+IF bHardOverridePending THEN
+    stExtCommand.bFeed := bHardOverridePackageExact;
+    stExtCommand.bDisable := TRUE;
+    stExtCommand.bPositiveMotionInhibit := bHardOverridePackageExact;
+END_IF
+IF NOT stExtCommand.bFeed THEN
+    (* Feed FALSE时绝不把marker送进Adapter的硬覆盖优先分支。 *)
+    stExtCommand.bPositiveMotionInhibit := FALSE;
+END_IF
+
+(* 标准Z Adapter在External通道释放前冻结事务号。 *)
+stSelectedZCommand := fbZAxisArbiter.stCommand;
+stSelectedZCommand.bReset := bNormalZResetAllowed OR bSafeTerminalResetRising;
+bExternalCommandChannelBusy := (fbZAxisExtSetpointAdapter.stStatus.eState
     <> E_ZExtSetpointState.Z_EXT_IDLE)
-    AND NOT fbZExtSetpoint.stStatus.bReleaseOwner;
+    AND NOT fbZAxisExtSetpointAdapter.stStatus.bReleaseOwner;
 IF bExternalCommandChannelBusy THEN
     stSelectedZCommand.bEnable := TRUE;
     stSelectedZCommand.bReset := FALSE;
@@ -233,41 +694,137 @@ IF bExternalCommandChannelBusy THEN
     stSelectedZCommand.bUseExternalSetpoint := TRUE;
     udiZStandardCommandId := fbZAxisNc.udiAcceptedCommandId;
 ELSE
-    udiZStandardCommandId := GVL_Command.stFast.nRequestId;
+    udiZStandardCommandId := udiZAdapterCommandId;
 END_IF
-
 fbZAxisNc(
     Axis := GVL_IO.Z_axis,
     bDriveLinked := GVL_Status.stHardwareBinding.bZAxisDriveLinked,
     udiCommandId := udiZStandardCommandId,
     stCommand := stSelectedZCommand);
 GVL_Status.stFast.stZAxis := fbZAxisNc.stStatus;
+IF bPendingZTransactionIsSequence
+    AND (fbZAxisNc.udiAcceptedCommandId = udiPendingZAdapterCommandId)
+    AND (udiPendingZSequenceSourceId <> 0) THEN
+    udiAcceptedZSequenceSourceId := udiPendingZSequenceSourceId;
+    GVL_Status.stFast.udiAcceptedSequenceZCommandId :=
+        udiPendingZSequenceSourceId;
+END_IF
 
-fbZExtSetpoint(
+fbZAxisExtSetpointAdapter(
     Axis := GVL_IO.Z_axis,
     bDriveLinked := GVL_Status.stHardwareBinding.bZAxisDriveLinked,
     bOwnerGranted := fbZAxisArbiter.eActiveOwner
         = E_ZCommandOwner.Z_OWNER_FORCE_PROCESS,
-    bLimitsValid := GVL_Config.stLimits.bValid,
+    bLimitsValid := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stLimits.bValid,
     bAxisReady := fbZAxisNc.stStatus.bReady,
     bAxisError := fbZAxisNc.stStatus.bError,
-    rCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001,
-    rMinimumPosition_mm := GVL_Config.stLimits.fZMinPositionMm,
-    rMaximumPosition_mm := GVL_Config.stLimits.fZMaxPositionMm,
-    rMaximumVelocity_mm_s := GVL_Config.stLimits.fZMaxVelocityMmS,
-    rMaximumAcceleration_mm_s2 := GVL_Config.stLimits.fZMaxAccelerationMmS2,
-    stConfig := GVL_Config.stZExtSetpoint,
-    stCommand := GVL_Command.stFast.stZExtSetpoint);
-
-GVL_Status.stFast.stZExtSetpoint := fbZExtSetpoint.stStatus;
-GVL_Status.stFast.stZAxis.bExternalSetpointActive := fbZExtSetpoint.stStatus.bEnabled;
+    rCycleTime_s := rFastCycleTime_s,
+    rMinimumPosition_mm := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stLimits.fZMinPositionMm,
+    rMaximumPosition_mm := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stLimits.fZMaxPositionMm,
+    rMaximumVelocity_mm_s := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stLimits.fZMaxVelocityMmS,
+    rMaximumAcceleration_mm_s2 := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stLimits.fZMaxAccelerationMmS2,
+    stConfig := GVL_Status.stFast.stSequence
+        .stFastConfigSnapshot.stZExtSetpoint,
+    stCommand := stExtCommand);
+GVL_Status.stFast.stZExtSetpoint := fbZAxisExtSetpointAdapter.stStatus;
+GVL_Status.stFast.stZAxis.bExternalSetpointActive :=
+    fbZAxisExtSetpointAdapter.stStatus.bEnabled;
 GVL_Status.stFast.stZAxis.eActiveOwner := fbZAxisArbiter.eActiveOwner;
-IF fbZExtSetpoint.stStatus.bError THEN
+IF fbZAxisExtSetpointAdapter.stStatus.bError THEN
     GVL_Status.stFast.stZAxis.bError := TRUE;
-    GVL_Status.stFast.stZAxis.nErrorId := fbZExtSetpoint.stStatus.nErrorId;
+    GVL_Status.stFast.stZAxis.nErrorId :=
+        fbZAxisExtSetpointAdapter.stStatus.nErrorId;
 END_IF
 
-(* 导纳力控使用固定唯一报警槽8；Profile预置错误同样不得静默忽略。 *)
+(* R源路由：源切换或同源更新仅创建一次Adapter事务。 *)
+bRNormalSourceBlockedByReset := bPostResetRNormalBarrier
+    AND NOT bAcceptedFastPackageNewerThanReset;
+bNewRSourceTransaction := (udiCurrentRSourceCommandId <> 0)
+    AND ((bRSequenceSourceActive <> bLastRSequenceSourceActive)
+        OR FC_IsNewerRequestId(
+            udiCandidate := udiCurrentRSourceCommandId,
+            udiReference := udiLastRSourceCommandId));
+IF bRNormalSourceBlockedByReset THEN
+    bNewRSourceTransaction := FALSE;
+END_IF
+IF NOT bFastSafetyStopLatched AND NOT bSafeTerminalResetRising THEN
+    bNewRAdapterTransaction := bNewRSourceTransaction;
+END_IF
+IF bNewRAdapterTransaction THEN
+IF NOT bFastSafetyStopLatched AND NOT bSafeTerminalResetRising THEN
+    udiRAdapterCommandId := udiRAdapterCommandId + 1;
+    IF udiRAdapterCommandId = 0 THEN
+        udiRAdapterCommandId := 1;
+    END_IF
+    udiLastRSourceCommandId := udiCurrentRSourceCommandId;
+    stLatchedRAdapterCommand := stCandidateRSourceCommand;
+    bLastRSequenceSourceActive := bRSequenceSourceActive;
+    udiPendingRAdapterCommandId := udiRAdapterCommandId;
+    rPendingRDeceleration_rpm_s :=
+        stCandidateRSourceCommand.rDeceleration_rpm_s;
+    bPendingRDecelerationValid := FC_IsFiniteLReal(
+        rValue := rPendingRDeceleration_rpm_s)
+        AND (rPendingRDeceleration_rpm_s > 0.0);
+    bPendingRTransactionIsSequence := bRSequenceSourceActive;
+    IF bRSequenceSourceActive THEN
+        udiPendingRSequenceSourceId := udiCurrentSequenceRSourceId;
+    ELSE
+        udiPendingRSequenceSourceId := 0;
+    END_IF
+    IF bPostResetRNormalBarrier
+        AND NOT bRSequenceSourceActive
+        AND bAcceptedFastPackageNewerThanReset THEN
+        bPostResetRNormalBarrier := FALSE;
+    END_IF
+END_IF
+END_IF
+stSelectedRCommand := stLatchedRAdapterCommand;
+
+bRSpeedRampSafeReset := bSafeTerminalReset
+    AND NOT bRSequenceSourceActive
+    AND GVL_Status.stFast.stRAxis.bStandstill;
+fbRSpeedRamp(
+    bEnable := bRSequenceSourceActive OR stSelectedRCommand.bEnable,
+    bReset := bNewRAdapterTransaction OR bRSpeedRampSafeReset,
+    rInitialValue := GVL_Status.stFast.stRAxis.rActualVelocity_rpm,
+    rTarget := stSelectedRCommand.rVelocity_rpm,
+    rRateUpPer_s := stSelectedRCommand.rAcceleration_rpm_s,
+    rRateDownPer_s := stSelectedRCommand.rDeceleration_rpm_s,
+    rCycleTime_s := rFastCycleTime_s,
+    rTolerance := 0.0);
+GVL_Status.stFast.rRSpeedEnvelope_rpm := fbRSpeedRamp.rOutput;
+GVL_Status.stFast.bRSpeedRampBusy := fbRSpeedRamp.bBusy;
+GVL_Status.stFast.bRSpeedRampReached := fbRSpeedRamp.bReached;
+GVL_Status.stFast.bRSpeedRampValid := fbRSpeedRamp.bValid;
+
+fbRAxisNc(
+    Axis := GVL_IO.R_axis,
+    bDriveLinked := GVL_Status.stHardwareBinding.bRAxisDriveLinked,
+    udiCommandId := udiRAdapterCommandId,
+    stCommand := stSelectedRCommand);
+GVL_Status.stFast.stRAxis := fbRAxisNc.stStatus;
+IF bPendingRTransactionIsSequence
+    AND (fbRAxisNc.udiAcceptedCommandId = udiPendingRAdapterCommandId)
+    AND (udiPendingRSequenceSourceId <> 0) THEN
+    udiAcceptedRSequenceSourceId := udiPendingRSequenceSourceId;
+    GVL_Status.stFast.udiAcceptedSequenceRCommandId :=
+        udiPendingRSequenceSourceId;
+END_IF
+
+(* 固定报警槽：External/轨迹=7，Force算法/Profile=8。 *)
+GVL_Alarm.astRequests[7].eCode := E_AlarmCode.ALARM_EXTERNAL_SETPOINT_FAULT;
+GVL_Alarm.astRequests[7].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
+GVL_Alarm.astRequests[7].nTextId := 2200;
+GVL_Alarm.astRequests[7].nSourceId := 7;
+GVL_Alarm.astRequests[7].bLatch := TRUE;
+GVL_Alarm.astRequests[7].bActive :=
+    fbZAxisExtSetpointAdapter.stStatus.bError
+    OR fbZExternalTrajectory.stOutput.bFault;
 GVL_Alarm.astRequests[8].eCode := E_AlarmCode.ALARM_FORCE_CONTROL_FAULT;
 GVL_Alarm.astRequests[8].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
 GVL_Alarm.astRequests[8].nTextId := 2500;
@@ -276,20 +833,5 @@ GVL_Alarm.astRequests[8].bLatch := TRUE;
 GVL_Alarm.astRequests[8].bActive := fbZForceAdmittance.stOutput.bFault
     OR fbZProfileSwitch.bError;
 
-(* External Setpoint使用固定唯一报警槽7；文本翻译由上位层按TextId完成。 *)
-GVL_Alarm.astRequests[7].eCode := E_AlarmCode.ALARM_EXTERNAL_SETPOINT_FAULT;
-GVL_Alarm.astRequests[7].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
-GVL_Alarm.astRequests[7].nTextId := 2200;
-GVL_Alarm.astRequests[7].nSourceId := 7;
-GVL_Alarm.astRequests[7].bLatch := TRUE;
-GVL_Alarm.astRequests[7].bActive := fbZExtSetpoint.stStatus.bError;
-
-fbRAxisNc(
-    Axis := GVL_IO.R_axis,
-    bDriveLinked := GVL_Status.stHardwareBinding.bRAxisDriveLinked,
-    udiCommandId := GVL_Command.stFast.nRequestId,
-    stCommand := GVL_Command.stFast.stRAxis);
-GVL_Status.stFast.stRAxis := fbRAxisNc.stStatus;
-
-(* Fast任务接受编号只表示已消费PLC内部事务，不代表未绑定硬件已执行。 *)
-GVL_Status.stFast.nAcceptedRequestId := GVL_Command.stFast.nRequestId;]]></ST></Implementation></POU></TcPlcObject>
+GVL_Status.stFast.nAcceptedRequestId :=
+    GVL_FastInternal.stAcceptedCommand.nRequestId;]]></ST></Implementation></POU></TcPlcObject>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZForceControlProfile" Id="{D3100000-0000-4000-8000-000000000006}"><Declaration><![CDATA[TYPE ST_ZForceControlProfile : STRUCT
+    (* Profile编号。 *)
+    nProfileId : UDINT;
     (* Profile修订号；变化时必须执行积分无扰预置。 *)
     nRevision : UDINT;
     (* 速度前馈，向下为正，单位毫米每秒。 *)

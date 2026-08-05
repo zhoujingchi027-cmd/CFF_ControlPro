@@ -12,6 +12,18 @@
     bNok : BOOL;
     (* 判据触发时的周期计数。 *)
     nTriggerCycle : UDINT;
+    (* 步骤是否过短。 *)
+    bTooShort : BOOL;
+    (* 合格力带保持时间是否满足。 *)
+    bQualifiedForceHoldMet : BOOL;
+    (* 合格力带实际保持时间，单位秒。 *)
+    rQualifiedForceHoldTime_s : LREAL;
+    (* 锁存的轴向力，单位千牛。 *)
+    rLatchedForce_kN : LREAL;
+    (* 锁存的相对位置，单位毫米。 *)
+    rLatchedRelativePosition_mm : LREAL;
+    (* 锁存的步骤时间，单位秒。 *)
+    rLatchedStepTime_s : LREAL;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

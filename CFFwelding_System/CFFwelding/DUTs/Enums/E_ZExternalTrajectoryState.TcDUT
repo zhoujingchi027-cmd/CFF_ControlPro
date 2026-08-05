@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="E_ZExternalTrajectoryState" Id="{C68E271F-E8B0-491E-B340-25BEF41FA75F}"><Declaration><![CDATA[TYPE E_ZExternalTrajectoryState : (
+    Z_TRAJ_IDLE := 0,
+    Z_TRAJ_SYNC := 10,
+    Z_TRAJ_TRACKING := 20,
+    Z_TRAJ_RAMP_TO_ZERO := 30,
+    Z_TRAJ_HOLD_OLD_DIRECTION := 40,
+    Z_TRAJ_DIRECTION_ZERO := 50,
+    Z_TRAJ_PRELOAD_NEW_DIRECTION := 60,
+    Z_TRAJ_FAULT := 100
+); END_TYPE
+]]></Declaration></DUT></TcPlcObject>

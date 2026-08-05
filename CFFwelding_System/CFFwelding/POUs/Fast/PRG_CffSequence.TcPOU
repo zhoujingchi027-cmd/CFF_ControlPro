@@ -1,123 +1,2832 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1"><POU Name="PRG_CffSequence" Id="{A2000000-0000-4000-8000-000000000002}"><Declaration><![CDATA[PROGRAM PRG_CffSequence
 VAR
-    (* ---------------------------------------------------------
-       Contact检测实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
-       输入：ForceCriterion、Axis/Sensor绝对位置、窗口、速度和周期。
-       输出：Contact候选、确认、双位置锁存和单扫描参考点请求。
-       Reset：新Cycle或Sequence Reset；Phase 10接入状态机前Enable保持FALSE。
-       --------------------------------------------------------- *)
     fbContactDetect : FB_ContactDetect;
-    (* ---------------------------------------------------------
-       Force Decline观察实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
-       输入：ForceCriterion、RPM、S_rel、速度、Arm/Decline窗口和周期。
-       输出：Armed、负下降率、候选、确认和锁存诊断。
-       Reset：每步骤进入或Sequence Reset；确认前不请求关闭PI。
-       --------------------------------------------------------- *)
     fbForceDecline : FB_ForceDeclineObserver;
-    (* ---------------------------------------------------------
-       步骤推进判据实例。
-       所属任务：Task_CffFast；唯一Owner：PRG_CffSequence。
-       输入：唯一Primary、Secondary、StepMin/Max、硬原因和Decline事实。
-       输出：EndCause、NOK、Advance/ControlledExit和锁存结果。
-       Reset：每步骤进入或Sequence Reset；Phase 10接入状态机前Enable保持FALSE。
-       --------------------------------------------------------- *)
     fbStepCriterion : FB_StepProceedingCriterion;
-    (* Contact调用前完整赋值的类型化输入。 *)
     stContactInput : ST_ContactDetectInput;
-    (* Force Decline调用前完整赋值的类型化输入。 *)
     stForceDeclineInput : ST_ForceDeclineInput;
-    (* 步骤判据调用前完整赋值的类型化输入。 *)
     stStepCriterionInput : ST_StepCriterionInput;
-END_VAR
-]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
-   CFF Contact、四步骤、制动压缩过渡与返回流程。
-   所属任务：Task_CffFast，调用顺序2；唯一Owner：PRG_CffSequence。
-   当前阶段：调用Phase 9算法并发布诊断，但所有Enable显式保持FALSE。
-   后续实现：Phase 10状态转换、参考点事务、力控和External轨迹接线。
-   --------------------------------------------------------- *)
+    stClearedStepCriterionResult : ST_StepCriterionResult;
+    stStepResultCandidate : ST_StepCriterionResult;
+    abStepResultWritten : ARRAY[1..4] OF BOOL;
+    bStepResultPublishRequested : BOOL;
+    bStepResultNok : BOOL;
+    nStepResultIndex : INT := 1;
 
-(* Phase 9只验证Contact算法接线；Phase 10状态机才允许使能。 *)
-stContactInput.bEnable := FALSE;
-stContactInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
+    eState : E_CffState := CFF_IDLE;
+    eNextState : E_CffState := CFF_IDLE;
+    ePreviousState : E_CffState := CFF_IDLE;
+    bStateEntry : BOOL;
+    eStep : E_CffStep := CFF_STEP_NONE;
+    eSubPhase : E_StepSubPhase := STEP_SUBPHASE_NONE;
+    eEndCause : E_StepEndCause := STEP_END_NONE;
+    eExitIntent : E_CffExitIntent := CFF_EXIT_NONE;
+
+    udiLastObservedCommandId : UDINT;
+    udiActiveStartCommandId : UDINT;
+    bNewSequenceCommand : BOOL;
+    bStartEvent : BOOL;
+    bStopEvent : BOOL;
+    bAbortEvent : BOOL;
+    bResetEvent : BOOL;
+    nEventPulseCount : UINT;
+    bStopRequestedLatched : BOOL;
+    bResetPendingLatched : BOOL;
+    bCycleNokLatched : BOOL;
+    udiFirstFaultId : UDINT;
+    stActiveSequenceCommand : ST_CffSequenceCommand;
+    udiActiveCycleSnapshotRevision : UDINT;
+    udiStartCycleSnapshotRevisionBefore : UDINT;
+    udiStartMachineRevisionBefore : UDINT;
+    udiStartForceProfileIdBefore : UDINT;
+    udiStartForceProfileRevisionBefore : UDINT;
+    udiStartRAxisProfileIdBefore : UDINT;
+    udiStartRAxisProfileRevisionBefore : UDINT;
+    bStartSourceSnapshotConsistent : BOOL;
+
+    stCycleSnapshot : ST_CycleSnapshot;
+    stMachineSnapshot : ST_MachineConfig;
+    stLimitsSnapshot : ST_MachineLimits;
+    stSequenceConfigSnapshot : ST_CffSequenceConfig;
+    stZExtConfigSnapshot : ST_ZExtSetpointConfig;
+    stForceProfileSnapshot : ST_ZForceControlProfile;
+    stRAxisProfileSnapshot : ST_RAxisProfile;
+    stFastConfigSnapshot : ST_CffFastConfigSnapshot;
+    rCycleStartZPosition_mm : LREAL;
+    rHardMaximumRelativePosition_mm : LREAL;
+    rRequiredRelativePosition_mm : LREAL;
+    rStepBoundary_mm : LREAL;
+    rCycleTime_s : LREAL;
+    nStepIndex : INT;
+
+    stMotionIntent : ST_CffMotionIntent;
+    udiZCommandId : UDINT;
+    udiRCommandId : UDINT;
+    stCandidateRCommand : ST_RAxisCommand;
+    stLastPublishedRCommand : ST_RAxisCommand;
+    bRCommandPayloadChanged : BOOL;
+
+    stPendingProcessReferenceCommand : ST_ProcessReferenceCommand;
+    udiContactReferenceRequestId : UDINT;
+    udiExpectedContactReferenceAckId : UDINT;
+    bProcessReferencePending : BOOL;
+    bProcessReferenceResetPending : BOOL;
+    bProcessReferenceLatchPending : BOOL;
+    bApproachFaultStopPending : BOOL;
+    bUnknownExternalRStopPending : BOOL;
+    bSafeExitRStopPending : BOOL;
+    bTerminalFaultStopRequired : BOOL;
+    bUnloadTransferInitialized : BOOL;
+
+    bBusy : BOOL;
+    bDone : BOOL;
+    bError : BOOL;
+    bAborted : BOOL;
+    bForceControlEnable : BOOL;
+    bForceProfileTransfer : BOOL;
+    bForceProfileTransferPending : BOOL;
+    rForceTransferVelocity_mm_s : LREAL;
+    rForceSet_kN : LREAL;
+    rForceRamp_kN_s : LREAL;
+    rSpeedSet_rpm : LREAL;
+    rTargetRelativePosition_mm : LREAL;
+    rStepTime_s : LREAL;
+    rQualifiedForceHoldTime_s : LREAL;
+    bRpmStopped : BOOL;
+    bForceInBand : BOOL;
+    nActiveStepProgramIndex : INT := 1;
+    bStepTimingActive : BOOL;
+    bStep4ProcessActive : BOOL;
+    uliCycleDelta_us : ULINT;
+    uliStepElapsed_us : ULINT;
+    uliStepMaximum_us : ULINT;
+    uliQualifiedHold_us : ULINT;
+    uliQualifiedHoldTarget_us : ULINT;
+
+    bPermissionValid : BOOL;
+    bSnapshotIdentityValid : BOOL;
+    bProgramValid : BOOL;
+    bSequenceConfigValid : BOOL;
+    bProfileValid : BOOL;
+    bHardwareReady : BOOL;
+    bSensorReady : BOOL;
+    bExternalReady : BOOL;
+    bLocalReturnTargetValid : BOOL;
+    bHardForceActive : BOOL;
+    bHardStrokeActive : BOOL;
+    bCollisionLimitActive : BOOL;
+    bExternalError : BOOL;
+    bAxisError : BOOL;
+    bSensorInvalid : BOOL;
+    bPostContactSensorRequired : BOOL;
+    bContactAcceptExactAck : BOOL;
+    bContactAcceptInvalidReference : BOOL;
+    bExternalProcessState : BOOL;
+    bExternalOwnerHold : BOOL;
+    bEntryMotionPermitted : BOOL;
+    bSafeExitRequested : BOOL;
+    bPrecheckExitRequested : BOOL;
+    bSafeTerminalReset : BOOL;
+    bUnloadHealthy : BOOL;
+    bUnloadStandstillQualified : BOOL;
+    bApproachNormalCompletion : BOOL;
+    bReturnLevelHealthy : BOOL;
+    bReturnEntryAuthorized : BOOL;
+    bReturnPublicationAllowed : BOOL;
+    bReturnSafeStopRequested : BOOL;
+    bReturnEntryBlocked : BOOL;
+    bEvaluateNok : BOOL;
+    bEvaluateFault : BOOL;
+    bStepResultHole : BOOL;
+    bMissingStepResult : BOOL;
+    nWrittenStepPrefix : INT;
+    bContactResetPulse : BOOL;
+    bForceDeclineResetPulse : BOOL;
+    bStepCriterionResetPulse : BOOL;
+
+    tonApproach : TON;
+    tonRAxisStop : TON;
+    tonStep4RAxisStop : TON;
+    tonContactSearch : TON;
+    tonContactReferenceAck : TON;
+    tonControlledUnload : TON;
+    tonUnloadStandstillConfirm : TON;
+    tonExitRAxisStop : TON;
+    tonReturn : TON;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* Task_CffFast 中 CFF 流程、事务和安全状态机的唯一Owner：PRG_CffSequence。 *)
+(* Scan pulses and scan-local defaults.  Transaction IDs and payloads are not reset. *)
+bStartEvent := FALSE;
+bStopEvent := FALSE;
+bAbortEvent := FALSE;
+bResetEvent := FALSE;
+bForceProfileTransfer := FALSE;
+bContactResetPulse := FALSE;
+bForceDeclineResetPulse := FALSE;
+bStepCriterionResetPulse := FALSE;
+bStepResultPublishRequested := FALSE;
+bStepResultNok := FALSE;
+nStepResultIndex := 1;
+eNextState := eState;
+(* Every scan starts from an explicit no-motion level intent.  Active states below
+   rebuild the complete package while source IDs remain monotonic and latched. *)
+stMotionIntent.stZCommand.bEnable := FALSE;
+stMotionIntent.stZCommand.bReset := FALSE;
+stMotionIntent.stZCommand.bStop := FALSE;
+stMotionIntent.stZCommand.bHome := FALSE;
+stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+stMotionIntent.stZCommand.rPosition_mm := 0.0;
+stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+stMotionIntent.stZCommand.rAcceleration_mm_s2 := 0.0;
+stMotionIntent.stZCommand.rDeceleration_mm_s2 := 0.0;
+stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_NONE;
+stMotionIntent.bExternalEnableRequest := FALSE;
+stMotionIntent.bExternalDisableRequest := FALSE;
+stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+stMotionIntent.bRAxisProcessRequested := FALSE;
+stMotionIntent.stRCommand.bEnable := TRUE;
+stMotionIntent.stRCommand.bReset := FALSE;
+stMotionIntent.stRCommand.bStop := TRUE;
+stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+stMotionIntent.bForceProcessExitComplete := FALSE;
+bForceControlEnable := FALSE;
+
+(* One wrap-aware high-water mark covers every Sequence event type. *)
+bNewSequenceCommand := FC_IsNewerRequestId(
+    udiCandidate := GVL_FastInternal.stAcceptedCommand.stSequence.nCommandId,
+    udiReference := udiLastObservedCommandId);
+IF bNewSequenceCommand THEN
+    nEventPulseCount := 0;
+    IF GVL_FastInternal.stAcceptedCommand.stSequence.bStartPulse THEN
+        nEventPulseCount := nEventPulseCount + 1;
+    END_IF
+    IF GVL_FastInternal.stAcceptedCommand.stSequence.bStopPulse THEN
+        nEventPulseCount := nEventPulseCount + 1;
+    END_IF
+    IF GVL_FastInternal.stAcceptedCommand.stSequence.bAbortPulse THEN
+        nEventPulseCount := nEventPulseCount + 1;
+    END_IF
+    IF GVL_FastInternal.stAcceptedCommand.stSequence.bResetPulse THEN
+        nEventPulseCount := nEventPulseCount + 1;
+    END_IF
+
+    udiLastObservedCommandId := GVL_FastInternal.stAcceptedCommand.stSequence.nCommandId;
+    IF nEventPulseCount > 1 THEN
+        IF udiFirstFaultId = 0 THEN
+            udiFirstFaultId := 16#0000A001;
+        END_IF
+    ELSE
+        bStartEvent := GVL_FastInternal.stAcceptedCommand.stSequence.bStartPulse;
+        bStopEvent := GVL_FastInternal.stAcceptedCommand.stSequence.bStopPulse;
+        bAbortEvent := GVL_FastInternal.stAcceptedCommand.stSequence.bAbortPulse;
+        bResetEvent := GVL_FastInternal.stAcceptedCommand.stSequence.bResetPulse;
+    END_IF
+END_IF
+
+(* Safe terminal Reset is the only Reset allowed to clear algorithms and cycle state. *)
+bSafeTerminalReset := (bResetEvent OR bResetPendingLatched)
+    AND ((eState = CFF_IDLE) OR (eState = CFF_COMPLETE_OK) OR (eState = CFF_COMPLETE_NOK)
+        OR (eState = CFF_ABORT) OR (eState = CFF_FAULT))
+    AND NOT bBusy
+    AND GVL_Status.stFast.stZAxis.bStandstill
+    AND GVL_Status.stFast.stRAxis.bStandstill
+    AND (GVL_Status.stFast.stZExtSetpoint.bReleaseOwner
+        OR ((GVL_Status.stFast.stZExtSetpoint.eState = Z_EXT_IDLE)
+            AND NOT GVL_Status.stFast.stZExtSetpoint.bEnabled));
+IF bResetEvent AND NOT bSafeTerminalReset THEN
+    bResetPendingLatched := TRUE;
+    bStopRequestedLatched := TRUE;
+    eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+END_IF
+IF bStopEvent OR bAbortEvent THEN
+    bStopRequestedLatched := TRUE;
+    eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+END_IF
+
+(* Frozen cycle validation is recomputed from the locally accepted Start snapshot. *)
+bPermissionValid := stActiveSequenceCommand.bProductionPermission
+    AND GVL_Command.stPermission.bAllowCycleStart
+    AND GVL_Status.bProductionReady;
+bSnapshotIdentityValid := (udiActiveStartCommandId > 0)
+    AND bStartSourceSnapshotConsistent
+    AND stCycleSnapshot.bValid
+    AND (udiActiveCycleSnapshotRevision = stCycleSnapshot.nSnapshotRevision)
+    AND (stActiveSequenceCommand.nProgramId
+        = stCycleSnapshot.stProgram.stHeader.nProgramId)
+    AND (stActiveSequenceCommand.nJoiningPointId
+        = stCycleSnapshot.nJoiningPointId)
+    AND (stCycleSnapshot.nMachineConfigRevision = stMachineSnapshot.nRevision)
+    AND (stCycleSnapshot.nCalibrationRevision > 0)
+    AND (stCycleSnapshot.nCalibrationRevision = GVL_Calibration.stForce.nRevision)
+    AND (stCycleSnapshot.nCalibrationRevision = GVL_Calibration.stDisplacement.nRevision)
+    AND (stCycleSnapshot.nCalibrationRevision = GVL_Calibration.stCollision.nRevision)
+    AND (stCycleSnapshot.stProgram.stHeader.nToolId = stMachineSnapshot.nToolId)
+    AND (stCycleSnapshot.stProgram.stHeader.nAnvilId = stMachineSnapshot.nAnvilId);
+bProgramValid := FC_ValidateJoinProgram(
+    stProgram := stCycleSnapshot.stProgram,
+    stMachineLimits := stLimitsSnapshot);
+bSequenceConfigValid := FC_ValidateCffSequenceConfig(
+    stConfig := stSequenceConfigSnapshot,
+    stLimits := stLimitsSnapshot);
+bProfileValid := stForceProfileSnapshot.bValid
+    AND (stForceProfileSnapshot.nProfileId > 0)
+    AND (stForceProfileSnapshot.nRevision > 0)
+    AND stRAxisProfileSnapshot.bValid
+    AND (stRAxisProfileSnapshot.nProfileId > 0)
+    AND (stRAxisProfileSnapshot.nRevision > 0)
+    AND (stCycleSnapshot.stProgram.stHeader.nForceProfileId
+        = stForceProfileSnapshot.nProfileId)
+    AND (stCycleSnapshot.stProgram.stHeader.nRAxisProfileId
+        = stRAxisProfileSnapshot.nProfileId)
+    AND FC_IsFiniteLReal(rValue := stRAxisProfileSnapshot.fTargetSpeedRpm)
+    AND FC_IsFiniteLReal(rValue := stRAxisProfileSnapshot.fSpeedRampRpmS)
+    AND FC_IsFiniteLReal(rValue := stRAxisProfileSnapshot.fAccelerationTimeS)
+    AND FC_IsFiniteLReal(rValue := stRAxisProfileSnapshot.fDecelerationTimeS)
+    AND FC_IsFiniteLReal(rValue := stRAxisProfileSnapshot.fMinimumQualifiedSpeedRpm)
+    AND (stRAxisProfileSnapshot.fSpeedRampRpmS > 0.0)
+    AND (stRAxisProfileSnapshot.fAccelerationTimeS > 0.0)
+    AND (stRAxisProfileSnapshot.fDecelerationTimeS > 0.0)
+    AND (ABS(stRAxisProfileSnapshot.fTargetSpeedRpm) <= stLimitsSnapshot.fRMaxSpeedRpm)
+    AND (stRAxisProfileSnapshot.fMinimumQualifiedSpeedRpm >= 0.0)
+    AND (stRAxisProfileSnapshot.fMinimumQualifiedSpeedRpm <= stLimitsSnapshot.fRMaxSpeedRpm);
+bHardwareReady := GVL_Status.stHardwareBinding.bZAxisNcAssigned
+    AND GVL_Status.stHardwareBinding.bRAxisNcAssigned
+    AND GVL_Status.stHardwareBinding.bZAxisDriveLinked
+    AND GVL_Status.stHardwareBinding.bRAxisDriveLinked
+    AND GVL_Status.stHardwareBinding.bForceInputMapped
+    AND GVL_Status.stHardwareBinding.bDisplacementInputMapped
+    AND GVL_Status.stHardwareBinding.bCollisionInputMapped
+    AND GVL_Status.stHardwareBinding.bProductionHardwareBindingComplete
+    AND GVL_Status.stFast.stZAxis.bReady
+    AND GVL_Status.stFast.stZAxis.bHomed
+    AND GVL_Status.stFast.stZAxis.bStandstill
+    AND NOT GVL_Status.stFast.stZAxis.bError
+    AND GVL_Status.stFast.stRAxis.bReady
+    AND GVL_Status.stFast.stRAxis.bStandstill
+    AND NOT GVL_Status.stFast.stRAxis.bError;
+bExternalReady := GVL_Status.stFast.stZExtSetpoint.bReleaseOwner
+    OR ((GVL_Status.stFast.stZExtSetpoint.eState = Z_EXT_IDLE)
+        AND NOT GVL_Status.stFast.stZExtSetpoint.bEnabled);
+bLocalReturnTargetValid := FC_IsFiniteLReal(rValue := rCycleStartZPosition_mm)
+    AND rCycleStartZPosition_mm >= stLimitsSnapshot.fZMinPositionMm
+    AND rCycleStartZPosition_mm <= stLimitsSnapshot.fZMaxPositionMm;
+
+(* Compute current-scan safety facts before any algorithm consumes them. *)
+bPostContactSensorRequired := (eState >= CFF_STEP1_ENTRY)
+    AND (eState <= CFF_EXTSETPOINT_DISABLE);
+bHardForceActive := bBusy
+    AND GVL_Process.stActual.bForceValid
+    AND FC_IsFiniteLReal(rValue := GVL_Process.stActual.fForceControlN)
+    AND (GVL_Process.stActual.fForceControlN >= stLimitsSnapshot.fMaxForceN);
+bHardStrokeActive := bBusy
+    AND bPostContactSensorRequired
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND FC_IsFiniteLReal(rValue := GVL_Process.stActual.fSRelSensorMm)
+    AND FC_IsFiniteLReal(rValue := rHardMaximumRelativePosition_mm)
+    AND (GVL_Process.stActual.fSRelSensorMm >= rHardMaximumRelativePosition_mm);
+bCollisionLimitActive := bBusy AND GVL_Process.stActual.bCollisionValid
+    AND GVL_Process.stActual.bCollisionSensorActive;
+bSensorReady := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bCollisionValid
+    AND NOT bHardForceActive
+    AND NOT bHardStrokeActive
+    AND NOT bCollisionLimitActive;
+bExternalError := GVL_Status.stFast.stZExtSetpoint.bError
+    OR GVL_Status.stFast.stZExternalTrajectory.bFault;
+bAxisError := GVL_Status.stFast.stZAxis.bError OR GVL_Status.stFast.stRAxis.bError;
+bContactAcceptExactAck := (eState = CFF_CONTACT_ACCEPT)
+    AND bProcessReferenceLatchPending
+    AND (GVL_Process.stActual.udiContactReferenceAcceptedId
+        = udiExpectedContactReferenceAckId);
+bContactAcceptInvalidReference := bContactAcceptExactAck
+    AND NOT GVL_Process.stActual.bContactReferenceValid;
+bSensorInvalid := bBusy AND NOT bContactAcceptInvalidReference
+    AND (NOT GVL_Process.stActual.bForceValid
+    OR NOT GVL_Process.stActual.bDisplacementValid
+    OR NOT GVL_Process.stActual.bCollisionValid
+    OR NOT FC_IsFiniteLReal(rValue := GVL_Process.stActual.fForceControlN)
+    OR NOT FC_IsFiniteLReal(rValue := GVL_Process.stActual.fForceCriterionN)
+    OR NOT FC_IsFiniteLReal(rValue := GVL_Process.stActual.fSRelSensorMm)
+    OR NOT FC_IsFiniteLReal(rValue := GVL_Status.stFast.stRAxis.rActualVelocity_rpm)
+    OR (bPostContactSensorRequired
+        AND (NOT GVL_Process.stActual.bValid
+            OR NOT GVL_Process.stActual.bContactReferenceValid
+            OR NOT GVL_Process.stActual.bAxisSensorAgreement)));
+
+IF bStartEvent AND bBusy THEN
+    IF udiFirstFaultId = 0 THEN
+        udiFirstFaultId := 16#0000A001;
+    END_IF
+END_IF
+IF bBusy AND (udiActiveStartCommandId > 0)
+    AND (eState <> CFF_IDLE)
+    AND NOT bContactAcceptInvalidReference
+    AND ((GVL_Calibration.stForce.nRevision <> stCycleSnapshot.nCalibrationRevision)
+        OR (GVL_Calibration.stDisplacement.nRevision <> stCycleSnapshot.nCalibrationRevision)
+        OR (GVL_Calibration.stCollision.nRevision <> stCycleSnapshot.nCalibrationRevision)) THEN
+    IF udiFirstFaultId = 0 THEN
+        udiFirstFaultId := 16#0000A00F;
+    END_IF
+END_IF
+
+(* Deterministic first-cause mapping applies from Approach through every safe terminal. *)
+IF (eState >= CFF_APPROACH)
+    AND (eState <= CFF_FAULT) AND (udiFirstFaultId = 0) THEN
+    IF bHardForceActive THEN
+        udiFirstFaultId := 16#0000A00C;
+    ELSIF bHardStrokeActive THEN
+        udiFirstFaultId := 16#0000A00D;
+    ELSIF bCollisionLimitActive THEN
+        udiFirstFaultId := 16#0000A00E;
+    ELSIF (eState = CFF_CONTROLLED_FORCE_UNLOAD)
+        AND (GVL_Status.stFast.stZForceControl.bFault
+            OR NOT GVL_Status.stFast.stZForceControl.bActive
+            OR NOT GVL_Status.stFast.bForceSetpointRampValid
+            OR NOT FC_IsFiniteLReal(rValue := rForceRamp_kN_s)
+            OR (rForceRamp_kN_s <= 0.0)) THEN
+        udiFirstFaultId := 16#0000A00B;
+    ELSIF bSensorInvalid THEN
+        udiFirstFaultId := 16#0000A00F;
+    ELSIF GVL_Status.stFast.stZAxis.bError THEN
+        udiFirstFaultId := 16#0000A010;
+    ELSIF GVL_Status.stFast.stRAxis.bError THEN
+        udiFirstFaultId := 16#0000A011;
+    ELSIF bExternalError THEN
+        udiFirstFaultId := 16#0000A012;
+    END_IF
+END_IF
+
+bEntryMotionPermitted := NOT (bStopRequestedLatched OR bAbortEvent
+    OR bResetPendingLatched OR bHardForceActive OR bHardStrokeActive
+    OR bCollisionLimitActive OR bExternalError OR bAxisError OR bSensorInvalid
+    OR (udiFirstFaultId > 0));
+bReturnEntryBlocked := bStopRequestedLatched OR bAbortEvent
+    OR bResetPendingLatched OR bHardForceActive OR bHardStrokeActive
+    OR bCollisionLimitActive OR bExternalError OR bAxisError OR bSensorInvalid
+    OR (udiFirstFaultId > 0);
+bApproachNormalCompletion := NOT bStateEntry
+    AND (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+    AND GVL_Status.stFast.stZAxis.bDone
+    AND GVL_Status.stFast.stZAxis.bStandstill
+    AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+    AND GVL_Status.stFast.stRAxis.bStandstill;
+bReturnLevelHealthy := GVL_Status.stFast.stZExtSetpoint.bReleaseOwner
+    AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+    AND GVL_Status.stFast.stRAxis.bStandstill
+    AND GVL_Status.stFast.stZAxis.bReady
+    AND GVL_Status.stFast.stRAxis.bReady
+    AND NOT GVL_Status.stFast.stZAxis.bError
+    AND NOT GVL_Status.stFast.stRAxis.bError
+    AND NOT GVL_Status.stFast.stZExtSetpoint.bError
+    AND NOT GVL_Status.stFast.stZExternalTrajectory.bFault;
+bReturnEntryAuthorized := bReturnLevelHealthy
+    AND GVL_Status.stFast.stZAxis.bStandstill;
+bReturnPublicationAllowed := NOT bReturnEntryBlocked
+    AND bReturnLevelHealthy
+    AND (NOT bStateEntry OR bReturnEntryAuthorized);
+
+bPrecheckExitRequested := bStopRequestedLatched OR bAbortEvent
+    OR bResetPendingLatched OR (udiFirstFaultId > 0);
+
+(* 受控卸载必须建立在已接管的Force与External生命周期上，原始传感器布尔值不能单独启用PI。 *)
+bUnloadHealthy := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement
+    AND GVL_Status.stFast.bForceSetpointRampValid
+    AND GVL_Status.stFast.stZForceControl.bActive
+    AND FC_IsFiniteLReal(rValue := rForceRamp_kN_s)
+    AND FC_IsFiniteLReal(rValue := GVL_Process.stActual.fForceControlN)
+    AND FC_IsFiniteLReal(rValue := GVL_Process.stActual.fSRelSensorMm)
+    AND rForceRamp_kN_s > 0
+    AND GVL_Status.stFast.stZExtSetpoint.bEnabled
+    AND GVL_Status.stFast.stZExtSetpoint.bAcceptedSetpointValid
+    AND GVL_Status.stFast.stZExternalTrajectory.bActive
+    AND FC_IsFiniteLReal(
+        rValue := GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s)
+    AND NOT bExternalError
+    AND NOT bAxisError
+    AND NOT bSensorInvalid
+    AND NOT GVL_Status.stFast.stZForceControl.bFault
+    AND NOT GVL_Status.stFast.stZExternalTrajectory.bFault;
+bUnloadStandstillQualified := GVL_Status.stFast.bForceSetpointRampValid
+    AND GVL_Status.stFast.bForceSetpointRampReached
+    AND ABS(GVL_Process.stActual.fForceControlN)
+        <= stCycleSnapshot.stProgram.stHeader.fContactForceOffN
+    AND ABS(GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s)
+        <= stZExtConfigSnapshot.rStandstillVelocity_mm_s
+    AND bUnloadHealthy;
+
+(* Step classification, Entry Reset and saturated clocks are resolved before
+   either stateful algorithm is called.  The index always remains in 1..4. *)
+nActiveStepProgramIndex := 1;
+IF (eState = CFF_STEP2_ENTRY) OR (eState = CFF_STEP2_RAMP_PROCESS)
+    OR (eState = CFF_STEP2_END_CHECK) THEN
+    nActiveStepProgramIndex := 2;
+ELSIF (eState = CFF_STEP3_ENTRY) OR (eState = CFF_STEP3_RAMP_PROCESS)
+    OR (eState = CFF_STEP3_END_CHECK) THEN
+    nActiveStepProgramIndex := 3;
+ELSIF (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+    OR (eState = CFF_STEP4_VALID_FORCE_HOLD) THEN
+    nActiveStepProgramIndex := 4;
+END_IF
+
+bForceDeclineResetPulse := bStateEntry
+    AND ((eState = CFF_STEP1_ENTRY)
+        OR (eState = CFF_STEP2_ENTRY)
+        OR (eState = CFF_STEP3_ENTRY));
+bStepCriterionResetPulse := bStateEntry
+    AND ((eState = CFF_STEP1_ENTRY)
+        OR (eState = CFF_STEP2_ENTRY)
+        OR (eState = CFF_STEP3_ENTRY)
+        OR (eState = CFF_BRAKE_AND_COMPRESSION_RAMP));
+
+IF bStateEntry
+    AND ((eState = CFF_STEP1_ENTRY)
+        OR (eState = CFF_STEP2_ENTRY)
+        OR (eState = CFF_STEP3_ENTRY)
+        OR (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)) THEN
+    uliStepElapsed_us := 0;
+END_IF
+IF bStateEntry AND (eState = CFF_BRAKE_AND_COMPRESSION_RAMP) THEN
+    uliQualifiedHold_us := 0;
+END_IF
+
+uliCycleDelta_us := UDINT_TO_ULINT(stMachineSnapshot.nFastTaskCycleUs);
+uliStepMaximum_us :=
+    UDINT_TO_ULINT(stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.nStepMaxMs)
+    * ULINT#1000;
+uliQualifiedHoldTarget_us :=
+    UDINT_TO_ULINT(stCycleSnapshot.stProgram.astSteps[4].stProceeding.nQualifiedForceHoldMs)
+    * ULINT#1000;
+bStepTimingActive := (eState = CFF_STEP1_RAMP_PROCESS)
+    OR (eState = CFF_STEP2_RAMP_PROCESS)
+    OR (eState = CFF_STEP3_RAMP_PROCESS)
+    OR (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+    OR (eState = CFF_STEP4_VALID_FORCE_HOLD);
+bStep4ProcessActive := (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+    OR (eState = CFF_STEP4_VALID_FORCE_HOLD);
+IF bStepTimingActive THEN
+    IF uliStepElapsed_us < uliStepMaximum_us THEN
+        IF uliCycleDelta_us >= uliStepMaximum_us - uliStepElapsed_us THEN
+            uliStepElapsed_us := uliStepMaximum_us;
+        ELSE
+            uliStepElapsed_us := uliStepElapsed_us + uliCycleDelta_us;
+        END_IF
+    END_IF
+END_IF
+rStepTime_s := ULINT_TO_LREAL(uliStepElapsed_us) * 0.000001;
+
+IF bStep4ProcessActive
+    AND GVL_Process.stActual.bForceValid
+    AND FC_IsFiniteLReal(rValue := GVL_Process.stActual.fForceControlN)
+    AND FC_IsFiniteLReal(rValue := GVL_Status.stFast.stRAxis.rActualVelocity_rpm) THEN
+    bRpmStopped := ABS(GVL_Status.stFast.stRAxis.rActualVelocity_rpm)
+        <= stCycleSnapshot.stProgram.astSteps[4].stProceeding.fRpmStoppedThresholdRpm;
+    bForceInBand := ABS(
+        GVL_Process.stActual.fForceControlN
+        - stCycleSnapshot.stProgram.astSteps[4].fSetForceN)
+        <= stCycleSnapshot.stProgram.astSteps[4].stProceeding.fForceBandToleranceN;
+    IF bRpmStopped AND bForceInBand THEN
+        IF uliQualifiedHold_us < uliQualifiedHoldTarget_us THEN
+            IF uliCycleDelta_us >= uliQualifiedHoldTarget_us - uliQualifiedHold_us THEN
+                uliQualifiedHold_us := uliQualifiedHoldTarget_us;
+            ELSE
+                uliQualifiedHold_us := uliQualifiedHold_us + uliCycleDelta_us;
+            END_IF
+        END_IF
+    END_IF
+ELSE
+    bRpmStopped := FALSE;
+    bForceInBand := FALSE;
+END_IF
+rQualifiedForceHoldTime_s := ULINT_TO_LREAL(uliQualifiedHold_us) * 0.000001;
+
+(* Algorithms use this scan's local state, never the previously published mirror. *)
+rCycleTime_s := UDINT_TO_LREAL(stMachineSnapshot.nFastTaskCycleUs) * 0.000001;
+stContactInput.bEnable := eState = CFF_CONTACT_SEARCH;
+stContactInput.bReset := bSafeTerminalReset OR bContactResetPulse;
 stContactInput.rForceActual_kN := GVL_Process.stActual.fForceCriterionN * 0.001;
-stContactInput.rForceOn_kN :=
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactForceOnN * 0.001;
-stContactInput.rForceOff_kN :=
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactForceOffN * 0.001;
+stContactInput.rForceOn_kN := stCycleSnapshot.stProgram.stHeader.fContactForceOnN * 0.001;
+stContactInput.rForceOff_kN := stCycleSnapshot.stProgram.stHeader.fContactForceOffN * 0.001;
 stContactInput.rAxisPosition_mm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
 stContactInput.rSensorPosition_mm := GVL_Process.stActual.fExternalDisplacementMm;
-stContactInput.rAxisPositionMinimum_mm := GVL_Config.stLimits.fZMinPositionMm;
-stContactInput.rAxisPositionMaximum_mm := GVL_Config.stLimits.fZMaxPositionMm;
-stContactInput.rSensorPositionMinimum_mm :=
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSensorMinimumMm;
-stContactInput.rSensorPositionMaximum_mm :=
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSensorMaximumMm;
+stContactInput.rAxisPositionMinimum_mm := stLimitsSnapshot.fZMinPositionMm;
+stContactInput.rAxisPositionMaximum_mm := stLimitsSnapshot.fZMaxPositionMm;
+stContactInput.rSensorPositionMinimum_mm := stCycleSnapshot.stProgram.stHeader.fContactSensorMinimumMm;
+stContactInput.rSensorPositionMaximum_mm := stCycleSnapshot.stProgram.stHeader.fContactSensorMaximumMm;
 stContactInput.rAxisVelocity_mm_s := GVL_Status.stFast.stZAxis.rActualVelocity_mm_s;
-stContactInput.rCaptureMaximumVelocity_mm_s :=
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS;
-stContactInput.rDebounceTime_s := UDINT_TO_LREAL(
-    GVL_Program.stCycleSnapshot.stProgram.stHeader.nContactDebounceMs) * 0.001;
-stContactInput.rCycleTime_s :=
-    UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+stContactInput.rCaptureMaximumVelocity_mm_s := stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS;
+stContactInput.rDebounceTime_s := UDINT_TO_LREAL(stCycleSnapshot.stProgram.stHeader.nContactDebounceMs) * 0.001;
+stContactInput.rCycleTime_s := rCycleTime_s;
 stContactInput.bSignalValid := GVL_Process.stActual.bForceValid
     AND GVL_Process.stActual.bDisplacementValid
     AND GVL_Status.stFast.stZAxis.bReady
-    AND GVL_Program.stCycleSnapshot.bValid;
+    AND stCycleSnapshot.bValid;
 fbContactDetect(stInput := stContactInput);
 
-(* Phase 9只验证Decline接口和对象生命周期，步骤参数由Phase 10选择。 *)
-stForceDeclineInput.bEnable := FALSE;
-stForceDeclineInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
-stForceDeclineInput.bSignalValid := FALSE;
-stForceDeclineInput.rForceActual_kN := 0.0;
-stForceDeclineInput.rSpeed_rpm := 0.0;
-stForceDeclineInput.rRelativePosition_mm := 0.0;
-stForceDeclineInput.rAxisVelocity_mm_s := 0.0;
-stForceDeclineInput.rStepTime_s := 0.0;
-stForceDeclineInput.rArmForce_kN := 0.0;
-stForceDeclineInput.rDeclineTo_kN := 0.0;
-stForceDeclineInput.rHysteresis_kN := 0.0;
-stForceDeclineInput.rMinimumDeclineRate_kN_s := 0.0;
-stForceDeclineInput.rCriterionSRelMinimum_mm := 0.0;
-stForceDeclineInput.rCriterionSRelMaximum_mm := 0.0;
-stForceDeclineInput.rCriterionRpmMinimum := 0.0;
-stForceDeclineInput.rCaptureMaximumVelocity_mm_s := 0.0;
-stForceDeclineInput.rDebounceTime_s := 0.0;
-stForceDeclineInput.rCycleTime_s :=
-    UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
+stForceDeclineInput.bEnable :=
+    ((eState = CFF_STEP1_RAMP_PROCESS)
+        OR (eState = CFF_STEP2_RAMP_PROCESS)
+        OR (eState = CFF_STEP3_RAMP_PROCESS))
+    AND (stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.ePrimaryCriterion
+        = STEP_CRIT_FORCE_DECLINE_TO);
+stForceDeclineInput.bReset := bSafeTerminalReset OR bForceDeclineResetPulse;
+stForceDeclineInput.bSignalValid := GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement
+    AND NOT bSensorInvalid
+    AND NOT bAxisError
+    AND NOT bExternalError;
+stForceDeclineInput.rForceActual_kN := GVL_Process.stActual.fForceCriterionN * 0.001;
+stForceDeclineInput.rSpeed_rpm := GVL_Status.stFast.stRAxis.rActualVelocity_rpm;
+stForceDeclineInput.rRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
+stForceDeclineInput.rAxisVelocity_mm_s := GVL_Status.stFast.stZAxis.rActualVelocity_mm_s;
+stForceDeclineInput.rStepTime_s := rStepTime_s;
+stForceDeclineInput.rArmForce_kN :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fArmForceN * 0.001;
+stForceDeclineInput.rDeclineTo_kN :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fDeclineToN * 0.001;
+stForceDeclineInput.rHysteresis_kN :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fDeclineHysteresisN * 0.001;
+stForceDeclineInput.rMinimumDeclineRate_kN_s :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fMinimumDeclineRateNS * 0.001;
+stForceDeclineInput.rCriterionSRelMinimum_mm :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fCriterionSRelMinMm;
+stForceDeclineInput.rCriterionSRelMaximum_mm :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fCriterionSRelMaxMm;
+stForceDeclineInput.rCriterionRpmMinimum :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fCriterionRpmMin;
+stForceDeclineInput.rCaptureMaximumVelocity_mm_s :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fCaptureMaxVelocityMmS;
+stForceDeclineInput.rDebounceTime_s :=
+    UDINT_TO_LREAL(stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.nDeclineDebounceMs)
+    * 0.001;
+stForceDeclineInput.rCycleTime_s := rCycleTime_s;
 fbForceDecline(stInput := stForceDeclineInput);
 
-(* Phase 9不推进任何步骤，Phase 10将从冻结Program快照完整赋值。 *)
-stStepCriterionInput.bEnable := FALSE;
-stStepCriterionInput.bReset := GVL_Command.stFast.stSequence.bResetPulse;
-stStepCriterionInput.bSignalValid := FALSE;
-stStepCriterionInput.ePrimaryCriterion := STEP_CRIT_RELATIVE_DISTANCE;
-stStepCriterionInput.eSecondaryAction := SECONDARY_ADVANCE_AND_NOK;
-stStepCriterionInput.rRelativePosition_mm := 0.0;
-stStepCriterionInput.rRelativeDistanceTarget_mm := 0.0;
-stStepCriterionInput.rStepTime_s := 0.0;
-stStepCriterionInput.rStepTimeTarget_s := 0.0;
-stStepCriterionInput.rStepMinimumTime_s := 0.0;
-stStepCriterionInput.rStepMaximumTime_s := 0.0;
-stStepCriterionInput.rForceActual_kN := 0.0;
-stStepCriterionInput.bForceDeclineArmed := FALSE;
-stStepCriterionInput.bForceDeclineConfirmed := FALSE;
-stStepCriterionInput.rSecondaryDistanceLimit_mm := 0.0;
-stStepCriterionInput.bHardForceActive := FALSE;
-stStepCriterionInput.bHardStrokeActive := FALSE;
-stStepCriterionInput.bSensorInvalid := FALSE;
-stStepCriterionInput.bAxisFault := FALSE;
-stStepCriterionInput.bStopRequested := FALSE;
+stStepCriterionInput.bEnable := (eState = CFF_STEP1_RAMP_PROCESS)
+    OR (eState = CFF_STEP2_RAMP_PROCESS)
+    OR (eState = CFF_STEP3_RAMP_PROCESS)
+    OR (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+    OR (eState = CFF_STEP4_VALID_FORCE_HOLD);
+stStepCriterionInput.bReset := bSafeTerminalReset OR bStepCriterionResetPulse;
+stStepCriterionInput.bSignalValid :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.bValid
+    AND GVL_Process.stActual.bForceValid
+    AND GVL_Process.stActual.bDisplacementValid
+    AND GVL_Process.stActual.bCollisionValid
+    AND GVL_Process.stActual.bContactReferenceValid
+    AND GVL_Process.stActual.bAxisSensorAgreement
+    AND NOT bSensorInvalid;
+stStepCriterionInput.ePrimaryCriterion :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.ePrimaryCriterion;
+stStepCriterionInput.eSecondaryAction :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.eSecondaryAction;
+stStepCriterionInput.rRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
+stStepCriterionInput.rRelativeDistanceTarget_mm :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fRelativeDistanceMm;
+stStepCriterionInput.rStepTime_s := rStepTime_s;
+stStepCriterionInput.rStepTimeTarget_s :=
+    UDINT_TO_LREAL(stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.nPrimaryStepTimeMs)
+    * 0.001;
+stStepCriterionInput.rStepMinimumTime_s :=
+    UDINT_TO_LREAL(stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.nStepMinMs)
+    * 0.001;
+stStepCriterionInput.rStepMaximumTime_s :=
+    ULINT_TO_LREAL(uliStepMaximum_us) * 0.000001;
+stStepCriterionInput.rForceActual_kN := GVL_Process.stActual.fForceCriterionN * 0.001;
+stStepCriterionInput.bForceDeclineArmed := fbForceDecline.stOutput.bArmed;
+stStepCriterionInput.bForceDeclineConfirmed := fbForceDecline.stOutput.bConfirmed;
+stStepCriterionInput.rSecondaryDistanceLimit_mm :=
+    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fSecondarySRelMm;
+stStepCriterionInput.bHardForceActive := bHardForceActive;
+stStepCriterionInput.bHardStrokeActive := bHardStrokeActive;
+stStepCriterionInput.bCollisionActive := bCollisionLimitActive;
+stStepCriterionInput.bSensorInvalid := bSensorInvalid;
+stStepCriterionInput.bAxisFault := bAxisError OR bExternalError;
+stStepCriterionInput.bStopRequested := bStopRequestedLatched;
 fbStepCriterion(stInput := stStepCriterionInput);
 
+(* Current algorithm/ramp faults become the first fault before event-priority
+   routing.  Entry scans are excluded because their new targets are not yet ACKed. *)
+IF bBusy AND (udiFirstFaultId = 0) THEN
+    IF ((eState = CFF_STEP1_RAMP_PROCESS)
+        OR (eState = CFF_STEP2_RAMP_PROCESS)
+        OR (eState = CFF_STEP3_RAMP_PROCESS))
+        AND (fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault) THEN
+        udiFirstFaultId := 16#0000A00B;
+    ELSIF (((eState = CFF_BRAKE_AND_COMPRESSION_RAMP) AND NOT bStateEntry)
+        OR (eState = CFF_STEP4_VALID_FORCE_HOLD))
+        AND (fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault
+            OR NOT GVL_Status.stFast.bForceSetpointRampValid
+            OR NOT GVL_Status.stFast.bRSpeedRampValid) THEN
+        udiFirstFaultId := 16#0000A00B;
+    END_IF
+END_IF
+
+(* Every timer is called once per scan, outside the state CASE. *)
+tonApproach(
+    IN := (eState = CFF_APPROACH) AND NOT bApproachNormalCompletion,
+    PT := stSequenceConfigSnapshot.tApproachTimeout);
+tonRAxisStop(
+    IN := (eState = CFF_APPROACH)
+        AND NOT ((GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill),
+    PT := stSequenceConfigSnapshot.tRAxisStopTimeout);
+tonStep4RAxisStop(
+    IN := ((eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+            OR (eState = CFF_STEP4_VALID_FORCE_HOLD))
+        AND ((eState = CFF_BRAKE_AND_COMPRESSION_RAMP AND bStateEntry)
+            OR NOT ((GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+                AND bRpmStopped)),
+    PT := stSequenceConfigSnapshot.tRAxisStopTimeout);
+tonContactSearch(IN := eState = CFF_CONTACT_SEARCH, PT := stSequenceConfigSnapshot.tContactSearchTimeout);
+tonContactReferenceAck(IN := bProcessReferencePending, PT := stSequenceConfigSnapshot.tContactReferenceAckTimeout);
+tonControlledUnload(
+    IN := eState = CFF_CONTROLLED_FORCE_UNLOAD,
+    PT := stSequenceConfigSnapshot.tControlledUnloadTimeout);
+tonUnloadStandstillConfirm(
+    IN := (eState = CFF_CONTROLLED_FORCE_UNLOAD)
+        AND NOT bStateEntry
+        AND bUnloadStandstillQualified,
+    PT := stSequenceConfigSnapshot.tUnloadStandstillConfirm);
+tonExitRAxisStop(
+    IN := (bSafeExitRStopPending OR bUnknownExternalRStopPending
+        OR bApproachFaultStopPending)
+        AND NOT ((GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill),
+    PT := stSequenceConfigSnapshot.tRAxisStopTimeout);
+tonReturn(
+    IN := (eState = CFF_RETURN_LOCAL) OR (eState = CFF_RETURN_REFERENCE),
+    PT := stSequenceConfigSnapshot.tReturnTimeout);
+
+IF tonExitRAxisStop.Q THEN
+    IF udiFirstFaultId = 0 THEN
+        udiFirstFaultId := 16#0000A014;
+    END_IF
+END_IF
+
+(* One candidate and one complete comparison drive every step R transaction. *)
+stCandidateRCommand := stLastPublishedRCommand;
+IF ((eState = CFF_STEP1_ENTRY) OR (eState = CFF_STEP2_ENTRY)
+    OR (eState = CFF_STEP3_ENTRY)) AND bEntryMotionPermitted THEN
+    stCandidateRCommand.bEnable := TRUE;
+    stCandidateRCommand.bReset := FALSE;
+    stCandidateRCommand.bStop := FALSE;
+    stCandidateRCommand.bMoveVelocity := TRUE;
+    stCandidateRCommand.rVelocity_rpm :=
+        stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].fSetSpeedRpm;
+    stCandidateRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stCandidateRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+ELSIF eState = CFF_BRAKE_AND_COMPRESSION_RAMP THEN
+    stCandidateRCommand.bEnable := TRUE;
+    stCandidateRCommand.bReset := FALSE;
+    stCandidateRCommand.bStop := TRUE;
+    stCandidateRCommand.bMoveVelocity := FALSE;
+    stCandidateRCommand.rVelocity_rpm := 0.0;
+    stCandidateRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stCandidateRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+ELSIF (eState = CFF_CONTROLLED_FORCE_UNLOAD) AND bStateEntry THEN
+    stCandidateRCommand.bEnable := TRUE;
+    stCandidateRCommand.bReset := FALSE;
+    stCandidateRCommand.bStop := TRUE;
+    stCandidateRCommand.bMoveVelocity := FALSE;
+    stCandidateRCommand.rVelocity_rpm := 0.0;
+    stCandidateRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stCandidateRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+END_IF
+bRCommandPayloadChanged :=
+    stCandidateRCommand.bEnable <> stLastPublishedRCommand.bEnable
+    OR stCandidateRCommand.bReset <> stLastPublishedRCommand.bReset
+    OR stCandidateRCommand.bStop <> stLastPublishedRCommand.bStop
+    OR stCandidateRCommand.bMoveVelocity <> stLastPublishedRCommand.bMoveVelocity
+    OR stCandidateRCommand.rVelocity_rpm <> stLastPublishedRCommand.rVelocity_rpm
+    OR stCandidateRCommand.rAcceleration_rpm_s
+        <> stLastPublishedRCommand.rAcceleration_rpm_s
+    OR stCandidateRCommand.rDeceleration_rpm_s
+        <> stLastPublishedRCommand.rDeceleration_rpm_s;
+
+(* Unique top-level External owner classifier. *)
+bExternalProcessState := (eState >= CFF_EXTSETPOINT_PREPARE)
+    AND (eState <= CFF_CONTROLLED_FORCE_UNLOAD);
+bExternalOwnerHold := ((eState = CFF_EXTSETPOINT_PREPARE)
+    OR (eState = CFF_CONTACT_SEARCH)
+    OR (eState = CFF_CONTACT_ACCEPT)
+    OR (eState = CFF_STEP1_ENTRY)
+    OR (eState = CFF_STEP1_RAMP_PROCESS)
+    OR (eState = CFF_STEP1_END_CHECK)
+    OR (eState = CFF_STEP2_ENTRY)
+    OR (eState = CFF_STEP2_RAMP_PROCESS)
+    OR (eState = CFF_STEP2_END_CHECK)
+    OR (eState = CFF_STEP3_ENTRY)
+    OR (eState = CFF_STEP3_RAMP_PROCESS)
+    OR (eState = CFF_STEP3_END_CHECK)
+    OR (eState = CFF_BRAKE_AND_COMPRESSION_RAMP)
+    OR (eState = CFF_STEP4_VALID_FORCE_HOLD)
+    OR (eState = CFF_CONTROLLED_FORCE_UNLOAD)
+    OR (eState = CFF_EXTSETPOINT_DISABLE))
+    AND NOT GVL_Status.stFast.stZExtSetpoint.bReleaseOwner;
+
+(* The complete Force/External and zero-R package is stable for the whole
+   External owner lifetime.  State branches repeat the level contract tokens. *)
+IF bExternalOwnerHold THEN
+    stMotionIntent.stZCommand.bEnable := TRUE;
+    stMotionIntent.stZCommand.bReset := FALSE;
+    stMotionIntent.stZCommand.bStop := FALSE;
+    stMotionIntent.stZCommand.bHome := FALSE;
+    stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+    stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+    stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+    stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+    stMotionIntent.stZCommand.rPosition_mm := 0.0;
+    stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+    stMotionIntent.stZCommand.rAcceleration_mm_s2 := 0.0;
+    stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+        stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+    stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+    stMotionIntent.bRAxisProcessRequested := TRUE;
+    stMotionIntent.stRCommand.bEnable := TRUE;
+    stMotionIntent.stRCommand.bReset := FALSE;
+    stMotionIntent.stRCommand.bStop := TRUE;
+    stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+    stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+    stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+END_IF
+
+CASE eState OF
+    CFF_IDLE:
+        bBusy := FALSE;
+        bDone := FALSE;
+        bError := FALSE;
+        bAborted := FALSE;
+        stFastConfigSnapshot.bValid := FALSE;
+        IF bStartEvent THEN
+            udiActiveStartCommandId := GVL_FastInternal.stAcceptedCommand.stSequence.nCommandId;
+            stActiveSequenceCommand := GVL_FastInternal.stAcceptedCommand.stSequence;
+            udiActiveCycleSnapshotRevision := GVL_FastInternal.stAcceptedCommand.nCycleSnapshotRevision;
+            udiStartCycleSnapshotRevisionBefore := GVL_Program.stCycleSnapshot.nSnapshotRevision;
+            udiStartMachineRevisionBefore := GVL_Config.stMachine.nRevision;
+            udiStartForceProfileIdBefore := GVL_Config.stZForceControl.nProfileId;
+            udiStartForceProfileRevisionBefore := GVL_Config.stZForceControl.nRevision;
+            udiStartRAxisProfileIdBefore := GVL_Config.stRAxis.nProfileId;
+            udiStartRAxisProfileRevisionBefore := GVL_Config.stRAxis.nRevision;
+            stCycleSnapshot := GVL_Program.stCycleSnapshot;
+            stMachineSnapshot := GVL_Config.stMachine;
+            stLimitsSnapshot := GVL_Config.stLimits;
+            stSequenceConfigSnapshot := GVL_Config.stCffSequence;
+            stZExtConfigSnapshot := GVL_Config.stZExtSetpoint;
+            stForceProfileSnapshot := GVL_Config.stZForceControl;
+            stRAxisProfileSnapshot := GVL_Config.stRAxis;
+            bStartSourceSnapshotConsistent :=
+                (udiStartCycleSnapshotRevisionBefore = stCycleSnapshot.nSnapshotRevision)
+                AND (GVL_Program.stCycleSnapshot.nSnapshotRevision
+                    = stCycleSnapshot.nSnapshotRevision)
+                AND (udiStartMachineRevisionBefore = stMachineSnapshot.nRevision)
+                AND (GVL_Config.stMachine.nRevision = stMachineSnapshot.nRevision)
+                AND (udiStartForceProfileIdBefore = stForceProfileSnapshot.nProfileId)
+                AND (udiStartForceProfileRevisionBefore = stForceProfileSnapshot.nRevision)
+                AND (GVL_Config.stZForceControl.nProfileId = stForceProfileSnapshot.nProfileId)
+                AND (GVL_Config.stZForceControl.nRevision = stForceProfileSnapshot.nRevision)
+                AND (udiStartRAxisProfileIdBefore = stRAxisProfileSnapshot.nProfileId)
+                AND (udiStartRAxisProfileRevisionBefore = stRAxisProfileSnapshot.nRevision)
+                AND (GVL_Config.stRAxis.nProfileId = stRAxisProfileSnapshot.nProfileId)
+                AND (GVL_Config.stRAxis.nRevision = stRAxisProfileSnapshot.nRevision);
+            rCycleStartZPosition_mm := GVL_Status.stFast.stZAxis.rActualPosition_mm;
+            bBusy := TRUE;
+            bCycleNokLatched := FALSE;
+            bStopRequestedLatched := FALSE;
+            bResetPendingLatched := FALSE;
+            udiFirstFaultId :=0;
+            eExitIntent := CFF_EXIT_NONE;
+            eStep := CFF_STEP_NONE;
+            eSubPhase := STEP_SUBPHASE_NONE;
+            eEndCause := STEP_END_NONE;
+            FOR nStepIndex := 1 TO 4 DO
+                GVL_Process.astStepCriterion[nStepIndex] := stClearedStepCriterionResult;
+                abStepResultWritten[nStepIndex] := FALSE;
+            END_FOR
+            stLastPublishedRCommand.bEnable := TRUE;
+            stLastPublishedRCommand.bReset := FALSE;
+            stLastPublishedRCommand.bStop := TRUE;
+            stLastPublishedRCommand.bMoveVelocity := FALSE;
+            stLastPublishedRCommand.rVelocity_rpm := 0.0;
+            stLastPublishedRCommand.rAcceleration_rpm_s :=
+                stRAxisProfileSnapshot.fSpeedRampRpmS;
+            stLastPublishedRCommand.rDeceleration_rpm_s :=
+                stRAxisProfileSnapshot.fSpeedRampRpmS;
+            stCandidateRCommand := stLastPublishedRCommand;
+            rHardMaximumRelativePosition_mm := 0.0;
+            rRequiredRelativePosition_mm := 0.0;
+            rStepBoundary_mm := 0.0;
+            rForceTransferVelocity_mm_s := 0.0;
+            rForceSet_kN := 0.0;
+            rForceRamp_kN_s := 0.0;
+            rSpeedSet_rpm := 0.0;
+            rTargetRelativePosition_mm := 0.0;
+            rStepTime_s := 0.0;
+            rQualifiedForceHoldTime_s := 0.0;
+            uliStepElapsed_us := 0;
+            uliStepMaximum_us := 0;
+            uliQualifiedHold_us := 0;
+            uliQualifiedHoldTarget_us := 0;
+            bRpmStopped := FALSE;
+            bForceInBand := FALSE;
+            bHardForceActive := FALSE;
+            bHardStrokeActive := FALSE;
+            bCollisionLimitActive := FALSE;
+            bForceControlEnable := FALSE;
+            bForceProfileTransfer := FALSE;
+            bForceProfileTransferPending := FALSE;
+            bProcessReferencePending := FALSE;
+            bProcessReferenceResetPending := FALSE;
+            bProcessReferenceLatchPending := FALSE;
+            bApproachFaultStopPending := FALSE;
+            bUnknownExternalRStopPending := FALSE;
+            bSafeExitRStopPending := FALSE;
+            bTerminalFaultStopRequired := FALSE;
+            bUnloadTransferInitialized := FALSE;
+            stFastConfigSnapshot.bValid := FALSE;
+            eNextState := CFF_PRECHECK;
+        END_IF
+
+    CFF_PRECHECK:
+        (* Generate the first of the two local Contact transactions: Reset. *)
+        IF bStateEntry THEN
+            IF NOT bProcessReferencePending THEN
+                stPendingProcessReferenceCommand.bLatchContactReference := FALSE;
+                stPendingProcessReferenceCommand.bUseProvidedContactReference := FALSE;
+                stPendingProcessReferenceCommand.rProvidedContactSensorPosition_mm := 0.0;
+                stPendingProcessReferenceCommand.rProvidedContactAxisPosition_mm := 0.0;
+                stPendingProcessReferenceCommand.bResetContactReference := TRUE;
+                udiContactReferenceRequestId := udiContactReferenceRequestId + 1;
+                IF udiContactReferenceRequestId = 0 THEN
+                    udiContactReferenceRequestId := 1;
+                END_IF
+                stPendingProcessReferenceCommand.udiContactReferenceRequestId := udiContactReferenceRequestId;
+                udiExpectedContactReferenceAckId := udiContactReferenceRequestId;
+                bProcessReferencePending := TRUE;
+                bProcessReferenceResetPending := TRUE;
+                bProcessReferenceLatchPending := FALSE;
+            END_IF
+        END_IF
+
+        IF bProcessReferenceResetPending
+            AND (GVL_Process.stActual.udiContactReferenceAcceptedId
+                = udiExpectedContactReferenceAckId) THEN
+            bProcessReferencePending := FALSE;
+            bProcessReferenceResetPending := FALSE;
+            IF GVL_Process.stActual.bContactReferenceValid THEN
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A001;
+                END_IF
+                eNextState := CFF_FAULT;
+            ELSIF bPermissionValid AND bSnapshotIdentityValid
+                AND stMachineSnapshot.bValid AND stLimitsSnapshot.bValid
+                AND stCycleSnapshot.stProgram.bValid AND stZExtConfigSnapshot.bValid
+                AND bProgramValid AND bSequenceConfigValid AND bProfileValid
+                AND bHardwareReady AND bSensorReady AND bLocalReturnTargetValid
+                AND bExternalReady
+                AND (GVL_Status.stFast.stZAxis.eActiveOwner = Z_OWNER_NONE) THEN
+                stFastConfigSnapshot.nSequenceCommandId := udiActiveStartCommandId;
+                stFastConfigSnapshot.stMachine := stMachineSnapshot;
+                stFastConfigSnapshot.stLimits := stLimitsSnapshot;
+                stFastConfigSnapshot.stZExtSetpoint := stZExtConfigSnapshot;
+                stFastConfigSnapshot.stZForceControl := stForceProfileSnapshot;
+                stFastConfigSnapshot.bValid := TRUE;
+                eNextState := CFF_APPROACH;
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    IF NOT bPermissionValid OR NOT bSnapshotIdentityValid THEN
+                        udiFirstFaultId := 16#0000A001;
+                    ELSIF NOT bProgramValid THEN
+                        udiFirstFaultId := 16#0000A002;
+                    ELSIF NOT bSequenceConfigValid OR NOT stMachineSnapshot.bValid
+                        OR NOT stLimitsSnapshot.bValid OR NOT stZExtConfigSnapshot.bValid THEN
+                        udiFirstFaultId := 16#0000A003;
+                    ELSIF NOT bProfileValid THEN
+                        udiFirstFaultId := 16#0000A004;
+                    ELSIF NOT bHardwareReady THEN
+                        udiFirstFaultId := 16#0000A005;
+                    ELSE
+                        udiFirstFaultId := 16#0000A006;
+                    END_IF
+                END_IF
+                stFastConfigSnapshot.bValid := FALSE;
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_FAULT;
+            END_IF
+        ELSIF tonContactReferenceAck.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A009;
+            END_IF
+            stFastConfigSnapshot.bValid := FALSE;
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        END_IF
+
+    CFF_APPROACH:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := FALSE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rPosition_mm := stCycleSnapshot.stProgram.stHeader.fContactSearchStartPositionMm;
+        stMotionIntent.stZCommand.rVelocity_mm_s := stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_APPROACH;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        IF bStateEntry THEN
+            IF bEntryMotionPermitted THEN
+                udiZCommandId := udiZCommandId + 1;
+                IF udiZCommandId = 0 THEN
+                    udiZCommandId := 1;
+                END_IF
+            END_IF
+            udiRCommandId := udiRCommandId + 1;
+            IF udiRCommandId = 0 THEN
+                udiRCommandId := 1;
+            END_IF
+        END_IF
+        IF bApproachNormalCompletion THEN
+            eNextState := CFF_EXTSETPOINT_PREPARE;
+        ELSIF tonRAxisStop.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A014;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        ELSIF tonApproach.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A007;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        ELSIF GVL_Status.stFast.stZAxis.bError THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A010;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        ELSIF GVL_Status.stFast.stRAxis.bError THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A011;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        END_IF
+
+    CFF_EXTSETPOINT_PREPARE:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF bStateEntry THEN
+            udiZCommandId := udiZCommandId + 1;
+            IF udiZCommandId = 0 THEN
+                udiZCommandId := 1;
+            END_IF
+        END_IF
+        IF (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+            AND (GVL_Status.stFast.stZAxis.eActiveOwner = Z_OWNER_FORCE_PROCESS)
+            AND GVL_Status.stFast.stZExtSetpoint.bEnabled
+            AND GVL_Status.stFast.stZExtSetpoint.bAcceptedSetpointValid
+            AND GVL_Status.stFast.stZExternalTrajectory.bActive THEN
+            eNextState := CFF_CONTACT_SEARCH;
+        END_IF
+
+    CFF_CONTACT_SEARCH:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := ABS(stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS);
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF fbContactDetect.stOutput.bReferenceLatchRequest AND NOT bProcessReferencePending THEN
+            stPendingProcessReferenceCommand.bLatchContactReference := TRUE;
+            stPendingProcessReferenceCommand.bUseProvidedContactReference := TRUE;
+            stPendingProcessReferenceCommand.rProvidedContactSensorPosition_mm := fbContactDetect.stOutput.rDetectedSensorPosition_mm;
+            stPendingProcessReferenceCommand.rProvidedContactAxisPosition_mm := fbContactDetect.stOutput.rDetectedAxisPosition_mm;
+            stPendingProcessReferenceCommand.bResetContactReference := FALSE;
+            udiContactReferenceRequestId := udiContactReferenceRequestId + 1;
+            IF udiContactReferenceRequestId = 0 THEN
+                udiContactReferenceRequestId := 1;
+            END_IF
+            stPendingProcessReferenceCommand.udiContactReferenceRequestId := udiContactReferenceRequestId;
+            udiExpectedContactReferenceAckId := udiContactReferenceRequestId;
+            bProcessReferencePending := TRUE;
+            bProcessReferenceResetPending := FALSE;
+            bProcessReferenceLatchPending := TRUE;
+            eNextState := CFF_CONTACT_ACCEPT;
+        ELSIF tonContactSearch.Q OR fbContactDetect.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A008;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        END_IF
+
+    CFF_CONTACT_ACCEPT:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := ABS(stCycleSnapshot.stProgram.stHeader.fContactSearchVelocityMmS);
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF bProcessReferenceLatchPending
+            AND (GVL_Process.stActual.udiContactReferenceAcceptedId
+                = udiExpectedContactReferenceAckId) THEN
+            bProcessReferencePending := FALSE;
+            bProcessReferenceLatchPending := FALSE;
+            IF NOT GVL_Process.stActual.bContactReferenceValid THEN
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A00A;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSIF NOT GVL_Process.stActual.bAxisSensorAgreement
+                OR NOT GVL_Process.stActual.bValid THEN
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A00F;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSE
+                rHardMaximumRelativePosition_mm := stLimitsSnapshot.fZMaxPositionMm
+                    - GVL_Process.stActual.fContactAxisPositionMm;
+                rRequiredRelativePosition_mm := 0.0;
+                FOR nStepIndex := 1 TO 4 DO
+                    rStepBoundary_mm := stCycleSnapshot.stProgram.astSteps[nStepIndex].stProceeding.fRelativeDistanceMm;
+                    IF stCycleSnapshot.stProgram.astSteps[nStepIndex].stProceeding.fSecondarySRelMm
+                        > rStepBoundary_mm THEN
+                        rStepBoundary_mm := stCycleSnapshot.stProgram.astSteps[nStepIndex].stProceeding.fSecondarySRelMm;
+                    END_IF
+                    IF rStepBoundary_mm > rRequiredRelativePosition_mm THEN
+                        rRequiredRelativePosition_mm := rStepBoundary_mm;
+                    END_IF
+                END_FOR
+                IF NOT FC_IsFiniteLReal(rValue := rHardMaximumRelativePosition_mm)
+                    OR (rHardMaximumRelativePosition_mm <= 0.0)
+                    OR (rRequiredRelativePosition_mm > rHardMaximumRelativePosition_mm) THEN
+                    IF udiFirstFaultId = 0 THEN
+                        udiFirstFaultId := 16#0000A00D;
+                    END_IF
+                    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                    eNextState := CFF_EXTSETPOINT_DISABLE;
+                ELSE
+                    rForceTransferVelocity_mm_s := GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+                    rForceSet_kN := GVL_Process.stActual.fForceControlN * 0.001;
+                    rForceRamp_kN_s := stForceProfileSnapshot.fForceRampNS * 0.001;
+                    bForceProfileTransferPending := TRUE;
+                    bForceControlEnable := TRUE;
+                    eNextState := CFF_STEP1_ENTRY;
+                END_IF
+            END_IF
+        ELSIF tonContactReferenceAck.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A009;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        END_IF
+
+    (* Step1 Entry：同一扫描发布Force目标、R目标和一次事务。 *)
+    CFF_STEP1_ENTRY:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP1_PENETRATION;
+        eSubPhase := STEP_SUBPHASE_ENTRY;
+        IF bStateEntry AND bEntryMotionPermitted THEN
+            rForceSet_kN := stCycleSnapshot.stProgram.astSteps[1].fSetForceN * 0.001;
+            rForceRamp_kN_s := stCycleSnapshot.stProgram.astSteps[1].fForceRampNS * 0.001;
+            rSpeedSet_rpm := stCycleSnapshot.stProgram.astSteps[1].fSetSpeedRpm;
+            IF stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.ePrimaryCriterion
+                = STEP_CRIT_RELATIVE_DISTANCE THEN
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fRelativeDistanceMm;
+            ELSE
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fSecondarySRelMm;
+            END_IF
+            rForceTransferVelocity_mm_s :=
+                GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+            bForceProfileTransferPending := TRUE;
+            stMotionIntent.stRCommand := stCandidateRCommand;
+            IF bRCommandPayloadChanged THEN
+                stLastPublishedRCommand := stCandidateRCommand;
+                stMotionIntent.stRCommand := stCandidateRCommand;
+                udiRCommandId := udiRCommandId + 1;
+                IF udiRCommandId = 0 THEN
+                    udiRCommandId := 1;
+                END_IF
+            END_IF
+            eNextState := CFF_STEP1_RAMP_PROCESS;
+        END_IF
+
+    (* Step1 Process：每扫描完整执行Decline与Criterion。 *)
+    CFF_STEP1_RAMP_PROCESS:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP1_PENETRATION;
+        eSubPhase := STEP_SUBPHASE_RAMP_PROCESS;
+        IF udiFirstFaultId > 0 THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND ((fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_FORCE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_STROKE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_COLLISION)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_SENSOR_INVALID)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_AXIS_FAULT))
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 1;
+                bStepResultNok := TRUE;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 1;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF udiFirstFaultId > 0 THEN
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+                eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSE
+                eNextState := CFF_STEP1_END_CHECK;
+            END_IF
+        END_IF
+
+    (* Step1 End：只锁存一次真实结果，然后推进或受控卸载。 *)
+    CFF_STEP1_END_CHECK:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP1_PENETRATION;
+        eSubPhase := STEP_SUBPHASE_END_CHECK;
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND (fbStepCriterion.stOutput.eEndCause = STEP_END_STOP_REQUEST)
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 1;
+                bStepResultNok := fbStepCriterion.stOutput.bNok;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 1;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF fbStepCriterion.stOutput.bNok THEN
+                bCycleNokLatched := TRUE;
+            END_IF
+            IF fbStepCriterion.stOutput.bControlledExitRequested
+                AND NOT fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eExitIntent := CFF_EXIT_NOK_RETURN;
+                eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+            ELSIF fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eNextState := CFF_STEP2_ENTRY;
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A00B;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            END_IF
+        END_IF
+
+    (* Step2 Entry：Force Profile更新与R完整payload去重。 *)
+    CFF_STEP2_ENTRY:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP2_CLEAN_ACTIVATE;
+        eSubPhase := STEP_SUBPHASE_ENTRY;
+        IF bStateEntry AND bEntryMotionPermitted THEN
+            rForceSet_kN := stCycleSnapshot.stProgram.astSteps[2].fSetForceN * 0.001;
+            rForceRamp_kN_s := stCycleSnapshot.stProgram.astSteps[2].fForceRampNS * 0.001;
+            rSpeedSet_rpm := stCycleSnapshot.stProgram.astSteps[2].fSetSpeedRpm;
+            IF stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.ePrimaryCriterion
+                = STEP_CRIT_RELATIVE_DISTANCE THEN
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fRelativeDistanceMm;
+            ELSE
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fSecondarySRelMm;
+            END_IF
+            rForceTransferVelocity_mm_s :=
+                GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+            bForceProfileTransferPending := TRUE;
+            stMotionIntent.stRCommand := stCandidateRCommand;
+            IF bRCommandPayloadChanged THEN
+                stLastPublishedRCommand := stCandidateRCommand;
+                stMotionIntent.stRCommand := stCandidateRCommand;
+                udiRCommandId := udiRCommandId + 1;
+                IF udiRCommandId = 0 THEN
+                    udiRCommandId := 1;
+                END_IF
+            END_IF
+            eNextState := CFF_STEP2_RAMP_PROCESS;
+        END_IF
+
+    CFF_STEP2_RAMP_PROCESS:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP2_CLEAN_ACTIVATE;
+        eSubPhase := STEP_SUBPHASE_RAMP_PROCESS;
+        IF udiFirstFaultId > 0 THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND ((fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_FORCE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_STROKE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_COLLISION)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_SENSOR_INVALID)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_AXIS_FAULT))
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 2;
+                bStepResultNok := TRUE;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 2;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF udiFirstFaultId > 0 THEN
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+                eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSE
+                eNextState := CFF_STEP2_END_CHECK;
+            END_IF
+        END_IF
+
+    CFF_STEP2_END_CHECK:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP2_CLEAN_ACTIVATE;
+        eSubPhase := STEP_SUBPHASE_END_CHECK;
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND (fbStepCriterion.stOutput.eEndCause = STEP_END_STOP_REQUEST)
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 2;
+                bStepResultNok := fbStepCriterion.stOutput.bNok;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 2;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF fbStepCriterion.stOutput.bNok THEN
+                bCycleNokLatched := TRUE;
+            END_IF
+            IF fbStepCriterion.stOutput.bControlledExitRequested
+                AND NOT fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eExitIntent := CFF_EXIT_NOK_RETURN;
+                eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+            ELSIF fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eNextState := CFF_STEP3_ENTRY;
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A00B;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            END_IF
+        END_IF
+
+    (* Step3 Entry/Process/End保持同一套事务和结果合同。 *)
+    CFF_STEP3_ENTRY:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP3_WELDING;
+        eSubPhase := STEP_SUBPHASE_ENTRY;
+        IF bStateEntry AND bEntryMotionPermitted THEN
+            rForceSet_kN := stCycleSnapshot.stProgram.astSteps[3].fSetForceN * 0.001;
+            rForceRamp_kN_s := stCycleSnapshot.stProgram.astSteps[3].fForceRampNS * 0.001;
+            rSpeedSet_rpm := stCycleSnapshot.stProgram.astSteps[3].fSetSpeedRpm;
+            IF stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.ePrimaryCriterion
+                = STEP_CRIT_RELATIVE_DISTANCE THEN
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fRelativeDistanceMm;
+            ELSE
+                rTargetRelativePosition_mm :=
+                    stCycleSnapshot.stProgram.astSteps[nActiveStepProgramIndex].stProceeding.fSecondarySRelMm;
+            END_IF
+            rForceTransferVelocity_mm_s :=
+                GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+            bForceProfileTransferPending := TRUE;
+            stMotionIntent.stRCommand := stCandidateRCommand;
+            IF bRCommandPayloadChanged THEN
+                stLastPublishedRCommand := stCandidateRCommand;
+                stMotionIntent.stRCommand := stCandidateRCommand;
+                udiRCommandId := udiRCommandId + 1;
+                IF udiRCommandId = 0 THEN
+                    udiRCommandId := 1;
+                END_IF
+            END_IF
+            eNextState := CFF_STEP3_RAMP_PROCESS;
+        END_IF
+
+    CFF_STEP3_RAMP_PROCESS:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP3_WELDING;
+        eSubPhase := STEP_SUBPHASE_RAMP_PROCESS;
+        IF udiFirstFaultId > 0 THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND ((fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_FORCE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_HARD_STROKE)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_COLLISION)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_SENSOR_INVALID)
+                    OR (fbStepCriterion.stOutput.eEndCause = STEP_END_AXIS_FAULT))
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 3;
+                bStepResultNok := TRUE;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 3;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF udiFirstFaultId > 0 THEN
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+                eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            ELSE
+                eNextState := CFF_STEP3_END_CHECK;
+            END_IF
+        END_IF
+
+    CFF_STEP3_END_CHECK:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP3_WELDING;
+        eSubPhase := STEP_SUBPHASE_END_CHECK;
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND (fbStepCriterion.stOutput.eEndCause = STEP_END_STOP_REQUEST)
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 3;
+                bStepResultNok := fbStepCriterion.stOutput.bNok;
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 3;
+            bStepResultNok := fbStepCriterion.stOutput.bNok;
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF fbStepCriterion.stOutput.bNok THEN
+                bCycleNokLatched := TRUE;
+            END_IF
+            IF fbStepCriterion.stOutput.bControlledExitRequested
+                AND NOT fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eExitIntent := CFF_EXIT_NOK_RETURN;
+                eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+            ELSIF fbStepCriterion.stOutput.bAdvanceRequested THEN
+                eNextState := CFF_BRAKE_AND_COMPRESSION_RAMP;
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A00B;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_EXTSETPOINT_DISABLE;
+            END_IF
+        END_IF
+
+    (* Brake Entry：R停止与Step4 Force/Ramp/计时同一扫描启动。 *)
+    CFF_BRAKE_AND_COMPRESSION_RAMP:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP4_COMPRESSION;
+        eSubPhase := STEP_SUBPHASE_BRAKE_COMPRESSION;
+        IF bStateEntry AND bEntryMotionPermitted THEN
+            rForceSet_kN := stCycleSnapshot.stProgram.astSteps[4].fSetForceN * 0.001;
+            rForceRamp_kN_s := stCycleSnapshot.stProgram.astSteps[4].fForceRampNS * 0.001;
+            rSpeedSet_rpm := 0.0;
+            rTargetRelativePosition_mm :=
+                stCycleSnapshot.stProgram.astSteps[4].stProceeding.fSecondarySRelMm;
+            rForceTransferVelocity_mm_s :=
+                GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+            bForceProfileTransferPending := TRUE;
+            stCandidateRCommand.rVelocity_rpm := 0.0;
+            stCandidateRCommand.bEnable := TRUE;
+            stCandidateRCommand.bReset := FALSE;
+            stCandidateRCommand.bStop := TRUE;
+            stCandidateRCommand.bMoveVelocity := FALSE;
+            stCandidateRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+            stCandidateRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+            stMotionIntent.stRCommand := stCandidateRCommand;
+            IF bRCommandPayloadChanged THEN
+                stLastPublishedRCommand := stCandidateRCommand;
+                stMotionIntent.stRCommand := stCandidateRCommand;
+                udiRCommandId := udiRCommandId + 1;
+                IF udiRCommandId = 0 THEN
+                    udiRCommandId := 1;
+                END_IF
+            END_IF
+        END_IF
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND (fbStepCriterion.stOutput.eEndCause = STEP_END_STOP_REQUEST)
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 4;
+                bStepResultNok := fbStepCriterion.stOutput.bNok
+                    OR (uliQualifiedHold_us < uliQualifiedHoldTarget_us);
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF NOT bStateEntry
+            AND (fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault
+                OR NOT GVL_Status.stFast.bForceSetpointRampValid
+                OR NOT GVL_Status.stFast.bRSpeedRampValid) THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF NOT bStateEntry AND fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 4;
+            bStepResultNok := fbStepCriterion.stOutput.bNok
+                OR (uliQualifiedHold_us < uliQualifiedHoldTarget_us);
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF bStepResultNok OR bCycleNokLatched THEN
+                bCycleNokLatched := TRUE;
+                eExitIntent := CFF_EXIT_NOK_RETURN;
+            ELSE
+                eExitIntent := CFF_EXIT_NORMAL_RETURN;
+            END_IF
+            eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+        ELSIF NOT bStateEntry AND tonStep4RAxisStop.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A014;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF NOT bStateEntry
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.bRSpeedRampValid
+            AND GVL_Status.stFast.bRSpeedRampReached
+            AND GVL_Status.stFast.bForceSetpointRampValid
+            AND GVL_Status.stFast.bForceSetpointRampReached THEN
+            eNextState := CFF_STEP4_VALID_FORCE_HOLD;
+        END_IF
+
+    (* Step4 Hold：继续同一Criterion、总时间和暂停式Qualified Hold。 *)
+    CFF_STEP4_VALID_FORCE_HOLD:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand := stLastPublishedRCommand;
+        bForceControlEnable := TRUE;
+        eStep := CFF_STEP4_COMPRESSION;
+        eSubPhase := STEP_SUBPHASE_VALID_FORCE_HOLD;
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+            IF fbStepCriterion.stOutput.bEndConfirmed
+                AND (fbStepCriterion.stOutput.eEndCause = STEP_END_STOP_REQUEST)
+                AND NOT fbForceDecline.stOutput.bFault
+                AND NOT fbStepCriterion.stOutput.bFault THEN
+                nStepResultIndex := 4;
+                bStepResultNok := fbStepCriterion.stOutput.bNok
+                    OR (uliQualifiedHold_us < uliQualifiedHoldTarget_us);
+                bStepResultPublishRequested := TRUE;
+                eEndCause := fbStepCriterion.stOutput.eEndCause;
+            END_IF
+            eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbForceDecline.stOutput.bFault OR fbStepCriterion.stOutput.bFault
+            OR NOT GVL_Status.stFast.bForceSetpointRampValid
+            OR NOT GVL_Status.stFast.bRSpeedRampValid THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A00B;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF fbStepCriterion.stOutput.bEndConfirmed THEN
+            nStepResultIndex := 4;
+            bStepResultNok := fbStepCriterion.stOutput.bNok
+                OR (uliQualifiedHold_us < uliQualifiedHoldTarget_us);
+            bStepResultPublishRequested := TRUE;
+            eEndCause := fbStepCriterion.stOutput.eEndCause;
+            IF bStepResultNok OR bCycleNokLatched THEN
+                bCycleNokLatched := TRUE;
+                eExitIntent := CFF_EXIT_NOK_RETURN;
+            ELSE
+                eExitIntent := CFF_EXIT_NORMAL_RETURN;
+            END_IF
+            eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+        ELSIF tonStep4RAxisStop.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A014;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        END_IF
+
+    CFF_CONTROLLED_FORCE_UNLOAD:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := FALSE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        rForceSet_kN := 0.0;
+        bForceControlEnable := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        IF bStateEntry THEN
+            IF NOT bUnloadTransferInitialized AND bUnloadHealthy THEN
+                rTargetRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
+                rForceTransferVelocity_mm_s :=
+                    GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+                bForceProfileTransferPending := TRUE;
+                bUnloadTransferInitialized := TRUE;
+            END_IF
+            bSafeExitRStopPending := TRUE;
+            IF bRCommandPayloadChanged THEN
+                stLastPublishedRCommand := stCandidateRCommand;
+                stMotionIntent.stRCommand := stCandidateRCommand;
+                udiRCommandId := udiRCommandId + 1;
+                IF udiRCommandId = 0 THEN
+                    udiRCommandId := 1;
+                END_IF
+            END_IF
+        END_IF
+        IF bSafeExitRStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            bSafeExitRStopPending := FALSE;
+        END_IF
+        (* 卸载条件已成立但连续确认时间未到时，显式保持当前状态。 *)
+        IF GVL_Status.stFast.bForceSetpointRampValid
+            AND GVL_Status.stFast.bForceSetpointRampReached
+            AND ABS(GVL_Process.stActual.fForceControlN)
+                <= stCycleSnapshot.stProgram.stHeader.fContactForceOffN
+            AND ABS(GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s)
+                <= stZExtConfigSnapshot.rStandstillVelocity_mm_s
+            AND bUnloadHealthy
+            AND (tonUnloadStandstillConfirm.ET
+                < stSequenceConfigSnapshot.tUnloadStandstillConfirm) THEN
+            eNextState := eState;
+        END_IF
+        IF tonControlledUnload.ET
+            < stSequenceConfigSnapshot.tControlledUnloadTimeout THEN
+            eNextState := eState;
+        END_IF
+        IF udiFirstFaultId > 0 THEN
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF tonControlledUnload.Q THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A013;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        ELSIF tonUnloadStandstillConfirm.Q THEN
+            eNextState := CFF_EXTSETPOINT_DISABLE;
+        END_IF
+
+    CFF_EXTSETPOINT_DISABLE:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := TRUE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := FALSE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF bUnknownExternalRStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            bUnknownExternalRStopPending := FALSE;
+        END_IF
+        IF bSafeExitRStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            bSafeExitRStopPending := FALSE;
+        END_IF
+        IF GVL_Status.stFast.stZExtSetpoint.bReleaseOwner
+            AND NOT bUnknownExternalRStopPending
+            AND NOT bSafeExitRStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            stMotionIntent.bForceProcessExitComplete := TRUE;
+            IF udiFirstFaultId > 0 THEN
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_FAULT;
+            ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+                eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+                eNextState := CFF_ABORT;
+            ELSE
+                CASE eExitIntent OF
+                    CFF_EXIT_NORMAL_RETURN:
+                        IF GVL_Status.stFast.stZAxis.bReady
+                            AND GVL_Status.stFast.stRAxis.bReady
+                            AND NOT GVL_Status.stFast.stZAxis.bError
+                            AND NOT GVL_Status.stFast.stRAxis.bError THEN
+                            IF stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_LOCAL THEN
+                                eNextState := CFF_RETURN_LOCAL;
+                            ELSIF stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_REFERENCE THEN
+                                eNextState := CFF_RETURN_REFERENCE;
+                            ELSE
+                                IF udiFirstFaultId = 0 THEN
+                                    udiFirstFaultId := 16#0000A016;
+                                END_IF
+                                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                                eNextState := CFF_FAULT;
+                            END_IF
+                        ELSE
+                            IF udiFirstFaultId = 0 THEN
+                                udiFirstFaultId := 16#0000A016;
+                            END_IF
+                            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                            eNextState := CFF_FAULT;
+                        END_IF
+                    CFF_EXIT_NOK_RETURN:
+                        IF GVL_Status.stFast.stZAxis.bReady
+                            AND GVL_Status.stFast.stRAxis.bReady
+                            AND NOT GVL_Status.stFast.stZAxis.bError
+                            AND NOT GVL_Status.stFast.stRAxis.bError THEN
+                            IF stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_LOCAL THEN
+                                eNextState := CFF_RETURN_LOCAL;
+                            ELSIF stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_REFERENCE THEN
+                                eNextState := CFF_RETURN_REFERENCE;
+                            ELSE
+                                IF udiFirstFaultId = 0 THEN
+                                    udiFirstFaultId := 16#0000A016;
+                                END_IF
+                                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                                eNextState := CFF_FAULT;
+                            END_IF
+                        ELSE
+                            IF udiFirstFaultId = 0 THEN
+                                udiFirstFaultId := 16#0000A016;
+                            END_IF
+                            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                            eNextState := CFF_FAULT;
+                        END_IF
+                    CFF_EXIT_ABORT_NO_RETURN:
+                        eNextState := CFF_ABORT;
+                    CFF_EXIT_FAULT_NO_RETURN:
+                        eNextState := CFF_FAULT;
+                ELSE
+                    IF udiFirstFaultId = 0 THEN
+                        udiFirstFaultId := 16#0000A016;
+                    END_IF
+                    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                    eNextState := CFF_FAULT;
+                END_CASE
+            END_IF
+            IF (eNextState = CFF_ABORT) OR (eNextState = CFF_FAULT) THEN
+                bTerminalFaultStopRequired := TRUE;
+            END_IF
+        END_IF
+
+    CFF_RETURN_LOCAL:
+        IF NOT bReturnEntryBlocked THEN
+            IF bReturnPublicationAllowed THEN
+                IF bStateEntry THEN
+                    udiZCommandId := udiZCommandId + 1;
+                    IF udiZCommandId = 0 THEN
+                        udiZCommandId := 1;
+                    END_IF
+                END_IF
+                stMotionIntent.stZCommand.bEnable := TRUE;
+                stMotionIntent.stZCommand.bReset := FALSE;
+                stMotionIntent.stZCommand.bStop := FALSE;
+                stMotionIntent.stZCommand.bHome := FALSE;
+                stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+                stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+                stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+                stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+                stMotionIntent.stZCommand.rPosition_mm := rCycleStartZPosition_mm;
+                stMotionIntent.stZCommand.rVelocity_mm_s :=
+                    stCycleSnapshot.stProgram.stHeader.fReturnVelocityMmS;
+                stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+                    stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+                stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+                    stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+                stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_RETRACT;
+                stMotionIntent.bExternalEnableRequest := FALSE;
+                stMotionIntent.bExternalDisableRequest := FALSE;
+                stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+                stMotionIntent.bForceProcessExitComplete := TRUE;
+                stMotionIntent.bRAxisProcessRequested := TRUE;
+                stMotionIntent.stRCommand.bEnable := TRUE;
+                stMotionIntent.stRCommand.bReset := FALSE;
+                stMotionIntent.stRCommand.bStop := TRUE;
+                stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+                stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+                stMotionIntent.stRCommand.rAcceleration_rpm_s :=
+                    stRAxisProfileSnapshot.fSpeedRampRpmS;
+                stMotionIntent.stRCommand.rDeceleration_rpm_s :=
+                    stRAxisProfileSnapshot.fSpeedRampRpmS;
+                bForceControlEnable := FALSE;
+                IF tonReturn.Q THEN
+                    IF udiFirstFaultId = 0 THEN
+                        udiFirstFaultId := 16#0000A015;
+                    END_IF
+                    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                    eNextState := CFF_FAULT;
+                END_IF
+                IF (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+                    AND GVL_Status.stFast.stZAxis.bDone
+                    AND GVL_Status.stFast.stZAxis.bStandstill
+                    AND NOT tonReturn.Q THEN
+                    eNextState := CFF_EVALUATE;
+                END_IF
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A016;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_FAULT;
+            END_IF
+        END_IF
+    CFF_RETURN_REFERENCE:
+        IF NOT bReturnEntryBlocked THEN
+            IF bReturnPublicationAllowed THEN
+                IF bStateEntry THEN
+                    udiZCommandId := udiZCommandId + 1;
+                    IF udiZCommandId = 0 THEN
+                        udiZCommandId := 1;
+                    END_IF
+                END_IF
+                stMotionIntent.stZCommand.bEnable := TRUE;
+                stMotionIntent.stZCommand.bReset := FALSE;
+                stMotionIntent.stZCommand.bStop := FALSE;
+                stMotionIntent.stZCommand.bHome := FALSE;
+                stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+                stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+                stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+                stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+                stMotionIntent.stZCommand.rPosition_mm :=
+                    stCycleSnapshot.stProgram.stHeader.fReturnOpeningMm;
+                stMotionIntent.stZCommand.rVelocity_mm_s :=
+                    stCycleSnapshot.stProgram.stHeader.fReturnVelocityMmS;
+                stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+                    stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+                stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+                    stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+                stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_RETRACT;
+                stMotionIntent.bExternalEnableRequest := FALSE;
+                stMotionIntent.bExternalDisableRequest := FALSE;
+                stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+                stMotionIntent.bForceProcessExitComplete := TRUE;
+                stMotionIntent.bRAxisProcessRequested := TRUE;
+                stMotionIntent.stRCommand.bEnable := TRUE;
+                stMotionIntent.stRCommand.bReset := FALSE;
+                stMotionIntent.stRCommand.bStop := TRUE;
+                stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+                stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+                stMotionIntent.stRCommand.rAcceleration_rpm_s :=
+                    stRAxisProfileSnapshot.fSpeedRampRpmS;
+                stMotionIntent.stRCommand.rDeceleration_rpm_s :=
+                    stRAxisProfileSnapshot.fSpeedRampRpmS;
+                bForceControlEnable := FALSE;
+                IF tonReturn.Q THEN
+                    IF udiFirstFaultId = 0 THEN
+                        udiFirstFaultId := 16#0000A015;
+                    END_IF
+                    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                    eNextState := CFF_FAULT;
+                END_IF
+                IF (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+                    AND GVL_Status.stFast.stZAxis.bDone
+                    AND GVL_Status.stFast.stZAxis.bStandstill
+                    AND NOT tonReturn.Q THEN
+                    eNextState := CFF_EVALUATE;
+                END_IF
+            ELSE
+                IF udiFirstFaultId = 0 THEN
+                    udiFirstFaultId := 16#0000A016;
+                END_IF
+                eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+                eNextState := CFF_FAULT;
+            END_IF
+        END_IF
+    CFF_EVALUATE:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := FALSE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := SEL(
+            stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_REFERENCE,
+            rCycleStartZPosition_mm,
+            stCycleSnapshot.stProgram.stHeader.fReturnOpeningMm);
+        stMotionIntent.stZCommand.rVelocity_mm_s :=
+            stCycleSnapshot.stProgram.stHeader.fReturnVelocityMmS;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_RETRACT;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        nWrittenStepPrefix := 0;
+        bStepResultHole := FALSE;
+        bMissingStepResult := FALSE;
+        bEvaluateNok := FALSE;
+        bEvaluateFault := FALSE;
+        FOR nStepIndex := 1 TO 4 DO
+            IF abStepResultWritten[nStepIndex] THEN
+                IF NOT bMissingStepResult THEN
+                    nWrittenStepPrefix := nStepIndex;
+                END_IF
+                IF bMissingStepResult THEN
+                    bStepResultHole := TRUE;
+                END_IF
+                bEvaluateNok := bEvaluateNok
+                    OR GVL_Process.astStepCriterion[nStepIndex].bNok
+                    OR GVL_Process.astStepCriterion[nStepIndex].bTooShort
+                    OR GVL_Process.astStepCriterion[nStepIndex].bSecondaryLatched
+                    OR (GVL_Process.astStepCriterion[nStepIndex].eEndCause
+                        = STEP_END_MAX_TIME);
+            ELSE
+                bMissingStepResult := TRUE;
+            END_IF
+        END_FOR
+        IF abStepResultWritten[4] THEN
+            bEvaluateNok := bEvaluateNok
+                OR NOT GVL_Process.astStepCriterion[4].bQualifiedForceHoldMet;
+        END_IF
+        bEvaluateFault := bStepResultHole;
+        IF eExitIntent = CFF_EXIT_NORMAL_RETURN THEN
+            IF (nWrittenStepPrefix <> 4) OR bEvaluateNok THEN
+                bEvaluateFault := TRUE;
+            END_IF
+        ELSIF eExitIntent = CFF_EXIT_NOK_RETURN THEN
+            IF NOT ((nWrittenStepPrefix >= 1) AND bEvaluateNok) THEN
+                bEvaluateFault := TRUE;
+            END_IF
+        ELSIF eExitIntent = CFF_EXIT_ABORT_NO_RETURN THEN
+            bEvaluateFault := FALSE;
+        ELSE
+            bEvaluateFault := TRUE;
+        END_IF
+        IF bEvaluateFault THEN
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A016;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+        END_IF
+        IF (eExitIntent = CFF_EXIT_NORMAL_RETURN) AND NOT bEvaluateFault THEN
+            eNextState := CFF_COMPLETE_OK;
+        ELSIF (eExitIntent = CFF_EXIT_NOK_RETURN) AND NOT bEvaluateFault THEN
+            eNextState := CFF_COMPLETE_NOK;
+        ELSIF (eExitIntent = CFF_EXIT_ABORT_NO_RETURN) AND NOT bEvaluateFault THEN
+            eNextState := CFF_ABORT;
+        ELSE
+            eNextState := CFF_FAULT;
+        END_IF
+    CFF_COMPLETE_OK:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := FALSE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := SEL(
+            stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_REFERENCE,
+            rCycleStartZPosition_mm,
+            stCycleSnapshot.stProgram.stHeader.fReturnOpeningMm);
+        stMotionIntent.stZCommand.rVelocity_mm_s :=
+            stCycleSnapshot.stProgram.stHeader.fReturnVelocityMmS;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_RETRACT;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF GVL_Status.stFast.stZAxis.bStandstill
+            AND GVL_Status.stFast.stRAxis.bStandstill
+            AND bExternalReady THEN
+            bBusy := FALSE;
+            bDone := TRUE;
+            bError := FALSE;
+            bAborted := FALSE;
+        END_IF
+    CFF_COMPLETE_NOK:
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := FALSE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := TRUE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := SEL(
+            stCycleSnapshot.stProgram.stHeader.eReturnMode = RETURN_MODE_REFERENCE,
+            rCycleStartZPosition_mm,
+            stCycleSnapshot.stProgram.stHeader.fReturnOpeningMm);
+        stMotionIntent.stZCommand.rVelocity_mm_s :=
+            stCycleSnapshot.stProgram.stHeader.fReturnVelocityMmS;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_RETRACT;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF GVL_Status.stFast.stZAxis.bStandstill
+            AND GVL_Status.stFast.stRAxis.bStandstill
+            AND bExternalReady THEN
+            bBusy := FALSE;
+            bDone := TRUE;
+            bError := TRUE;
+            bAborted := FALSE;
+        END_IF
+    CFF_ABORT:
+        IF bStateEntry AND bTerminalFaultStopRequired
+            AND NOT bApproachFaultStopPending THEN
+            udiZCommandId := udiZCommandId + 1;
+            IF udiZCommandId = 0 THEN
+                udiZCommandId := 1;
+            END_IF
+            bApproachFaultStopPending := TRUE;
+            bTerminalFaultStopRequired := FALSE;
+        END_IF
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := TRUE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := 0.0;
+        stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF bApproachFaultStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+            AND GVL_Status.stFast.stZAxis.bStandstill
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            bApproachFaultStopPending := FALSE;
+        END_IF
+        IF NOT bApproachFaultStopPending
+            AND GVL_Status.stFast.stZAxis.bStandstill
+            AND GVL_Status.stFast.stRAxis.bStandstill
+            AND bExternalReady THEN
+            bBusy := FALSE;
+            bDone := FALSE;
+            bError := FALSE;
+            bAborted := TRUE;
+        END_IF
+    CFF_FAULT:
+        IF udiFirstFaultId = 0 THEN
+            udiFirstFaultId := 16#0000A016;
+        END_IF
+        IF bStateEntry AND bTerminalFaultStopRequired
+            AND NOT bApproachFaultStopPending THEN
+            udiZCommandId := udiZCommandId + 1;
+            IF udiZCommandId = 0 THEN
+                udiZCommandId := 1;
+            END_IF
+            bApproachFaultStopPending := TRUE;
+            bTerminalFaultStopRequired := FALSE;
+        END_IF
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := TRUE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := 0.0;
+        stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF bApproachFaultStopPending
+            AND (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+            AND GVL_Status.stFast.stZAxis.bStandstill
+            AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+            AND GVL_Status.stFast.stRAxis.bStandstill THEN
+            bApproachFaultStopPending := FALSE;
+        END_IF
+        IF NOT bApproachFaultStopPending
+            AND GVL_Status.stFast.stZAxis.bStandstill
+            AND GVL_Status.stFast.stRAxis.bStandstill
+            AND bExternalReady THEN
+            bBusy := FALSE;
+            bDone := FALSE;
+            bError := TRUE;
+            bAborted := FALSE;
+        END_IF
+ELSE
+    IF udiFirstFaultId = 0 THEN
+        udiFirstFaultId := 16#0000A016;
+    END_IF
+    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+    IF NOT bExternalReady THEN
+        (* Unknown state while External still owns the axis: preserve the
+           active Z identity/owner contract and create a fresh R stop. *)
+        IF udiZCommandId = 0 THEN
+            udiZCommandId := 1;
+        END_IF
+        udiRCommandId := udiRCommandId + 1;
+        IF udiRCommandId = 0 THEN
+            udiRCommandId := 1;
+        END_IF
+        bUnknownExternalRStopPending := TRUE;
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := FALSE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := 0.0;
+        stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := 0.0;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+            stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := TRUE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := FALSE;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        eNextState := CFF_EXTSETPOINT_DISABLE;
+    ELSE
+        (* External is released, so terminate any possible standard NC motion
+           with one fresh FaultStop transaction and retain the R zero-stop. *)
+        udiZCommandId := udiZCommandId + 1;
+        IF udiZCommandId = 0 THEN
+            udiZCommandId := 1;
+        END_IF
+        udiRCommandId := udiRCommandId + 1;
+        IF udiRCommandId = 0 THEN
+            udiRCommandId := 1;
+        END_IF
+        bApproachFaultStopPending := TRUE;
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := TRUE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := 0.0;
+        stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        eNextState := CFF_FAULT;
+    END_IF
+END_CASE
+
+(* 唯一结果发布点：先构造完整payload，再写公开槽位，最后锁存guard。 *)
+IF bStepResultPublishRequested AND NOT abStepResultWritten[nStepResultIndex] THEN
+    stStepResultCandidate := stClearedStepCriterionResult;
+    stStepResultCandidate.eStep := eStep;
+    stStepResultCandidate.eEndCause := fbStepCriterion.stOutput.eEndCause;
+    stStepResultCandidate.bPrimaryLatched := fbStepCriterion.stOutput.bPrimaryMet;
+    stStepResultCandidate.bSecondaryLatched :=
+        fbStepCriterion.stOutput.bSecondaryLimitReached;
+    stStepResultCandidate.bNok := bStepResultNok;
+    stStepResultCandidate.nTriggerCycle := GVL_Status.stFast.nCycleCounter;
+    stStepResultCandidate.bTooShort := fbStepCriterion.stOutput.bTooShort;
+    stStepResultCandidate.bQualifiedForceHoldMet := (nStepResultIndex = 4)
+        AND (uliQualifiedHold_us >= uliQualifiedHoldTarget_us);
+    stStepResultCandidate.rQualifiedForceHoldTime_s := rQualifiedForceHoldTime_s;
+    stStepResultCandidate.rLatchedForce_kN :=
+        fbStepCriterion.stOutput.rLatchedForce_kN;
+    stStepResultCandidate.rLatchedRelativePosition_mm :=
+        fbStepCriterion.stOutput.rLatchedRelativePosition_mm;
+    stStepResultCandidate.rLatchedStepTime_s :=
+        fbStepCriterion.stOutput.rLatchedStepTime_s;
+    GVL_Process.astStepCriterion[nStepResultIndex] := stStepResultCandidate;
+    abStepResultWritten[nStepResultIndex] := TRUE;
+END_IF
+
+(* This classifier is evaluated after the state branch so a newly latched
+   timeout/algorithm fault is routed to safety in the same Fast scan. *)
+bSafeExitRequested := bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched
+    OR bHardForceActive OR bHardStrokeActive OR bCollisionLimitActive
+    OR bExternalError OR bAxisError OR bSensorInvalid OR (udiFirstFaultId > 0);
+bReturnSafeStopRequested := ((eState = CFF_RETURN_LOCAL)
+        OR (eState = CFF_RETURN_REFERENCE)
+        OR (eState = CFF_EVALUATE)
+        OR (eState = CFF_COMPLETE_OK)
+        OR (eState = CFF_COMPLETE_NOK))
+    AND bSafeExitRequested;
+
+(* Return-capable intent never survives a same-scan real fault or active event. *)
+IF (udiFirstFaultId > 0) OR bHardForceActive OR bHardStrokeActive
+    OR bCollisionLimitActive OR bExternalError OR bAxisError OR bSensorInvalid THEN
+    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+ELSIF bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched THEN
+    eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+END_IF
+
+(* Disable may have selected Abort before a same-scan real fault was normalized. *)
+IF (eState = CFF_EXTSETPOINT_DISABLE)
+    AND (eNextState = CFF_ABORT)
+    AND (eExitIntent = CFF_EXIT_FAULT_NO_RETURN) THEN
+    eNextState := CFF_FAULT;
+END_IF
+
+(* Abort等待中出现的真实故障必须覆盖Abort，但不改写已锁存的更早首故障。 *)
+IF (eState = CFF_ABORT) AND (eExitIntent = CFF_EXIT_FAULT_NO_RETURN) THEN
+    eNextState := CFF_FAULT;
+END_IF
+
+(* A same-scan hard/error/abort path cannot withdraw the External owner before release. *)
+IF bExternalOwnerHold AND bSafeExitRequested THEN
+    stMotionIntent.stZCommand.bEnable := TRUE;
+    stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FORCE_PROCESS;
+    stMotionIntent.stZCommand.bUseExternalSetpoint := TRUE;
+    stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+    stMotionIntent.bForceProcessExitComplete := FALSE;
+    stMotionIntent.bRAxisProcessRequested := TRUE;
+    stCandidateRCommand.bEnable := TRUE;
+    stCandidateRCommand.bReset := FALSE;
+    stCandidateRCommand.bStop := TRUE;
+    stCandidateRCommand.bMoveVelocity := FALSE;
+    stCandidateRCommand.rVelocity_rpm := 0.0;
+    stCandidateRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stCandidateRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stMotionIntent.stRCommand := stCandidateRCommand;
+    bSafeExitRStopPending := TRUE;
+    IF stCandidateRCommand.bEnable <> stLastPublishedRCommand.bEnable
+        OR stCandidateRCommand.bReset <> stLastPublishedRCommand.bReset
+        OR stCandidateRCommand.bStop <> stLastPublishedRCommand.bStop
+        OR stCandidateRCommand.bMoveVelocity <> stLastPublishedRCommand.bMoveVelocity
+        OR stCandidateRCommand.rVelocity_rpm <> stLastPublishedRCommand.rVelocity_rpm
+        OR stCandidateRCommand.rAcceleration_rpm_s
+            <> stLastPublishedRCommand.rAcceleration_rpm_s
+        OR stCandidateRCommand.rDeceleration_rpm_s
+            <> stLastPublishedRCommand.rDeceleration_rpm_s THEN
+        stLastPublishedRCommand := stCandidateRCommand;
+        stMotionIntent.stRCommand := stCandidateRCommand;
+        udiRCommandId := udiRCommandId + 1;
+        IF udiRCommandId = 0 THEN
+            udiRCommandId := 1;
+        END_IF
+    END_IF
+    bForceControlEnable := FALSE;
+    IF (eExitIntent = CFF_EXIT_ABORT_NO_RETURN)
+        AND bUnloadHealthy
+        AND (eState >= CFF_CONTACT_SEARCH)
+        AND (eState <= CFF_CONTROLLED_FORCE_UNLOAD) THEN
+        stMotionIntent.bExternalEnableRequest := TRUE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        bForceControlEnable := TRUE;
+        rForceSet_kN := 0.0;
+        IF eState < CFF_CONTROLLED_FORCE_UNLOAD THEN
+            IF NOT bUnloadTransferInitialized THEN
+                rTargetRelativePosition_mm := GVL_Process.stActual.fSRelSensorMm;
+                rForceTransferVelocity_mm_s :=
+                    GVL_Status.stFast.stZExtSetpoint.rAcceptedVelocity_mm_s;
+                bForceProfileTransferPending := TRUE;
+                bUnloadTransferInitialized := TRUE;
+            END_IF
+            eNextState := CFF_CONTROLLED_FORCE_UNLOAD;
+        END_IF
+    ELSE
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := TRUE;
+        bForceControlEnable := FALSE;
+        eNextState := CFF_EXTSETPOINT_DISABLE;
+    END_IF
+END_IF
+
+(* If release and a safety cause arrive in the same scan, the state branch may
+   already have rebuilt an Enable request.  The strictly positive release gate
+   therefore overrides the complete payload with fresh standard stop identities. *)
+IF GVL_Status.stFast.stZExtSetpoint.bReleaseOwner THEN
+    IF bExternalProcessState
+        AND GVL_Status.stFast.stZExtSetpoint.bReleaseOwner
+        AND bSafeExitRequested THEN
+        udiZCommandId := udiZCommandId + 1;
+        IF udiZCommandId = 0 THEN
+            udiZCommandId := 1;
+        END_IF
+        udiRCommandId := udiRCommandId + 1;
+        IF udiRCommandId = 0 THEN
+            udiRCommandId := 1;
+        END_IF
+        bApproachFaultStopPending := TRUE;
+        stMotionIntent.bExternalEnableRequest := FALSE;
+        stMotionIntent.bExternalDisableRequest := FALSE;
+        stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+        stMotionIntent.bForceProcessExitComplete := TRUE;
+        stMotionIntent.stZCommand.bEnable := TRUE;
+        stMotionIntent.stZCommand.bReset := FALSE;
+        stMotionIntent.stZCommand.bStop := TRUE;
+        stMotionIntent.stZCommand.bHome := FALSE;
+        stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+        stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+        stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+        stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+        stMotionIntent.stZCommand.rPosition_mm := 0.0;
+        stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+        stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+        stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+        stMotionIntent.bRAxisProcessRequested := TRUE;
+        stMotionIntent.stRCommand.bEnable := TRUE;
+        stMotionIntent.stRCommand.bReset := FALSE;
+        stMotionIntent.stRCommand.bStop := TRUE;
+        stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+        stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+        stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+        bForceControlEnable := FALSE;
+        IF eExitIntent = CFF_EXIT_ABORT_NO_RETURN THEN
+            eNextState := CFF_ABORT;
+        ELSE
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        END_IF
+    END_IF
+END_IF
+
+(* Return/Evaluate/Complete的同扫安全事件在状态分支之后覆盖Done，并只创建一次FaultStop事务。 *)
+IF bReturnSafeStopRequested THEN
+    IF NOT bApproachFaultStopPending THEN
+        udiZCommandId := udiZCommandId + 1;
+        IF udiZCommandId = 0 THEN
+            udiZCommandId := 1;
+        END_IF
+        bApproachFaultStopPending := TRUE;
+    END_IF
+    stMotionIntent.stZCommand.bEnable := TRUE;
+    stMotionIntent.stZCommand.bReset := FALSE;
+    stMotionIntent.stZCommand.bStop := TRUE;
+    stMotionIntent.stZCommand.bHome := FALSE;
+    stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+    stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+    stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+    stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+    stMotionIntent.stZCommand.rPosition_mm := 0.0;
+    stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+    stMotionIntent.stZCommand.rAcceleration_mm_s2 :=
+        stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+    stMotionIntent.stZCommand.rDeceleration_mm_s2 :=
+        stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+    stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+    stMotionIntent.bExternalEnableRequest := FALSE;
+    stMotionIntent.bExternalDisableRequest := FALSE;
+    stMotionIntent.rExternalTargetVelocity_mm_s := 0.0;
+    stMotionIntent.bForceProcessExitComplete := TRUE;
+    stMotionIntent.bRAxisProcessRequested := TRUE;
+    stMotionIntent.stRCommand.bEnable := TRUE;
+    stMotionIntent.stRCommand.bReset := FALSE;
+    stMotionIntent.stRCommand.bStop := TRUE;
+    stMotionIntent.stRCommand.bMoveVelocity := FALSE;
+    stMotionIntent.stRCommand.rVelocity_rpm := 0.0;
+    stMotionIntent.stRCommand.rAcceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    stMotionIntent.stRCommand.rDeceleration_rpm_s := stRAxisProfileSnapshot.fSpeedRampRpmS;
+    bForceControlEnable := FALSE;
+    IF eExitIntent = CFF_EXIT_FAULT_NO_RETURN THEN
+        eNextState := CFF_FAULT;
+    ELSE
+        eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+        eNextState := CFF_ABORT;
+    END_IF
+END_IF
+
+(* Precheck owns no motion, so active Stop/Abort/Reset can route directly to a
+   terminal wait without depending on the asynchronous Contact Reset ACK. *)
+IF eState = CFF_PRECHECK AND bPrecheckExitRequested THEN
+    IF eExitIntent = CFF_EXIT_ABORT_NO_RETURN THEN
+        eNextState := CFF_ABORT;
+    ELSE
+        eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+        eNextState := CFF_FAULT;
+    END_IF
+END_IF
+
+(* Approach has not entered External and may use the standard Fault Stop path. *)
+IF eState = CFF_APPROACH AND bSafeExitRequested THEN
+    IF NOT bApproachFaultStopPending THEN
+        udiZCommandId := udiZCommandId + 1;
+        IF udiZCommandId = 0 THEN
+            udiZCommandId := 1;
+        END_IF
+        bApproachFaultStopPending := TRUE;
+    END_IF
+    stMotionIntent.stZCommand.bEnable := TRUE;
+    stMotionIntent.stZCommand.bReset := FALSE;
+    stMotionIntent.stZCommand.bStop := TRUE;
+    stMotionIntent.stZCommand.bHome := FALSE;
+    stMotionIntent.stZCommand.bMoveAbsolute := FALSE;
+    stMotionIntent.stZCommand.bMoveVelocity := FALSE;
+    stMotionIntent.stZCommand.eOwnerRequest := Z_OWNER_FAULT_STOP;
+    stMotionIntent.stZCommand.bUseExternalSetpoint := FALSE;
+    stMotionIntent.stZCommand.rHomePosition_mm := 0.0;
+    stMotionIntent.stZCommand.rPosition_mm := 0.0;
+    stMotionIntent.stZCommand.rVelocity_mm_s := 0.0;
+    stMotionIntent.stZCommand.rAcceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveAccelerationMmS2;
+    stMotionIntent.stZCommand.rDeceleration_mm_s2 := stSequenceConfigSnapshot.fStandardMoveDecelerationMmS2;
+    stMotionIntent.bExternalDisableRequest := FALSE;
+    IF tonRAxisStop.Q
+        OR (udiFirstFaultId = 16#0000A014) THEN
+        eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+        eNextState := CFF_FAULT;
+    ELSIF tonApproach.Q THEN
+        IF udiFirstFaultId = 0 THEN
+            udiFirstFaultId := 16#0000A007;
+        END_IF
+        eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+        eNextState := CFF_FAULT;
+    ELSIF (GVL_Status.stFast.udiAcceptedSequenceZCommandId = udiZCommandId)
+        AND GVL_Status.stFast.stZAxis.bStandstill
+        AND (GVL_Status.stFast.udiAcceptedSequenceRCommandId = udiRCommandId)
+        AND GVL_Status.stFast.stRAxis.bStandstill THEN
+        bApproachFaultStopPending := FALSE;
+        IF eExitIntent = CFF_EXIT_ABORT_NO_RETURN THEN
+            eNextState := CFF_ABORT;
+        ELSIF eExitIntent = CFF_EXIT_FAULT_NO_RETURN THEN
+            eNextState := CFF_FAULT;
+        ELSE
+            IF udiFirstFaultId = 0 THEN
+                udiFirstFaultId := 16#0000A016;
+            END_IF
+            eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+            eNextState := CFF_FAULT;
+        END_IF
+    ELSE
+        eNextState := eState;
+    END_IF
+END_IF
+
+IF (eState = CFF_IDLE) AND NOT bSafeTerminalReset
+    AND (bStopRequestedLatched OR bAbortEvent OR bResetPendingLatched) THEN
+    eExitIntent := CFF_EXIT_ABORT_NO_RETURN;
+    eNextState := CFF_ABORT;
+END_IF
+
+IF (eState = CFF_IDLE) AND (udiFirstFaultId <> 0) THEN
+    bBusy := TRUE;
+    eExitIntent := CFF_EXIT_FAULT_NO_RETURN;
+    eNextState := CFF_FAULT;
+END_IF
+
+(* Contact publisher: five payload fields first and the RequestId last, at one site only. *)
+IF bProcessReferencePending THEN
+    GVL_Command.stProcessReference.bLatchContactReference :=
+        stPendingProcessReferenceCommand.bLatchContactReference;
+    GVL_Command.stProcessReference.bUseProvidedContactReference :=
+        stPendingProcessReferenceCommand.bUseProvidedContactReference;
+    GVL_Command.stProcessReference.rProvidedContactSensorPosition_mm :=
+        stPendingProcessReferenceCommand.rProvidedContactSensorPosition_mm;
+    GVL_Command.stProcessReference.rProvidedContactAxisPosition_mm :=
+        stPendingProcessReferenceCommand.rProvidedContactAxisPosition_mm;
+    GVL_Command.stProcessReference.bResetContactReference :=
+        stPendingProcessReferenceCommand.bResetContactReference;
+    GVL_Command.stProcessReference.udiContactReferenceRequestId :=
+        stPendingProcessReferenceCommand.udiContactReferenceRequestId;
+END_IF
+
+(* A profile-transfer request is retained until Force is actually enabled. *)
+IF bForceProfileTransferPending AND bForceControlEnable THEN
+    bForceProfileTransfer := TRUE;
+    bForceProfileTransferPending := FALSE;
+END_IF
+
+IF bSafeTerminalReset THEN
+    bBusy := FALSE;
+    bDone := FALSE;
+    bError := FALSE;
+    bAborted := FALSE;
+    bStopRequestedLatched := FALSE;
+    bResetPendingLatched := FALSE;
+    bCycleNokLatched := FALSE;
+    udiFirstFaultId :=0;
+    udiActiveStartCommandId := 0;
+    bStartSourceSnapshotConsistent := FALSE;
+    eExitIntent := CFF_EXIT_NONE;
+    eStep := CFF_STEP_NONE;
+    eSubPhase := STEP_SUBPHASE_NONE;
+    eEndCause := STEP_END_NONE;
+    stFastConfigSnapshot.bValid := FALSE;
+    bForceControlEnable := FALSE;
+    bForceProfileTransfer := FALSE;
+    bForceProfileTransferPending := FALSE;
+    rForceTransferVelocity_mm_s := 0.0;
+    rForceSet_kN := 0.0;
+    rForceRamp_kN_s := 0.0;
+    rSpeedSet_rpm := 0.0;
+    rTargetRelativePosition_mm := 0.0;
+    rHardMaximumRelativePosition_mm := 0.0;
+    rRequiredRelativePosition_mm := 0.0;
+    rStepBoundary_mm := 0.0;
+    rCycleStartZPosition_mm := 0.0;
+    rStepTime_s := 0.0;
+    rQualifiedForceHoldTime_s := 0.0;
+    uliCycleDelta_us := 0;
+    uliStepElapsed_us := 0;
+    uliStepMaximum_us := 0;
+    uliQualifiedHold_us := 0;
+    uliQualifiedHoldTarget_us := 0;
+    bRpmStopped := FALSE;
+    bForceInBand := FALSE;
+    bStepResultPublishRequested := FALSE;
+    bStepResultNok := FALSE;
+    nStepResultIndex := 1;
+    bEvaluateNok := FALSE;
+    bEvaluateFault := FALSE;
+    bStepResultHole := FALSE;
+    bMissingStepResult := FALSE;
+    nWrittenStepPrefix := 0;
+    bHardForceActive := FALSE;
+    bHardStrokeActive := FALSE;
+    bCollisionLimitActive := FALSE;
+    bProcessReferencePending := FALSE;
+    bProcessReferenceResetPending := FALSE;
+    bProcessReferenceLatchPending := FALSE;
+    bApproachFaultStopPending := FALSE;
+    bUnknownExternalRStopPending := FALSE;
+    bSafeExitRStopPending := FALSE;
+    bTerminalFaultStopRequired := FALSE;
+    bUnloadTransferInitialized := FALSE;
+    bContactResetPulse := TRUE;
+    bForceDeclineResetPulse := TRUE;
+    bStepCriterionResetPulse := TRUE;
+    eNextState := CFF_IDLE;
+END_IF
+
+(* Stop is the final diagnostic end cause until Start or safe Reset clears it. *)
+IF bStopRequestedLatched THEN
+    eEndCause := STEP_END_STOP_REQUEST;
+END_IF
+
+(* A transition scan never publishes the completed truth table of its source state. *)
+IF (eState <> eNextState)
+    AND ((eNextState = CFF_ABORT) OR (eNextState = CFF_FAULT)) THEN
+    bBusy := TRUE;
+    bDone := FALSE;
+    bError := FALSE;
+    bAborted := FALSE;
+END_IF
+
+(* Publish stable source identities and the complete typed Sequence status. *)
+stMotionIntent.udiZCommandId := udiZCommandId;
+stMotionIntent.udiRCommandId := udiRCommandId;
+GVL_Status.stFast.stSequence.nAcceptedCommandId := udiActiveStartCommandId;
+GVL_Status.stFast.stSequence.bBusy := bBusy;
+GVL_Status.stFast.stSequence.bDone := bDone;
+GVL_Status.stFast.stSequence.bAborted := bAborted;
+GVL_Status.stFast.stSequence.bError := bError;
+GVL_Status.stFast.stSequence.nErrorId := udiFirstFaultId;
+GVL_Status.stFast.stSequence.eState := eNextState;
+GVL_Status.stFast.stSequence.eStep := eStep;
+GVL_Status.stFast.stSequence.eSubPhase := eSubPhase;
+GVL_Status.stFast.stSequence.eEndCause := eEndCause;
+GVL_Status.stFast.stSequence.eExitIntent := eExitIntent;
+GVL_Status.stFast.stSequence.bCycleNok := bCycleNokLatched;
+GVL_Status.stFast.stSequence.bRpmStopped := bRpmStopped;
+GVL_Status.stFast.stSequence.bForceInBand := bForceInBand;
+GVL_Status.stFast.stSequence.rStepTime_s := rStepTime_s;
+GVL_Status.stFast.stSequence.rQualifiedForceHoldTime_s := rQualifiedForceHoldTime_s;
+GVL_Status.stFast.stSequence.rForceSet_kN := rForceSet_kN;
+GVL_Status.stFast.stSequence.rForceRamp_kN_s := rForceRamp_kN_s;
+GVL_Status.stFast.stSequence.bForceControlEnable := bForceControlEnable;
+GVL_Status.stFast.stSequence.bForceProfileTransfer := bForceProfileTransfer;
+GVL_Status.stFast.stSequence.rForceTransferVelocity_mm_s := rForceTransferVelocity_mm_s;
+GVL_Status.stFast.stSequence.rTargetRelativePosition_mm := rTargetRelativePosition_mm;
+GVL_Status.stFast.stSequence.rHardMaximumRelativePosition_mm := rHardMaximumRelativePosition_mm;
+GVL_Status.stFast.stSequence.bForceHardLimitActive := bHardForceActive;
+GVL_Status.stFast.stSequence.bStrokeHardLimitActive := bHardStrokeActive;
+GVL_Status.stFast.stSequence.bCollisionLimitActive := bCollisionLimitActive;
+GVL_Status.stFast.stSequence.rSpeedSet_rpm := rSpeedSet_rpm;
 GVL_Status.stFast.stSequence.stContact := fbContactDetect.stOutput;
 GVL_Status.stFast.stSequence.stForceDecline := fbForceDecline.stOutput;
 GVL_Status.stFast.stSequence.stStepCriterion := fbStepCriterion.stOutput;
+GVL_Status.stFast.stSequence.stMotionIntent := stMotionIntent;
+GVL_Status.stFast.stSequence.stFastConfigSnapshot := stFastConfigSnapshot;
 
-(* Phase 9算法使用固定唯一报警槽9，不与External或导纳报警混用。 *)
 GVL_Alarm.astRequests[9].eCode := E_AlarmCode.ALARM_CFF_CRITERION_FAULT;
 GVL_Alarm.astRequests[9].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
 GVL_Alarm.astRequests[9].nTextId := 3000;
@@ -125,4 +2834,15 @@ GVL_Alarm.astRequests[9].nSourceId := 9;
 GVL_Alarm.astRequests[9].bLatch := TRUE;
 GVL_Alarm.astRequests[9].bActive := fbContactDetect.stOutput.bFault
     OR fbForceDecline.stOutput.bFault
-    OR fbStepCriterion.stOutput.bFault;]]></ST></Implementation></POU></TcPlcObject>
+    OR fbStepCriterion.stOutput.bFault;
+GVL_Alarm.astRequests[10].eCode := E_AlarmCode.ALARM_CFF_SEQUENCE_FAULT;
+GVL_Alarm.astRequests[10].eLevel := E_AlarmLevel.ALARM_LEVEL_FAULT;
+GVL_Alarm.astRequests[10].nTextId := 3200;
+GVL_Alarm.astRequests[10].nSourceId := 10;
+GVL_Alarm.astRequests[10].bLatch := TRUE;
+GVL_Alarm.astRequests[10].bActive := udiFirstFaultId <> 0;
+
+(* Exactly one state assignment completes the scan. *)
+ePreviousState := eState;
+eState := eNextState;
+bStateEntry := eState <> ePreviousState;]]></ST></Implementation></POU></TcPlcObject>

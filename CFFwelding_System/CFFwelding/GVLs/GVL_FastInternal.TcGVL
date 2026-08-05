@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><GVL Name="GVL_FastInternal" Id="{CA3D483E-12F4-4687-9EA3-C5BEF1496A7D}"><Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+    (* FastInputs按RequestId合同接受的完整快速命令快照。 *)
+    stAcceptedCommand : ST_FastCommand;
+END_VAR
+]]></Declaration></GVL></TcPlcObject>

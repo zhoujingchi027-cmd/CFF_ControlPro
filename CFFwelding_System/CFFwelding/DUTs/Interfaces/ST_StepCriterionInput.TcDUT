@@ -35,6 +35,8 @@ STRUCT
     bHardForceActive : BOOL;
     (* Hard S_rel边界已经触发。 *)
     bHardStrokeActive : BOOL;
+    (* Collision边界已经触发。 *)
+    bCollisionActive : BOOL;
     (* 必需传感器或参考点无效。 *)
     bSensorInvalid : BOOL;
     (* 轴状态或External通道故障。 *)

@@ -1,5 +1,30 @@
 # scripts
 
+## Phase 10 scoped offline acceptance
+
+`Test-Phase10CffSequence.ps1` is an ASCII-only PowerShell harness. Its
+source, messages, regular expressions, and comments remain ASCII-only; it
+reads TwinCAT ST/XML and Markdown as UTF-8.
+
+Run one scope while implementing its contract, or use `All` for the full
+offline acceptance sequence:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase10CffSequence.ps1 -Scope Contracts
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Phase10CffSequence.ps1 -Scope All
+```
+
+Available scopes are `Contracts`, `Validation`, `Trajectory`, `Adapter`,
+`Routing`, `SequenceFront`, `SequenceSteps`, and `SequenceExit`. `All` runs
+all eight scopes in declaration order. `-RequireReport` additionally requires
+the Phase 10 execution report; omit it during implementation so the harness
+can run before final reporting.
+
+The harness is static acceptance evidence plus independent reference vectors.
+It is not a PLC Runtime test, an Online Change, a hardware test, or a machine
+qualification. It must not scan, activate, download, enable axes, or move
+hardware.
+
 只允许放置：
 
 - 环境检测；

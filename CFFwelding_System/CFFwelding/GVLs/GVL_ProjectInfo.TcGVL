@@ -4,8 +4,8 @@ VAR_GLOBAL CONSTANT
     (* 工程名称。 *)
     c_sProjectName : STRING(63) := 'CFFwelding';
     (* 当前绿地架构版本。 *)
-    c_sArchitectureVersion : STRING(31) := 'V3.3';
+    c_sArchitectureVersion : STRING(31) := 'V3.7';
     (* 当前实现阶段。 *)
-    c_sImplementationPhase : STRING(31) := 'Phase 9';
+    c_sImplementationPhase : STRING(31) := 'Phase 10 Source';
 END_VAR
 ]]></Declaration></GVL></TcPlcObject>

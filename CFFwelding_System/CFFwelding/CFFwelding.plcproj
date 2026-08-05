@@ -48,6 +48,9 @@
     <Compile Include="DUTs\Enums\E_CffState.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\Enums\E_CffExitIntent.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\Enums\E_CffStep.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -67,6 +70,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\Enums\E_ZExtSetpointState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Enums\E_ZExternalTrajectoryState.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\Enums\E_AlarmLevel.TcDUT">
@@ -210,6 +216,12 @@
     <Compile Include="DUTs\Structures\ST_ZExtSetpointConfig.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\Structures\ST_CffSequenceConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Structures\ST_CffFastConfigSnapshot.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="GVLs\GVL_Const.TcGVL">
       <SubType>Code</SubType>
     </Compile>
@@ -273,6 +285,15 @@
     <Compile Include="DUTs\Interfaces\ST_RAxisStatus.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\Interfaces\ST_CffMotionIntent.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExternalTrajectoryInput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Interfaces\ST_ZExternalTrajectoryOutput.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\Interfaces\ST_ContactDetectInput.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -322,6 +343,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Functions\FC_IsFiniteLReal.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_IsNewerRequestId.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\FC_ValidateCffSequenceConfig.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Functions\FC_Interpolate1D.TcPOU">
@@ -378,6 +405,9 @@
     <Compile Include="POUs\FunctionBlocks\Control\FB_ZForceAdmittance.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FunctionBlocks\Control\FB_ZExternalTrajectory.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FunctionBlocks\Control\FB_ContactDetect.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -385,6 +415,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FunctionBlocks\Control\FB_StepProceedingCriterion.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_FastInternal.TcGVL">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Fast\PRG_FastInputs.TcPOU">

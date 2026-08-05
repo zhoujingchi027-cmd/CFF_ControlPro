@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_ZExternalTrajectoryOutput" Id="{EA3FEACE-47F9-4A31-A6EA-1CF99C98F83F}"><Declaration><![CDATA[TYPE ST_ZExternalTrajectoryOutput : STRUCT
+    (* 轨迹位置，单位mm。 *)
+    rPosition_mm : LREAL;
+    (* 轨迹速度，单位mm/s。 *)
+    rVelocity_mm_s : LREAL;
+    (* 轨迹加速度，单位mm/s2。 *)
+    rAcceleration_mm_s2 : LREAL;
+    (* 轨迹方向。 *)
+    nDirection : DINT;
+    (* 轨迹发生器状态。 *)
+    eState : E_ZExternalTrajectoryState;
+    (* 正在执行方向过渡。 *)
+    bDirectionTransition : BOOL;
+    (* 零速度已经确认。 *)
+    bZeroConfirmed : BOOL;
+    (* 正方向运动已禁止。 *)
+    bPositiveMotionInhibited : BOOL;
+    (* 轨迹发生器活动。 *)
+    bActive : BOOL;
+    (* 轨迹发生器故障。 *)
+    bFault : BOOL;
+    (* 轨迹发生器故障编号。 *)
+    nFaultId : UDINT;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

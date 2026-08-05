@@ -19,6 +19,16 @@ STRUCT
     eState : E_ZExtSetpointState;
     (* 已执行的External Feed周期计数。 *)
     udiFeedCycleCounter : UDINT;
+    (* 已接受设定值有效。 *)
+    bAcceptedSetpointValid : BOOL;
+    (* 已接受位置，单位mm。 *)
+    rAcceptedPosition_mm : LREAL;
+    (* 已接受速度，单位mm/s。 *)
+    rAcceptedVelocity_mm_s : LREAL;
+    (* 已接受加速度，单位mm/s2。 *)
+    rAcceptedAcceleration_mm_s2 : LREAL;
+    (* 已接受方向。 *)
+    nAcceptedDirection : DINT;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

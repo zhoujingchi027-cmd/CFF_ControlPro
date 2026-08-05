@@ -21,8 +21,22 @@ STRUCT
     eSubPhase : E_StepSubPhase;
     (* 最近步骤结束原因。 *)
     eEndCause : E_StepEndCause;
+    (* 流程退出意图。 *)
+    eExitIntent : E_CffExitIntent;
+    (* 当前周期是否不合格。 *)
+    bCycleNok : BOOL;
+    (* R轴转速是否已经停止。 *)
+    bRpmStopped : BOOL;
+    (* 实际力是否位于合格力带。 *)
+    bForceInBand : BOOL;
+    (* 当前步骤时间，单位秒。 *)
+    rStepTime_s : LREAL;
+    (* 合格力带保持时间，单位秒。 *)
+    rQualifiedForceHoldTime_s : LREAL;
     (* 当前流程目标轴向力，单位千牛。 *)
     rForceSet_kN : LREAL;
+    (* 当前步骤力设定斜坡，单位千牛每秒。 *)
+    rForceRamp_kN_s : LREAL;
     (* 请求Fast轴层运行导纳力控；Phase 10实现前保持FALSE。 *)
     bForceControlEnable : BOOL;
     (* Contact接管或Profile变化时请求一次积分无扰预置。 *)
@@ -47,6 +61,10 @@ STRUCT
     stForceDecline : ST_ForceDeclineOutput;
     (* Phase 9步骤判据诊断；Phase 10接入步骤前保持未使能。 *)
     stStepCriterion : ST_StepCriterionOutput;
+    (* 当前流程运动意图。 *)
+    stMotionIntent : ST_CffMotionIntent;
+    (* 当前流程冻结的Fast配置快照。 *)
+    stFastConfigSnapshot : ST_CffFastConfigSnapshot;
 END_STRUCT
 END_TYPE
 ]]></Declaration></DUT></TcPlcObject>

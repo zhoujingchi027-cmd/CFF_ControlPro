@@ -5,6 +5,7 @@ VAR_INPUT
     bReset : BOOL;
     (* 最高优先级故障受控停止请求。 *)
     bFaultStopRequest : BOOL;
+    stFaultStopCommand : ST_ZAxisCommand;
     (* 力过程已完成受控退出，允许转交Owner。 *)
     bForceProcessExitComplete : BOOL;
     (* 回零Owner候选命令。 *)
@@ -80,6 +81,7 @@ CASE eActiveOwner OF
     E_ZCommandOwner.Z_OWNER_RETRACT:
         stCommand := stRetractCommand;
     E_ZCommandOwner.Z_OWNER_FAULT_STOP:
+        stCommand := stFaultStopCommand;
         stCommand.bEnable := TRUE;
         stCommand.bReset := FALSE;
         stCommand.bStop := TRUE;
@@ -91,7 +93,6 @@ CASE eActiveOwner OF
         stCommand.rPosition_mm := 0.0;
         stCommand.rVelocity_mm_s := 0.0;
         stCommand.rAcceleration_mm_s2 := 0.0;
-        stCommand.rDeceleration_mm_s2 := 0.0;
         stCommand.eOwnerRequest := E_ZCommandOwner.Z_OWNER_FAULT_STOP;
     ELSE
         stCommand.bEnable := FALSE;

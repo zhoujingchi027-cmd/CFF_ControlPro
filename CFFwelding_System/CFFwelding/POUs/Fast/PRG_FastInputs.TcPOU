@@ -61,6 +61,10 @@ VAR
     bCollisionCalibrationValid : BOOL;
     (* Z轴真实驱动与轴状态是否允许使用NC位置诊断。 *)
     bAxisPositionValid : BOOL;
+    (* Stable candidate used for the Main-to-Fast double-read acceptance. *)
+    stFastCommandCandidate : ST_FastCommand;
+    (* Live outer request identity sampled before copying the complete payload. *)
+    udiLiveFastRequestId : UDINT;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
    快速输入处理状态。
@@ -72,6 +76,18 @@ END_VAR
    超时：由各SignalValidity和Debounce实例按配置处理。
    NOK/Fault：任何输入无效即撤销对应有效位，不生成替代假值。
    --------------------------------------------------------- *)
+(* Accept only a genuinely newer and stable complete Main-to-Fast package. *)
+udiLiveFastRequestId := GVL_Command.stFast.nRequestId;
+IF FC_IsNewerRequestId(
+        udiCandidate := udiLiveFastRequestId,
+        udiReference := GVL_FastInternal.stAcceptedCommand.nRequestId) THEN
+    stFastCommandCandidate := GVL_Command.stFast;
+    IF (stFastCommandCandidate.nRequestId = udiLiveFastRequestId)
+        AND (GVL_Command.stFast.nRequestId = udiLiveFastRequestId) THEN
+        GVL_FastInternal.stAcceptedCommand := stFastCommandCandidate;
+    END_IF
+END_IF
+
 rCycleTime_s := UDINT_TO_LREAL(GVL_Config.stMachine.nFastTaskCycleUs) * 0.000001;
 
 (* 力测量链：EP3174诊断、人工映射和受控标定必须同时有效。 *)

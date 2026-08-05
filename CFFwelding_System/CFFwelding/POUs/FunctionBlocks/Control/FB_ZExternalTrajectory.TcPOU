@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FB_ZExternalTrajectory" Id="{49BB0003-2BA9-4043-A877-34D1985BA004}" SpecialFunc="None"><Declaration><![CDATA[FUNCTION_BLOCK FB_ZExternalTrajectory
+VAR_INPUT
+    (* 调用者完整赋值的External轨迹输入快照。 *)
+    stInput : ST_ZExternalTrajectoryInput;
+END_VAR
+VAR_OUTPUT
+    (* 仅由已接受设定值推导的轨迹包和状态。 *)
+    stOutput : ST_ZExternalTrajectoryOutput;
+END_VAR
+VAR
+    (* 当前纯轨迹状态。 *)
+    eState : E_ZExternalTrajectoryState;
+    (* 最近一次已处理的Adapter接受周期计数。 *)
+    udiLastAcceptedFeedCycleCounter : UDINT;
+    (* 最近一次发布的位置，单位mm。 *)
+    rLastPublishedPosition_mm : LREAL;
+    (* 最近一次发布的速度，单位mm/s。 *)
+    rLastPublishedVelocity_mm_s : LREAL;
+    (* 最近一次发布的加速度，单位mm/s2。 *)
+    rLastPublishedAcceleration_mm_s2 : LREAL;
+    (* 最近一次发布的方向。 *)
+    nLastPublishedDirection : DINT;
+    (* 最近一次发布包携带的Hard Inhibit连续性绕过标志。 *)
+    bLastPublishedPositiveMotionInhibited : BOOL;
+    (* 最近一次有效的非零方向。 *)
+    nLastNonZeroDirection : DINT;
+    (* 零速换向完成后待预置的新方向。 *)
+    nPendingDirection : DINT;
+    (* 当前静止握手状态已经确认的接受周期数。 *)
+    nAcceptedStateCycles : UINT;
+    (* 当前External Active生命周期已经同步接受基准。 *)
+    bInitialized : BOOL;
+    (* 本扫描收到一个新的Adapter接受确认。 *)
+    bNewAcceptedFeed : BOOL;
+    (* 本扫描接受的是最近一次发布的零速包。 *)
+    bAcceptedPublishedZero : BOOL;
+    (* 配置、周期和目标满足纯算法边界。 *)
+    bConfigurationValid : BOOL;
+    (* 已接受P/V/A均有限且位于速度和加速度边界内。 *)
+    bAcceptedMotionValid : BOOL;
+    (* 新接受包与最近一次发布包连续。 *)
+    bAcceptedContinuityValid : BOOL;
+    (* 当前目标速度对应的离散方向。 *)
+    nTargetDirection : DINT;
+    (* 本扫描Rate Limit结果，单位mm/s。 *)
+    rNextVelocity_mm_s : LREAL;
+    (* 本扫描梯形积分加速度，单位mm/s2。 *)
+    rNextAcceleration_mm_s2 : LREAL;
+    (* 本扫描梯形积分位置，单位mm。 *)
+    rNextPosition_mm : LREAL;
+    (* 算法故障锁存。 *)
+    bFaultLatched : BOOL;
+    (* 首次锁存的确定性故障编号。 *)
+    udiLatchedFaultId : UDINT;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* ---------------------------------------------------------
+   Z轴External纯轨迹发生器。
+   进入：External Adapter已Active且已接受P/V/A/Direction有效。
+   周期动作：只从最后accepted包进行Rate Limit和梯形积分。
+   换向：零速、旧方向保持、方向归零、新方向预置均由accepted Feed推进。
+   硬禁止：同一扫描保持accepted位置并发布V=0、A=0、方向不变。
+   Fault：首次故障锁存；调用者必须停止Feed并请求Adapter安全Disable。
+   --------------------------------------------------------- *)
+stOutput.rPosition_mm := 0.0;
+stOutput.rVelocity_mm_s := 0.0;
+stOutput.rAcceleration_mm_s2 := 0.0;
+stOutput.nDirection := 0;
+stOutput.eState := eState;
+stOutput.bDirectionTransition := FALSE;
+stOutput.bZeroConfirmed := FALSE;
+stOutput.bPositiveMotionInhibited := FALSE;
+stOutput.bActive := FALSE;
+stOutput.bFault := bFaultLatched;
+stOutput.nFaultId := udiLatchedFaultId;
+
+(* Fault只能在未使能时显式复位；复位扫描保持IDLE和非活动。 *)
+IF bFaultLatched THEN
+    eState := Z_TRAJ_FAULT;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    IF stInput.bReset AND NOT stInput.bEnable THEN
+        bFaultLatched := FALSE;
+        udiLatchedFaultId := 0;
+        bInitialized := FALSE;
+        bLastPublishedPositiveMotionInhibited := FALSE;
+        udiLastAcceptedFeedCycleCounter := 0;
+        nLastNonZeroDirection := 0;
+        nPendingDirection := 0;
+        nAcceptedStateCycles := 0;
+        eState := Z_TRAJ_IDLE;
+        stOutput.bFault := FALSE;
+        stOutput.nFaultId := 0;
+        stOutput.bActive := FALSE;
+        stOutput.eState := Z_TRAJ_IDLE;
+    END_IF;
+    RETURN;
+END_IF;
+
+(* Disable清除运行态但不伪造Active或轨迹Feed。 *)
+IF NOT stInput.bEnable THEN
+    bInitialized := FALSE;
+    bLastPublishedPositiveMotionInhibited := FALSE;
+    udiLastAcceptedFeedCycleCounter := 0;
+    nLastNonZeroDirection := 0;
+    nPendingDirection := 0;
+    nAcceptedStateCycles := 0;
+    eState := Z_TRAJ_IDLE;
+    stOutput.eState := Z_TRAJ_IDLE;
+    RETURN;
+END_IF;
+
+nTargetDirection := 0;
+IF stInput.rTargetVelocity_mm_s > 0.0 THEN
+    nTargetDirection := 1;
+ELSIF stInput.rTargetVelocity_mm_s < 0.0 THEN
+    nTargetDirection := -1;
+END_IF;
+
+bConfigurationValid := (stInput.rCycleTime_s > 0.0)
+    AND FC_IsFiniteLReal(rValue := stInput.rCycleTime_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rMinimumPosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rMaximumPosition_mm)
+    AND (stInput.rMaximumPosition_mm > stInput.rMinimumPosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rMaximumVelocity_mm_s)
+    AND (stInput.rMaximumVelocity_mm_s > 0.0)
+    AND FC_IsFiniteLReal(rValue := stInput.rMaximumAcceleration_mm_s2)
+    AND (stInput.rMaximumAcceleration_mm_s2 > 0.0)
+    AND FC_IsFiniteLReal(rValue := stInput.rStandstillVelocity_mm_s)
+    AND (stInput.rStandstillVelocity_mm_s >= 0.0)
+    AND (stInput.rStandstillVelocity_mm_s < stInput.rMaximumVelocity_mm_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rMaximumPositionDeviation_mm)
+    AND (stInput.rMaximumPositionDeviation_mm >= 0.0)
+    AND FC_IsFiniteLReal(rValue := stInput.rTargetVelocity_mm_s)
+    AND (ABS(stInput.rTargetVelocity_mm_s) <= stInput.rMaximumVelocity_mm_s)
+    AND (stInput.nDirectionHoldCycles >= 1);
+
+IF NOT bConfigurationValid THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B001;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+(* Adapter未Active时只等待重新同步，不消费或外推任何包。 *)
+IF stInput.eExternalState <> Z_EXT_ACTIVE THEN
+    bInitialized := FALSE;
+    bLastPublishedPositiveMotionInhibited := FALSE;
+    nAcceptedStateCycles := 0;
+    eState := Z_TRAJ_SYNC;
+    stOutput.eState := Z_TRAJ_SYNC;
+    RETURN;
+END_IF;
+
+bAcceptedMotionValid := stInput.bAcceptedSetpointValid
+    AND FC_IsFiniteLReal(rValue := stInput.rAcceptedPosition_mm)
+    AND FC_IsFiniteLReal(rValue := stInput.rAcceptedVelocity_mm_s)
+    AND FC_IsFiniteLReal(rValue := stInput.rAcceptedAcceleration_mm_s2)
+    AND (ABS(stInput.rAcceptedVelocity_mm_s) <= stInput.rMaximumVelocity_mm_s)
+    AND (ABS(stInput.rAcceptedAcceleration_mm_s2) <= stInput.rMaximumAcceleration_mm_s2);
+
+IF NOT bAcceptedMotionValid THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B002;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+IF (stInput.nAcceptedDirection < -1) OR (stInput.nAcceptedDirection > 1) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B003;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+IF (stInput.rAcceptedPosition_mm < stInput.rMinimumPosition_mm)
+    OR (stInput.rAcceptedPosition_mm > stInput.rMaximumPosition_mm) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B004;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+IF (stInput.nAcceptedDirection = 0)
+    AND ((ABS(stInput.rAcceptedVelocity_mm_s) > stInput.rStandstillVelocity_mm_s)
+        OR (stInput.rAcceptedAcceleration_mm_s2 <> 0.0)) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B007;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+IF ((stInput.rAcceptedVelocity_mm_s > stInput.rStandstillVelocity_mm_s)
+        AND (stInput.nAcceptedDirection <> 1))
+    OR ((stInput.rAcceptedVelocity_mm_s < -stInput.rStandstillVelocity_mm_s)
+        AND (stInput.nAcceptedDirection <> -1)) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B006;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+bNewAcceptedFeed := (stInput.bFeedAccepted = TRUE)
+    AND (stInput.udiAcceptedFeedCycleCounter <> udiLastAcceptedFeedCycleCounter);
+bAcceptedPublishedZero := FALSE;
+stOutput.bPositiveMotionInhibited := stInput.bInhibitPositiveMotion;
+
+IF NOT bInitialized THEN
+    (* 首个Active扫描只发布同步包；必须等该包accepted后才进入TRACKING。 *)
+    udiLastAcceptedFeedCycleCounter := stInput.udiAcceptedFeedCycleCounter;
+    IF stInput.nAcceptedDirection <> 0 THEN
+        nLastNonZeroDirection := stInput.nAcceptedDirection;
+    END_IF;
+    bInitialized := TRUE;
+    eState := Z_TRAJ_SYNC;
+    stOutput.eState := Z_TRAJ_SYNC;
+    stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+    stOutput.rVelocity_mm_s := stInput.rAcceptedVelocity_mm_s;
+    stOutput.rAcceleration_mm_s2 := stInput.rAcceptedAcceleration_mm_s2;
+    stOutput.nDirection := stInput.nAcceptedDirection;
+    IF stInput.bInhibitPositiveMotion
+        AND (stInput.rAcceptedVelocity_mm_s > 0.0) THEN
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := 0.0;
+        stOutput.rAcceleration_mm_s2 := 0.0;
+        stOutput.nDirection := stInput.nAcceptedDirection;
+        stOutput.bPositiveMotionInhibited := TRUE;
+    END_IF;
+    rLastPublishedPosition_mm := stOutput.rPosition_mm;
+    rLastPublishedVelocity_mm_s := stOutput.rVelocity_mm_s;
+    rLastPublishedAcceleration_mm_s2 := stOutput.rAcceleration_mm_s2;
+    nLastPublishedDirection := stOutput.nDirection;
+    bLastPublishedPositiveMotionInhibited := stOutput.bPositiveMotionInhibited;
+    stOutput.bActive := TRUE;
+    RETURN;
+ELSE
+    IF bNewAcceptedFeed THEN
+        IF (stInput.nAcceptedDirection <> nLastPublishedDirection)
+            AND (ABS(stInput.rAcceptedVelocity_mm_s) > stInput.rStandstillVelocity_mm_s) THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#0000B006;
+            eState := Z_TRAJ_FAULT;
+            stOutput.bFault := TRUE;
+            stOutput.nFaultId := udiLatchedFaultId;
+            stOutput.eState := Z_TRAJ_FAULT;
+            stOutput.bActive := FALSE;
+            RETURN;
+        END_IF;
+        IF (eState <> Z_TRAJ_PRELOAD_NEW_DIRECTION)
+            AND (stInput.nAcceptedDirection <> 0)
+            AND (nLastNonZeroDirection <> 0)
+            AND (stInput.nAcceptedDirection <> nLastNonZeroDirection) THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#0000B006;
+            eState := Z_TRAJ_FAULT;
+            stOutput.bFault := TRUE;
+            stOutput.nFaultId := udiLatchedFaultId;
+            stOutput.eState := Z_TRAJ_FAULT;
+            stOutput.bActive := FALSE;
+            RETURN;
+        END_IF;
+
+        bAcceptedContinuityValid := ABS(stInput.rAcceptedPosition_mm
+                - rLastPublishedPosition_mm) <= stInput.rMaximumPositionDeviation_mm
+            AND (stInput.rAcceptedVelocity_mm_s = rLastPublishedVelocity_mm_s)
+            AND (stInput.rAcceptedAcceleration_mm_s2 = rLastPublishedAcceleration_mm_s2)
+            AND (stInput.nAcceptedDirection = nLastPublishedDirection);
+        IF NOT bAcceptedContinuityValid THEN
+            bFaultLatched := TRUE;
+            udiLatchedFaultId := 16#0000B005;
+            eState := Z_TRAJ_FAULT;
+            stOutput.bFault := TRUE;
+            stOutput.nFaultId := udiLatchedFaultId;
+            stOutput.eState := Z_TRAJ_FAULT;
+            stOutput.bActive := FALSE;
+            RETURN;
+        END_IF;
+
+        bAcceptedPublishedZero := (rLastPublishedVelocity_mm_s = 0.0)
+            AND (rLastPublishedAcceleration_mm_s2 = 0.0)
+            AND (ABS(stInput.rAcceptedVelocity_mm_s) <= stInput.rStandstillVelocity_mm_s)
+            AND (stInput.rAcceptedAcceleration_mm_s2 = 0.0);
+        udiLastAcceptedFeedCycleCounter := stInput.udiAcceptedFeedCycleCounter;
+        IF stInput.nAcceptedDirection <> 0 THEN
+            nLastNonZeroDirection := stInput.nAcceptedDirection;
+        END_IF;
+    END_IF;
+END_IF;
+
+stOutput.bZeroConfirmed := bNewAcceptedFeed AND bAcceptedPublishedZero;
+
+(* 转换期间目标方向必须保持为进入转换时锁存的非零方向。 *)
+IF (eState = Z_TRAJ_RAMP_TO_ZERO)
+    OR (eState = Z_TRAJ_HOLD_OLD_DIRECTION)
+    OR (eState = Z_TRAJ_DIRECTION_ZERO)
+    OR (eState = Z_TRAJ_PRELOAD_NEW_DIRECTION) THEN
+    IF (nTargetDirection = 0) OR (nTargetDirection <> nPendingDirection) THEN
+        bFaultLatched := TRUE;
+        udiLatchedFaultId := 16#0000B00A;
+        eState := Z_TRAJ_FAULT;
+        stOutput.bFault := TRUE;
+        stOutput.nFaultId := udiLatchedFaultId;
+        stOutput.eState := Z_TRAJ_FAULT;
+        stOutput.bActive := FALSE;
+        RETURN;
+    END_IF;
+END_IF;
+
+stOutput.eState := eState;
+stOutput.bDirectionTransition := (eState = Z_TRAJ_RAMP_TO_ZERO)
+    OR (eState = Z_TRAJ_HOLD_OLD_DIRECTION)
+    OR (eState = Z_TRAJ_DIRECTION_ZERO)
+    OR (eState = Z_TRAJ_PRELOAD_NEW_DIRECTION);
+
+(* Hard Inhibit是唯一允许替换未接受普通包的安全优先级。 *)
+IF NOT bNewAcceptedFeed AND stInput.bInhibitPositiveMotion
+    AND ((stInput.rAcceptedVelocity_mm_s > 0.0)
+        OR (rLastPublishedVelocity_mm_s > 0.0)) THEN
+    stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+    stOutput.rVelocity_mm_s := 0.0;
+    stOutput.rAcceleration_mm_s2 := 0.0;
+    stOutput.nDirection := stInput.nAcceptedDirection;
+    stOutput.bPositiveMotionInhibited := TRUE;
+    rLastPublishedPosition_mm := stOutput.rPosition_mm;
+    rLastPublishedVelocity_mm_s := stOutput.rVelocity_mm_s;
+    rLastPublishedAcceleration_mm_s2 := stOutput.rAcceleration_mm_s2;
+    nLastPublishedDirection := stOutput.nDirection;
+    bLastPublishedPositiveMotionInhibited := stOutput.bPositiveMotionInhibited;
+    stOutput.bActive := TRUE;
+    RETURN;
+END_IF;
+
+(* 无新accepted counter时严格重复待接受包，忽略TRACKING实时目标变化。 *)
+IF NOT bNewAcceptedFeed THEN
+    stOutput.rPosition_mm := rLastPublishedPosition_mm;
+    stOutput.rVelocity_mm_s := rLastPublishedVelocity_mm_s;
+    stOutput.rAcceleration_mm_s2 := rLastPublishedAcceleration_mm_s2;
+    stOutput.nDirection := nLastPublishedDirection;
+    stOutput.bPositiveMotionInhibited := bLastPublishedPositiveMotionInhibited;
+    stOutput.bActive := TRUE;
+    RETURN;
+END_IF;
+
+CASE eState OF
+    Z_TRAJ_IDLE:
+        eState := Z_TRAJ_SYNC;
+
+    Z_TRAJ_SYNC:
+        (* 同步扫描原样发布accepted包，下一扫描才开始积分。 *)
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := stInput.rAcceptedVelocity_mm_s;
+        stOutput.rAcceleration_mm_s2 := stInput.rAcceptedAcceleration_mm_s2;
+        stOutput.nDirection := stInput.nAcceptedDirection;
+        IF bInitialized THEN
+            eState := Z_TRAJ_TRACKING;
+        END_IF;
+
+    Z_TRAJ_TRACKING:
+        IF (nTargetDirection <> 0)
+            AND (nLastNonZeroDirection <> 0)
+            AND (nTargetDirection <> nLastNonZeroDirection) THEN
+            (* 非零反向目标先按accepted速度主动降到零。 *)
+            nPendingDirection := nTargetDirection;
+            nAcceptedStateCycles := 0;
+            eState := Z_TRAJ_RAMP_TO_ZERO;
+            rNextVelocity_mm_s := FC_LimitRate(
+                rCurrent := stInput.rAcceptedVelocity_mm_s,
+                rTarget := 0.0,
+                rRateUpPer_s := stInput.rMaximumAcceleration_mm_s2,
+                rRateDownPer_s := stInput.rMaximumAcceleration_mm_s2,
+                rCycleTime_s := stInput.rCycleTime_s);
+            rNextAcceleration_mm_s2 :=
+                (rNextVelocity_mm_s - stInput.rAcceptedVelocity_mm_s)
+                / stInput.rCycleTime_s;
+            rNextPosition_mm := stInput.rAcceptedPosition_mm
+                + 0.5 * (stInput.rAcceptedVelocity_mm_s + rNextVelocity_mm_s)
+                * stInput.rCycleTime_s;
+            stOutput.rPosition_mm := rNextPosition_mm;
+            stOutput.rVelocity_mm_s := rNextVelocity_mm_s;
+            stOutput.rAcceleration_mm_s2 := rNextAcceleration_mm_s2;
+            stOutput.nDirection := nLastNonZeroDirection;
+        ELSIF (stInput.nAcceptedDirection = 0) AND (nTargetDirection <> 0) THEN
+            (* 静止初始状态先预置新方向一个被接受的完整周期。 *)
+            nPendingDirection := nTargetDirection;
+            nAcceptedStateCycles := 0;
+            eState := Z_TRAJ_PRELOAD_NEW_DIRECTION;
+            stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+            stOutput.rVelocity_mm_s := 0.0;
+            stOutput.rAcceleration_mm_s2 := 0.0;
+            stOutput.nDirection := nPendingDirection;
+        ELSE
+            rNextVelocity_mm_s := FC_LimitRate(
+                rCurrent := stInput.rAcceptedVelocity_mm_s,
+                rTarget := stInput.rTargetVelocity_mm_s,
+                rRateUpPer_s := stInput.rMaximumAcceleration_mm_s2,
+                rRateDownPer_s := stInput.rMaximumAcceleration_mm_s2,
+                rCycleTime_s := stInput.rCycleTime_s);
+            IF stInput.bInhibitPositiveMotion AND (rNextVelocity_mm_s > 0.0) THEN
+                rNextVelocity_mm_s := 0.0;
+            END_IF;
+            rNextAcceleration_mm_s2 :=
+                (rNextVelocity_mm_s - stInput.rAcceptedVelocity_mm_s)
+                / stInput.rCycleTime_s;
+            rNextPosition_mm := stInput.rAcceptedPosition_mm
+                + 0.5 * (stInput.rAcceptedVelocity_mm_s + rNextVelocity_mm_s)
+                * stInput.rCycleTime_s;
+            stOutput.rPosition_mm := rNextPosition_mm;
+            stOutput.rVelocity_mm_s := rNextVelocity_mm_s;
+            stOutput.rAcceleration_mm_s2 := rNextAcceleration_mm_s2;
+            stOutput.nDirection := stInput.nAcceptedDirection;
+        END_IF;
+
+        (* Hard Force/Stroke/Collision覆盖普通正向制动尾巴。 *)
+        IF stInput.bInhibitPositiveMotion THEN
+            IF stInput.rAcceptedVelocity_mm_s > 0.0 THEN
+                stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+                stOutput.rVelocity_mm_s := 0.0;
+                stOutput.rAcceleration_mm_s2 := 0.0;
+                stOutput.nDirection := stInput.nAcceptedDirection;
+                stOutput.bPositiveMotionInhibited := TRUE;
+            ELSIF stOutput.rVelocity_mm_s > 0.0 THEN
+                stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+                stOutput.rVelocity_mm_s := 0.0;
+                stOutput.rAcceleration_mm_s2 := 0.0;
+                stOutput.nDirection := stInput.nAcceptedDirection;
+                stOutput.bPositiveMotionInhibited := TRUE;
+            ELSE
+                stOutput.bPositiveMotionInhibited := TRUE;
+            END_IF;
+        END_IF;
+
+    Z_TRAJ_RAMP_TO_ZERO:
+        rNextVelocity_mm_s := FC_LimitRate(
+            rCurrent := stInput.rAcceptedVelocity_mm_s,
+            rTarget := 0.0,
+            rRateUpPer_s := stInput.rMaximumAcceleration_mm_s2,
+            rRateDownPer_s := stInput.rMaximumAcceleration_mm_s2,
+            rCycleTime_s := stInput.rCycleTime_s);
+        IF ABS(rNextVelocity_mm_s) <= stInput.rStandstillVelocity_mm_s THEN
+            rNextVelocity_mm_s := 0.0;
+        END_IF;
+        rNextAcceleration_mm_s2 :=
+            (rNextVelocity_mm_s - stInput.rAcceptedVelocity_mm_s)
+            / stInput.rCycleTime_s;
+        rNextPosition_mm := stInput.rAcceptedPosition_mm
+            + 0.5 * (stInput.rAcceptedVelocity_mm_s + rNextVelocity_mm_s)
+            * stInput.rCycleTime_s;
+        stOutput.rPosition_mm := rNextPosition_mm;
+        stOutput.rVelocity_mm_s := rNextVelocity_mm_s;
+        stOutput.rAcceleration_mm_s2 := rNextAcceleration_mm_s2;
+        stOutput.nDirection := nLastNonZeroDirection;
+        IF stInput.bInhibitPositiveMotion AND (stInput.rAcceptedVelocity_mm_s > 0.0) THEN
+            stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+            stOutput.rVelocity_mm_s := 0.0;
+            stOutput.rAcceleration_mm_s2 := 0.0;
+            stOutput.nDirection := stInput.nAcceptedDirection;
+            stOutput.bPositiveMotionInhibited := TRUE;
+        END_IF;
+        IF stOutput.bZeroConfirmed THEN
+            nAcceptedStateCycles := 0;
+            eState := Z_TRAJ_HOLD_OLD_DIRECTION;
+        END_IF;
+
+    Z_TRAJ_HOLD_OLD_DIRECTION:
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := 0.0;
+        stOutput.rAcceleration_mm_s2 := 0.0;
+        stOutput.nDirection := nLastNonZeroDirection;
+        IF bNewAcceptedFeed THEN
+            IF nAcceptedStateCycles < UINT#65535 THEN
+                nAcceptedStateCycles := nAcceptedStateCycles + 1;
+            END_IF;
+            IF nAcceptedStateCycles >= stInput.nDirectionHoldCycles THEN
+                nAcceptedStateCycles := 0;
+                eState := Z_TRAJ_DIRECTION_ZERO;
+            END_IF;
+        END_IF;
+
+    Z_TRAJ_DIRECTION_ZERO:
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := 0.0;
+        stOutput.rAcceleration_mm_s2 := 0.0;
+        stOutput.nDirection := 0;
+        IF bNewAcceptedFeed AND (stInput.nAcceptedDirection = 0) THEN
+            nAcceptedStateCycles := 0;
+            eState := Z_TRAJ_PRELOAD_NEW_DIRECTION;
+        END_IF;
+
+    Z_TRAJ_PRELOAD_NEW_DIRECTION:
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := 0.0;
+        stOutput.rAcceleration_mm_s2 := 0.0;
+        stOutput.nDirection := nPendingDirection;
+        IF bNewAcceptedFeed
+            AND (stInput.nAcceptedDirection = nPendingDirection) THEN
+            nLastNonZeroDirection := nPendingDirection;
+            nAcceptedStateCycles := 0;
+            eState := Z_TRAJ_TRACKING;
+        END_IF;
+
+    Z_TRAJ_FAULT:
+        stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+        stOutput.rVelocity_mm_s := 0.0;
+        stOutput.rAcceleration_mm_s2 := 0.0;
+        stOutput.nDirection := stInput.nAcceptedDirection;
+        stOutput.bFault := TRUE;
+        stOutput.nFaultId := udiLatchedFaultId;
+        stOutput.bActive := FALSE;
+        IF stInput.bReset AND NOT stInput.bEnable THEN
+            bFaultLatched := FALSE;
+            udiLatchedFaultId := 0;
+            bInitialized := FALSE;
+            bLastPublishedPositiveMotionInhibited := FALSE;
+            eState := Z_TRAJ_IDLE;
+            stOutput.bFault := FALSE;
+            stOutput.nFaultId := 0;
+            stOutput.bActive := FALSE;
+            stOutput.eState := Z_TRAJ_IDLE;
+        END_IF;
+
+ELSE
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B009;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_CASE;
+
+(* 所有Active状态统一执行Hard Inhibit，消除SYNC和转换态的正向尾包。 *)
+IF stInput.bInhibitPositiveMotion
+    AND (stInput.rAcceptedVelocity_mm_s > 0.0) THEN
+    stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+    stOutput.rVelocity_mm_s := 0.0;
+    stOutput.rAcceleration_mm_s2 := 0.0;
+    stOutput.nDirection := stInput.nAcceptedDirection;
+    stOutput.bPositiveMotionInhibited := TRUE;
+ELSIF stInput.bInhibitPositiveMotion
+    AND (stOutput.rVelocity_mm_s > 0.0) THEN
+    stOutput.rPosition_mm := stInput.rAcceptedPosition_mm;
+    stOutput.rVelocity_mm_s := 0.0;
+    stOutput.rAcceleration_mm_s2 := 0.0;
+    stOutput.nDirection := stInput.nAcceptedDirection;
+    stOutput.bPositiveMotionInhibited := TRUE;
+END_IF;
+
+IF (stOutput.rPosition_mm < stInput.rMinimumPosition_mm)
+    OR (stOutput.rPosition_mm > stInput.rMaximumPosition_mm)
+    OR NOT FC_IsFiniteLReal(rValue := stOutput.rPosition_mm) THEN
+    bFaultLatched := TRUE;
+    udiLatchedFaultId := 16#0000B008;
+    eState := Z_TRAJ_FAULT;
+    stOutput.bFault := TRUE;
+    stOutput.nFaultId := udiLatchedFaultId;
+    stOutput.eState := Z_TRAJ_FAULT;
+    stOutput.bActive := FALSE;
+    RETURN;
+END_IF;
+
+stOutput.eState := eState;
+stOutput.bDirectionTransition := (eState = Z_TRAJ_RAMP_TO_ZERO)
+    OR (eState = Z_TRAJ_HOLD_OLD_DIRECTION)
+    OR (eState = Z_TRAJ_DIRECTION_ZERO)
+    OR (eState = Z_TRAJ_PRELOAD_NEW_DIRECTION);
+stOutput.bActive := (stInput.eExternalState = Z_EXT_ACTIVE)
+    AND ((eState = Z_TRAJ_SYNC)
+        OR (eState = Z_TRAJ_TRACKING)
+        OR (eState = Z_TRAJ_RAMP_TO_ZERO)
+        OR (eState = Z_TRAJ_HOLD_OLD_DIRECTION)
+        OR (eState = Z_TRAJ_DIRECTION_ZERO)
+        OR (eState = Z_TRAJ_PRELOAD_NEW_DIRECTION));
+
+(* 仅保存本扫描实际发布包；下一扫描先验证accepted，再生成后续包。 *)
+rLastPublishedPosition_mm := stOutput.rPosition_mm;
+rLastPublishedVelocity_mm_s := stOutput.rVelocity_mm_s;
+rLastPublishedAcceleration_mm_s2 := stOutput.rAcceleration_mm_s2;
+nLastPublishedDirection := stOutput.nDirection;
+bLastPublishedPositiveMotionInhibited := stOutput.bPositiveMotionInhibited;]]></ST></Implementation></POU></TcPlcObject>

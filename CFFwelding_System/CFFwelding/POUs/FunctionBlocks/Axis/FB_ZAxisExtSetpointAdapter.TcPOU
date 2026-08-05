@@ -53,8 +53,10 @@ VAR
     bFeedThisCycle : BOOL;
     (* MC_ExtSetPointGenFeed未使用的函数返回值。 *)
     bFeedUnused : BOOL;
-    (* 当前命令通过方向、有限值、限值和配置检查。 *)
-    bCommandValid : BOOL;
+    (* Enable前真实NC初值、轴健康、Owner、配置和限值检查结果。 *)
+    bPrecheckOk : BOOL;
+    (* Active期当前Feed包通过有限值、边界和方向基本检查。 *)
+    bActiveFeedCommandValid : BOOL;
     (* 当前命令与上一Feed满足连续性窗口。 *)
     bContinuityValid : BOOL;
     (* 当前送入NC的外部位置，单位毫米。 *)
@@ -65,8 +67,24 @@ VAR
     rFeedAcceleration_mm_s2 : LREAL;
     (* 当前送入NC的方向，只允许-1、0、1。 *)
     nFeedDirection : DINT;
+    (* Precheck从真实NC速度推导的初始方向。 *)
+    nInitialDirection : DINT;
     (* 退出前最后一个非零方向。 *)
     nLastNonZeroDirection : DINT;
+    (* Active内换向已接受旧方向静止包。 *)
+    bZ_EXT_DIRECTION_HOLD : BOOL;
+    (* Active内换向已接受Direction=0静止包。 *)
+    bZ_EXT_DIRECTION_ZERO : BOOL;
+    (* Active内换向已接受新非零Direction静止预置包。 *)
+    bZ_EXT_DIRECTION_PRELOAD : BOOL;
+    (* 已预置但尚未开始运动的新方向。 *)
+    nPendingDirection : DINT;
+    (* 本扫描Feed前的accepted方向快照。 *)
+    nAcceptedDirection : DINT;
+    (* 硬正向抑制包已在本扫描接受，下一扫描消费Disable。 *)
+    bDisable : BOOL;
+    (* 本扫描普通非静止Feed接受后清除方向握手状态。 *)
+    bClearDirectionHandshakeAfterFeed : BOOL;
     (* 梯形积分使用的上周期速度。 *)
     rPreviousVelocity_mm_s : LREAL;
     (* 连续性检查的期望位置。 *)
@@ -77,6 +95,8 @@ VAR
     udiFeedCycleCounter : UDINT;
     (* 生命周期错误锁存编号。 *)
     udiLatchedErrorId : UDINT;
+    (* 本扫描Active Feed安全检查的故障候选，非零时同扫描锁存。 *)
+    nFaultId : UDINT;
     (* 完整退出结束后应进入ERROR而不是DONE。 *)
     bExitDueToError : BOOL;
     (* 已进入Disable阶段，释放Owner前必须完成Disabled确认和后保持。 *)
@@ -93,10 +113,13 @@ END_VAR
 bEnablePulse := FALSE;
 bDisablePulse := FALSE;
 bFeedThisCycle := FALSE;
+bClearDirectionHandshakeAfterFeed := FALSE;
 stStatus.bFeedAccepted := FALSE;
+nAcceptedDirection := stStatus.nAcceptedDirection;
+nFaultId := 0;
 
-(* 正式P/V/A/Direction命令必须有限、同向并位于受控硬边界。 *)
-bCommandValid := stConfig.bValid
+(* Enable前只检查真实NC初值与生命周期条件，不要求上层尚未生成的Feed包。 *)
+bPrecheckOk := stConfig.bValid
     AND bDriveLinked AND bOwnerGranted AND bLimitsValid
     AND bAxisReady AND NOT bAxisError
     AND (rCycleTime_s > 0.0)
@@ -113,9 +136,6 @@ bCommandValid := stConfig.bValid
     AND FC_IsFiniteLReal(rValue := stConfig.rStandstillVelocity_mm_s)
     AND FC_IsFiniteLReal(rValue := stConfig.rMaximumPositionDeviation_mm)
     AND FC_IsFiniteLReal(rValue := stConfig.rMaximumVelocityStep_mm_s)
-    AND FC_IsFiniteLReal(rValue := stCommand.rPosition_mm)
-    AND FC_IsFiniteLReal(rValue := stCommand.rVelocity_mm_s)
-    AND FC_IsFiniteLReal(rValue := stCommand.rAcceleration_mm_s2)
     AND FC_IsFiniteLReal(rValue := Axis.NcToPlc.SetPos)
     AND FC_IsFiniteLReal(rValue := Axis.NcToPlc.SetVelo)
     AND FC_IsFiniteLReal(rValue := Axis.NcToPlc.SetAcc)
@@ -123,21 +143,27 @@ bCommandValid := stConfig.bValid
     AND (Axis.NcToPlc.SetPos <= rMaximumPosition_mm)
     AND (ABS(Axis.NcToPlc.SetVelo) <= ABS(rMaximumVelocity_mm_s))
     AND (ABS(Axis.NcToPlc.SetAcc) <= ABS(rMaximumAcceleration_mm_s2))
-    AND (stCommand.nDirection >= -1) AND (stCommand.nDirection <= 1)
-    AND (stCommand.rPosition_mm >= rMinimumPosition_mm)
-    AND (stCommand.rPosition_mm <= rMaximumPosition_mm)
-    AND (ABS(stCommand.rVelocity_mm_s) <= ABS(rMaximumVelocity_mm_s))
-    AND (ABS(stCommand.rAcceleration_mm_s2) <= ABS(rMaximumAcceleration_mm_s2))
     AND (stConfig.rStandstillVelocity_mm_s >= 0.0)
     AND (stConfig.rMaximumPositionDeviation_mm >= 0.0)
     AND (stConfig.rMaximumVelocityStep_mm_s >= 0.0)
     AND (stConfig.nDirectionHoldCycles >= 1)
     AND (stConfig.nPostDisableHoldCycles >= 1);
 
+(* Active Feed额外检查命令本身；连续性和换向握手在ACTIVE分支中检查。 *)
+bActiveFeedCommandValid := bPrecheckOk
+    AND FC_IsFiniteLReal(rValue := stCommand.rPosition_mm)
+    AND FC_IsFiniteLReal(rValue := stCommand.rVelocity_mm_s)
+    AND FC_IsFiniteLReal(rValue := stCommand.rAcceleration_mm_s2)
+    AND (stCommand.nDirection >= -1) AND (stCommand.nDirection <= 1)
+    AND (stCommand.rPosition_mm >= rMinimumPosition_mm)
+    AND (stCommand.rPosition_mm <= rMaximumPosition_mm)
+    AND (ABS(stCommand.rVelocity_mm_s) <= ABS(rMaximumVelocity_mm_s))
+    AND (ABS(stCommand.rAcceleration_mm_s2) <= ABS(rMaximumAcceleration_mm_s2));
+
 IF stCommand.rVelocity_mm_s > stConfig.rStandstillVelocity_mm_s THEN
-    bCommandValid := bCommandValid AND (stCommand.nDirection = 1);
+    bActiveFeedCommandValid := bActiveFeedCommandValid AND (stCommand.nDirection = 1);
 ELSIF stCommand.rVelocity_mm_s < -stConfig.rStandstillVelocity_mm_s THEN
-    bCommandValid := bCommandValid AND (stCommand.nDirection = -1);
+    bActiveFeedCommandValid := bActiveFeedCommandValid AND (stCommand.nDirection = -1);
 END_IF
 
 fbEnableTimeout(
@@ -151,7 +177,13 @@ CASE eState OF
     E_ZExtSetpointState.Z_EXT_IDLE:
         stStatus.bDone := FALSE;
         stStatus.bReleaseOwner := FALSE;
+        stStatus.bAcceptedSetpointValid := FALSE;
         nStateCycleCounter := 0;
+        bZ_EXT_DIRECTION_HOLD := FALSE;
+        bZ_EXT_DIRECTION_ZERO := FALSE;
+        bZ_EXT_DIRECTION_PRELOAD := FALSE;
+        nPendingDirection := 0;
+        bDisable := FALSE;
         IF stCommand.bReset THEN
             udiLatchedErrorId := 0;
             bExitDueToError := FALSE;
@@ -161,11 +193,13 @@ CASE eState OF
         END_IF
 
     E_ZExtSetpointState.Z_EXT_PRECHECK:
+        (* 每次新Precheck先清除有效标志，不伪造accepted数值。 *)
+        stStatus.bAcceptedSetpointValid := FALSE;
         IF NOT bOwnerGranted THEN
             udiLatchedErrorId := 16#00007202;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_ERROR;
-        ELSIF NOT bCommandValid THEN
+        ELSIF NOT bPrecheckOk THEN
             udiLatchedErrorId := 16#00007201;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_ERROR;
@@ -174,18 +208,26 @@ CASE eState OF
             rFeedPosition_mm := Axis.NcToPlc.SetPos;
             rFeedVelocity_mm_s := Axis.NcToPlc.SetVelo;
             rFeedAcceleration_mm_s2 := Axis.NcToPlc.SetAcc;
-            nFeedDirection := stCommand.nDirection;
-            IF nFeedDirection = 0 THEN
-                IF rFeedVelocity_mm_s > 0.0 THEN
-                    nFeedDirection := 1;
-                ELSIF rFeedVelocity_mm_s < 0.0 THEN
-                    nFeedDirection := -1;
-                END_IF
+            nInitialDirection := 0;
+            IF rFeedVelocity_mm_s > stConfig.rStandstillVelocity_mm_s THEN
+                nInitialDirection := 1;
+            ELSIF rFeedVelocity_mm_s < -stConfig.rStandstillVelocity_mm_s THEN
+                nInitialDirection := -1;
             END_IF
-            IF nFeedDirection <> 0 THEN
-                nLastNonZeroDirection := nFeedDirection;
-            END_IF
+            nFeedDirection := nInitialDirection;
+            (* 新生命周期不得继承上一周期的非零方向。 *)
+            nLastNonZeroDirection := nInitialDirection;
             rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
+            bZ_EXT_DIRECTION_HOLD := FALSE;
+            bZ_EXT_DIRECTION_ZERO := FALSE;
+            bZ_EXT_DIRECTION_PRELOAD := FALSE;
+            nPendingDirection := 0;
+            bDisable := FALSE;
+            stStatus.bAcceptedSetpointValid := TRUE;
+            stStatus.rAcceptedPosition_mm := Axis.NcToPlc.SetPos;
+            stStatus.rAcceptedVelocity_mm_s := Axis.NcToPlc.SetVelo;
+            stStatus.rAcceptedAcceleration_mm_s2 := Axis.NcToPlc.SetAcc;
+            stStatus.nAcceptedDirection := nInitialDirection;
             eState := E_ZExtSetpointState.Z_EXT_PRELOAD_DIRECTION;
         END_IF
 
@@ -203,7 +245,7 @@ CASE eState OF
             udiLatchedErrorId := 16#00007202;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
-        ELSIF NOT bCommandValid THEN
+        ELSIF NOT bPrecheckOk THEN
             udiLatchedErrorId := 16#00007201;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
@@ -215,66 +257,210 @@ CASE eState OF
     E_ZExtSetpointState.Z_EXT_WAIT_ENABLED:
         bFeedThisCycle := TRUE;
         IF fbEnable.Error THEN
+            bFeedThisCycle := FALSE;
             udiLatchedErrorId := fbEnable.ErrorID;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
         ELSIF NOT bOwnerGranted THEN
+            bFeedThisCycle := FALSE;
             udiLatchedErrorId := 16#00007202;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+        ELSIF NOT bPrecheckOk THEN
+            (* Enable确认前健康、配置或真实NC初值失效时禁止本扫描Feed。 *)
+            bFeedThisCycle := FALSE;
+            udiLatchedErrorId := 16#00007201;
+            bExitDueToError := TRUE;
+            eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
         ELSIF Axis.Status.ExtSetPointGenEnabled OR fbEnable.Enabled THEN
-            rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
-            eState := E_ZExtSetpointState.Z_EXT_ACTIVE;
+            IF stCommand.bPositiveMotionInhibit THEN
+                (* Enable确认扫描也必须在MC Feed前完成硬抑制包校验。 *)
+                IF stCommand.bFeed
+                    AND bActiveFeedCommandValid
+                    AND stStatus.bAcceptedSetpointValid
+                    AND (stCommand.rPosition_mm = stStatus.rAcceptedPosition_mm)
+                    AND (stCommand.rVelocity_mm_s = 0.0)
+                    AND (stCommand.rAcceleration_mm_s2 = 0.0)
+                    AND (stCommand.nDirection = stStatus.nAcceptedDirection) THEN
+                    rFeedPosition_mm := stStatus.rAcceptedPosition_mm;
+                    rFeedVelocity_mm_s := 0.0;
+                    rFeedAcceleration_mm_s2 := 0.0;
+                    nFeedDirection := stStatus.nAcceptedDirection;
+                    bFeedThisCycle := TRUE;
+                    bDisable := TRUE;
+                    rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
+                    eState := E_ZExtSetpointState.Z_EXT_ACTIVE;
+                ELSE
+                    bFeedThisCycle := FALSE;
+                    udiLatchedErrorId := 16#0000720A;
+                    bExitDueToError := TRUE;
+                    eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+                END_IF
+            ELSE
+                rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
+                eState := E_ZExtSetpointState.Z_EXT_ACTIVE;
+            END_IF
         ELSIF fbEnableTimeout.Q THEN
+            bFeedThisCycle := FALSE;
             udiLatchedErrorId := 16#00007204;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
         END_IF
 
     E_ZExtSetpointState.Z_EXT_ACTIVE:
-        IF NOT bOwnerGranted THEN
+        (* 固定优先级：轴/Owner健康 -> 已接受硬抑制的Disable -> 硬抑制包 ->
+           普通Disable/Reset -> 普通Feed与Active内双阶段换向。 *)
+        IF NOT bDriveLinked OR NOT bOwnerGranted OR NOT bAxisReady OR bAxisError THEN
+            IF NOT bOwnerGranted THEN
+                udiLatchedErrorId := 16#00007202;
+            ELSE
+                udiLatchedErrorId := 16#00007201;
+            END_IF
+            bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+        ELSIF bDisable THEN
+            (* 硬抑制零速包已在上一扫描接受，本扫描进入既有完整Disable序列。 *)
+            bDisable := FALSE;
+            eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+        ELSIF stCommand.bPositiveMotionInhibit THEN
+            (* 唯一允许绕过Velocity-Step的包：保持accepted P/方向，V/A立即为零。 *)
+            IF stCommand.bFeed
+                AND bActiveFeedCommandValid
+                AND stStatus.bAcceptedSetpointValid
+                AND (stCommand.rPosition_mm = stStatus.rAcceptedPosition_mm)
+                AND (stCommand.rVelocity_mm_s = 0.0)
+                AND (stCommand.rAcceleration_mm_s2 = 0.0)
+                AND (stCommand.nDirection = stStatus.nAcceptedDirection) THEN
+                rFeedPosition_mm := stStatus.rAcceptedPosition_mm;
+                rFeedVelocity_mm_s := 0.0;
+                rFeedAcceleration_mm_s2 := 0.0;
+                nFeedDirection := stStatus.nAcceptedDirection;
+                bFeedThisCycle := TRUE;
+                (* 只接受一包；下一扫描由内部Disable请求进入安全退出。 *)
+                bDisable := TRUE;
+            ELSE
+                udiLatchedErrorId := 16#0000720A;
+                bExitDueToError := TRUE;
+                eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+            END_IF
         ELSIF stCommand.bDisable OR stCommand.bReset OR NOT stCommand.bEnable THEN
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
-        ELSIF NOT stCommand.bFeed OR NOT bCommandValid THEN
+        ELSIF NOT stCommand.bFeed OR NOT bActiveFeedCommandValid THEN
             udiLatchedErrorId := 16#00007207;
             bExitDueToError := TRUE;
             eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
-        ELSIF (nFeedDirection <> 0) AND (stCommand.nDirection <> 0)
-            AND (stCommand.nDirection <> nFeedDirection) THEN
-            (* 非零方向反转必须先完成零速、方向保持和Disable。 *)
-            udiLatchedErrorId := 16#00007209;
-            bExitDueToError := TRUE;
-            eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
-        ELSIF (nFeedDirection <> 0) AND (stCommand.nDirection = 0) THEN
-            (* Direction归零只能经受控退出序列完成。 *)
-            eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
-        ELSIF (nFeedDirection = 0) AND (stCommand.nDirection <> 0) THEN
-            (* 运动前先单独预置非零Direction一个完整Fast/SAF周期。 *)
-            nFeedDirection := stCommand.nDirection;
-            nLastNonZeroDirection := nFeedDirection;
-            bFeedThisCycle := TRUE;
         ELSE
-            rExpectedPosition_mm := rFeedPosition_mm
-                + 0.5 * (rFeedVelocity_mm_s + stCommand.rVelocity_mm_s) * rCycleTime_s;
-            bContinuityValid := ABS(stCommand.rPosition_mm - rExpectedPosition_mm)
-                    <= stConfig.rMaximumPositionDeviation_mm
-                AND ABS(stCommand.rVelocity_mm_s - rFeedVelocity_mm_s)
-                    <= stConfig.rMaximumVelocityStep_mm_s;
-            IF NOT bContinuityValid THEN
-                udiLatchedErrorId := 16#00007208;
+            nFeedDirection := stCommand.nDirection;
+
+            IF ((nAcceptedDirection = 1) AND (nFeedDirection = -1))
+                OR ((nAcceptedDirection = -1) AND (nFeedDirection = 1)) THEN
+                (* +1/-1不得直接跳变。 *)
+                nFaultId := 16#00007209;
+                udiLatchedErrorId := nFaultId;
+                bExitDueToError := TRUE;
+                eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+            ELSIF (nFeedDirection <> stStatus.nAcceptedDirection)
+                AND ((stCommand.rVelocity_mm_s <> 0.0)
+                    OR (stCommand.rAcceleration_mm_s2 <> 0.0)
+                    OR (stCommand.rPosition_mm <> stStatus.rAcceptedPosition_mm)) THEN
+                (* 任何方向变化都必须使用held-P/V0/A0静止包。 *)
+                udiLatchedErrorId := 16#00007209;
+                bExitDueToError := TRUE;
+                eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+            ELSIF (nFeedDirection = stStatus.nAcceptedDirection)
+                AND (nFeedDirection <> 0)
+                AND (stStatus.rAcceptedVelocity_mm_s = 0.0)
+                AND (stCommand.rVelocity_mm_s = 0.0)
+                AND (stCommand.rAcceleration_mm_s2 = 0.0)
+                AND (stCommand.rPosition_mm <> stStatus.rAcceptedPosition_mm) THEN
+                (* 旧方向已静止时也必须严格held accepted-P，禁止窗口内位置偷跳。 *)
+                udiLatchedErrorId := 16#00007209;
+                bExitDueToError := TRUE;
+                eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+            ELSIF (nFeedDirection = stStatus.nAcceptedDirection)
+                AND (nFeedDirection <> 0)
+                AND (stStatus.rAcceptedVelocity_mm_s = 0.0)
+                AND (stCommand.rPosition_mm = stStatus.rAcceptedPosition_mm)
+                AND (stCommand.rVelocity_mm_s = 0.0)
+                AND (stCommand.rAcceleration_mm_s2 = 0.0) THEN
+                (* 旧方向静止Feed是换向的第一接受阶段。 *)
+                bZ_EXT_DIRECTION_HOLD := TRUE;
+                rFeedPosition_mm := stCommand.rPosition_mm;
+                rFeedVelocity_mm_s := 0.0;
+                rFeedAcceleration_mm_s2 := 0.0;
+                bFeedThisCycle := TRUE;
+            ELSIF (nFeedDirection = 0)
+                AND (stStatus.nAcceptedDirection <> 0) THEN
+                IF NOT bZ_EXT_DIRECTION_HOLD THEN
+                    udiLatchedErrorId := 16#00007209;
+                    bExitDueToError := TRUE;
+                    eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+                ELSE
+                    (* 第二阶段：保持位置并接受Direction=0一个完整周期。 *)
+                    bZ_EXT_DIRECTION_ZERO := TRUE;
+                    bZ_EXT_DIRECTION_PRELOAD := FALSE;
+                    nPendingDirection := 0;
+                    rFeedPosition_mm := stStatus.rAcceptedPosition_mm;
+                    rFeedVelocity_mm_s := 0.0;
+                    rFeedAcceleration_mm_s2 := 0.0;
+                    bFeedThisCycle := TRUE;
+                END_IF
+            ELSIF (stStatus.nAcceptedDirection = 0)
+                AND (nFeedDirection <> 0) THEN
+                IF NOT bZ_EXT_DIRECTION_ZERO THEN
+                    udiLatchedErrorId := 16#00007209;
+                    bExitDueToError := TRUE;
+                    eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+                ELSE
+                    (* 第三阶段：新非零方向必须先接受一个held-P/V0/A0预置包。 *)
+                    nPendingDirection := nFeedDirection;
+                    bZ_EXT_DIRECTION_PRELOAD := TRUE;
+                    rFeedPosition_mm := stStatus.rAcceptedPosition_mm;
+                    rFeedVelocity_mm_s := 0.0;
+                    rFeedAcceleration_mm_s2 := 0.0;
+                    bFeedThisCycle := TRUE;
+                END_IF
+            ELSIF (nFeedDirection = 0)
+                AND ((stCommand.rPosition_mm <> stStatus.rAcceptedPosition_mm)
+                    OR (stCommand.rVelocity_mm_s <> 0.0)
+                    OR (stCommand.rAcceleration_mm_s2 <> 0.0)) THEN
+                udiLatchedErrorId := 16#00007209;
+                bExitDueToError := TRUE;
+                eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+            ELSIF (bZ_EXT_DIRECTION_PRELOAD)
+                AND ((nFeedDirection <> nPendingDirection)
+                    OR (stStatus.nAcceptedDirection <> nPendingDirection)) THEN
+                (* 新方向移动必须晚于一个已接受的新方向预置包。 *)
+                udiLatchedErrorId := 16#00007209;
                 bExitDueToError := TRUE;
                 eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
             ELSE
-                rFeedPosition_mm := stCommand.rPosition_mm;
-                rFeedVelocity_mm_s := stCommand.rVelocity_mm_s;
-                rFeedAcceleration_mm_s2 := stCommand.rAcceleration_mm_s2;
-                nFeedDirection := stCommand.nDirection;
-                IF nFeedDirection <> 0 THEN
-                    nLastNonZeroDirection := nFeedDirection;
+                rExpectedPosition_mm := stStatus.rAcceptedPosition_mm
+                    + 0.5 * (stStatus.rAcceptedVelocity_mm_s + stCommand.rVelocity_mm_s)
+                    * rCycleTime_s;
+                bContinuityValid := ABS(stCommand.rPosition_mm - rExpectedPosition_mm)
+                        <= stConfig.rMaximumPositionDeviation_mm
+                    AND ABS(stCommand.rVelocity_mm_s - stStatus.rAcceptedVelocity_mm_s)
+                        <= stConfig.rMaximumVelocityStep_mm_s;
+                IF NOT bContinuityValid THEN
+                    udiLatchedErrorId := 16#00007208;
+                    bExitDueToError := TRUE;
+                    eState := E_ZExtSetpointState.Z_EXT_RAMP_TO_ZERO;
+                ELSE
+                    rFeedPosition_mm := stCommand.rPosition_mm;
+                    rFeedVelocity_mm_s := stCommand.rVelocity_mm_s;
+                    rFeedAcceleration_mm_s2 := stCommand.rAcceleration_mm_s2;
+                    IF nFeedDirection <> 0 THEN
+                        nLastNonZeroDirection := nFeedDirection;
+                    END_IF
+                    rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
+                    bFeedThisCycle := TRUE;
+                    IF (stCommand.rPosition_mm <> stStatus.rAcceptedPosition_mm)
+                        OR (stCommand.rVelocity_mm_s <> 0.0)
+                        OR (stCommand.rAcceleration_mm_s2 <> 0.0) THEN
+                        bClearDirectionHandshakeAfterFeed := TRUE;
+                    END_IF
                 END_IF
-                rPreviousVelocity_mm_s := rFeedVelocity_mm_s;
-                bFeedThisCycle := TRUE;
             END_IF
         END_IF
 
@@ -368,6 +554,12 @@ CASE eState OF
         stStatus.bDone := TRUE;
         stStatus.bReleaseOwner := TRUE;
         IF NOT stCommand.bEnable THEN
+            stStatus.bAcceptedSetpointValid := FALSE;
+            bZ_EXT_DIRECTION_HOLD := FALSE;
+            bZ_EXT_DIRECTION_ZERO := FALSE;
+            bZ_EXT_DIRECTION_PRELOAD := FALSE;
+            nPendingDirection := 0;
+            bDisable := FALSE;
             eState := E_ZExtSetpointState.Z_EXT_IDLE;
         END_IF
 
@@ -385,7 +577,28 @@ CASE eState OF
         ELSIF stCommand.bReset AND NOT stCommand.bEnable AND stStatus.bReleaseOwner THEN
             udiLatchedErrorId := 0;
             bExitDueToError := FALSE;
+            stStatus.bAcceptedSetpointValid := FALSE;
+            bZ_EXT_DIRECTION_HOLD := FALSE;
+            bZ_EXT_DIRECTION_ZERO := FALSE;
+            bZ_EXT_DIRECTION_PRELOAD := FALSE;
+            nPendingDirection := 0;
+            bDisable := FALSE;
             eState := E_ZExtSetpointState.Z_EXT_IDLE;
+        END_IF
+
+    ELSE
+        udiLatchedErrorId := 16#00007206;
+        bExitDueToError := TRUE;
+        stStatus.bDone := FALSE;
+        stStatus.bReleaseOwner := FALSE;
+        stStatus.bAcceptedSetpointValid := FALSE;
+        bFeedThisCycle := FALSE;
+        IF Axis.Status.ExtSetPointGenEnabled OR fbEnable.Enabled OR fbDisable.Enabled THEN
+            bPostDisableHoldPending := TRUE;
+            eState := E_ZExtSetpointState.Z_EXT_DISABLE;
+        ELSE
+            bPostDisableHoldPending := FALSE;
+            eState := E_ZExtSetpointState.Z_EXT_ERROR;
         END_IF
 END_CASE
 
@@ -403,8 +616,40 @@ IF bFeedThisCycle AND bDriveLinked THEN
         Velocity := rFeedVelocity_mm_s,
         Acceleration := rFeedAcceleration_mm_s2,
         Direction := nFeedDirection);
-    udiFeedCycleCounter := udiFeedCycleCounter + 1;
+    IF udiFeedCycleCounter = UDINT#4294967295 THEN
+        udiFeedCycleCounter := 1;
+    ELSE
+        udiFeedCycleCounter := udiFeedCycleCounter + 1;
+    END_IF
+    (* 所有安全检查已在MC Feed前完成；这是唯一accepted发布点。 *)
     stStatus.bFeedAccepted := TRUE;
+    stStatus.bAcceptedSetpointValid := TRUE;
+    stStatus.rAcceptedPosition_mm := rFeedPosition_mm;
+    stStatus.rAcceptedVelocity_mm_s := rFeedVelocity_mm_s;
+    stStatus.rAcceptedAcceleration_mm_s2 := rFeedAcceleration_mm_s2;
+    stStatus.nAcceptedDirection := nFeedDirection;
+
+    IF bClearDirectionHandshakeAfterFeed THEN
+        bZ_EXT_DIRECTION_HOLD := FALSE;
+        bZ_EXT_DIRECTION_ZERO := FALSE;
+        bZ_EXT_DIRECTION_PRELOAD := FALSE;
+        nPendingDirection := 0;
+    END_IF
+
+    (* 初始静止Feed也是真实accepted Direction=0阶段，可安全启动新方向预置。 *)
+    IF (nFeedDirection = 0)
+        AND (ABS(rFeedVelocity_mm_s) <= stConfig.rStandstillVelocity_mm_s)
+        AND (rFeedAcceleration_mm_s2 = 0.0) THEN
+        bZ_EXT_DIRECTION_ZERO := TRUE;
+        bZ_EXT_DIRECTION_PRELOAD := FALSE;
+        nPendingDirection := 0;
+    ELSIF bZ_EXT_DIRECTION_ZERO
+        AND (nFeedDirection <> 0)
+        AND (ABS(rFeedVelocity_mm_s) <= stConfig.rStandstillVelocity_mm_s)
+        AND (rFeedAcceleration_mm_s2 = 0.0) THEN
+        nPendingDirection := nFeedDirection;
+        bZ_EXT_DIRECTION_PRELOAD := TRUE;
+    END_IF
 END_IF
 
 stStatus.eState := eState;

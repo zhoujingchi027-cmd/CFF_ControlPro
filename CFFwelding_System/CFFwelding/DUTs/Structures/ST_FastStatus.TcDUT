@@ -12,10 +12,28 @@
     stZAxis : ST_ZAxisStatus;
     (* Z轴External Setpoint生命周期状态。 *)
     stZExtSetpoint : ST_ZExtSetpointStatus;
+    (* Z轴External轨迹状态。 *)
+    stZExternalTrajectory : ST_ZExternalTrajectoryOutput;
+    (* 已接受的Sequence Z轴命令事务号。 *)
+    udiAcceptedSequenceZCommandId : UDINT;
+    (* 已接受的Sequence R轴命令事务号。 *)
+    udiAcceptedSequenceRCommandId : UDINT;
     (* Z轴导纳力控速度和Anti-windup诊断。 *)
     stZForceControl : ST_ZForceControlOutput;
     (* R 轴状态。 *)
     stRAxis : ST_RAxisStatus;
+    (* R轴转速包络，单位转每分钟。 *)
+    rRSpeedEnvelope_rpm : LREAL;
+    (* R轴转速斜坡正在执行。 *)
+    bRSpeedRampBusy : BOOL;
+    (* R轴转速斜坡已经达到目标。 *)
+    bRSpeedRampReached : BOOL;
+    (* R轴转速斜坡参数有效。 *)
+    bRSpeedRampValid : BOOL;
+    (* 力设定值斜坡已经达到目标。 *)
+    bForceSetpointRampReached : BOOL;
+    (* 力设定值斜坡参数有效。 *)
+    bForceSetpointRampValid : BOOL;
     (* 快速过程实际值。 *)
     stProcess : ST_ProcessActual;
 END_STRUCT

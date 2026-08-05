@@ -13,5 +13,7 @@ VAR_GLOBAL
     stSensorProcessing : ST_SensorProcessingConfig;
     (* Z轴External Setpoint超时、连续性和退出保持参数。 *)
     stZExtSetpoint : ST_ZExtSetpointConfig;
+    (* CFF流程超时和标准定位斜率；默认无效。 *)
+    stCffSequence : ST_CffSequenceConfig;
 END_VAR
 ]]></Declaration></GVL></TcPlcObject>

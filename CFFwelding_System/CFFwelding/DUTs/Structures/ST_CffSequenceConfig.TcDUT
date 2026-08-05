@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffSequenceConfig" Id="{5D65580A-2126-4820-9D19-1A4AE7A35238}"><Declaration><![CDATA[TYPE ST_CffSequenceConfig : STRUCT
+    (* Approach标准定位等待超时。 *)
+    tApproachTimeout : TIME;
+    (* External Contact Search等待超时。 *)
+    tContactSearchTimeout : TIME;
+    (* Contact参考点事务确认等待超时。 *)
+    tContactReferenceAckTimeout : TIME;
+    (* 受控卸载等待超时。 *)
+    tControlledUnloadTimeout : TIME;
+    (* 卸载静止条件连续确认时间。 *)
+    tUnloadStandstillConfirm : TIME;
+    (* R轴受控停止等待超时。 *)
+    tRAxisStopTimeout : TIME;
+    (* 标准NC返回等待超时。 *)
+    tReturnTimeout : TIME;
+    (* Approach和Return标准NC加速度，单位mm/s2。 *)
+    fStandardMoveAccelerationMmS2 : LREAL;
+    (* Approach和Return标准NC减速度，单位mm/s2。 *)
+    fStandardMoveDecelerationMmS2 : LREAL;
+    (* 配置已受控确认。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -16,6 +16,8 @@
     nContactDebounceMs : UDINT;
     (* Contact Search向下速度绝对值，单位毫米每秒。 *)
     fContactSearchVelocityMmS : LREAL;
+    (* Contact Search起始位置，单位毫米。 *)
+    fContactSearchStartPositionMm : LREAL;
     (* Contact外部位移绝对窗口下限，单位毫米。 *)
     fContactSensorMinimumMm : LREAL;
     (* Contact外部位移绝对窗口上限，单位毫米。 *)

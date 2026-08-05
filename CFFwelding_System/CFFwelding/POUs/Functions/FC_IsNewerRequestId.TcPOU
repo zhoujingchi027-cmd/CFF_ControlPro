@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><POU Name="FC_IsNewerRequestId" Id="{F0A1324E-FFF9-40EF-BD99-BB5A478812F0}"><Declaration><![CDATA[FUNCTION FC_IsNewerRequestId : BOOL
+VAR_INPUT
+    (* 待接纳的事务编号。*)
+    udiCandidate : UDINT;
+    (* 已接纳的事务编号。*)
+    udiReference : UDINT;
+END_VAR
+VAR
+    (* 从参考编号到候选编号的无符号前向距离。*)
+    udiForwardDistance : UDINT;
+END_VAR
+]]></Declaration><Implementation><ST><![CDATA[(* 事务编号使用半区间规则处理 UDINT 回绕；零值保留为未请求。*)
+FC_IsNewerRequestId := FALSE;
+IF udiCandidate = 0 OR udiCandidate = udiReference THEN
+    RETURN;
+END_IF
+IF udiReference = 0 THEN
+    FC_IsNewerRequestId := TRUE;
+    RETURN;
+END_IF
+udiForwardDistance := udiCandidate - udiReference;
+FC_IsNewerRequestId := udiForwardDistance < 16#80000000;]]></ST></Implementation></POU></TcPlcObject>

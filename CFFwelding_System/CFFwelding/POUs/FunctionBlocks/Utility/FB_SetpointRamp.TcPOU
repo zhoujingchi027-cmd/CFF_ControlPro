@@ -31,15 +31,40 @@ END_VAR
 VAR
     (* 已用起始值建立连续输出。 *)
     bInitialized : BOOL;
+    (* 所有可能影响输出的参数均有限且位于允许符号范围。 *)
+    bInputsValid : BOOL;
     (* 非负到达容差。 *)
     rAbsoluteTolerance : LREAL;
 END_VAR
-]]></Declaration><Implementation><ST><![CDATA[IF bReset OR NOT bEnable THEN
-    rOutput := rInitialValue;
-    bInitialized := FALSE;
+]]></Declaration><Implementation><ST><![CDATA[bInputsValid := (rCycleTime_s > 0.0)
+    AND (rRateUpPer_s >= 0.0)
+    AND (rRateDownPer_s >= 0.0)
+    AND (rTolerance >= 0.0)
+    AND FC_IsFiniteLReal(rValue := rInitialValue)
+    AND FC_IsFiniteLReal(rValue := rTarget)
+    AND FC_IsFiniteLReal(rValue := rRateUpPer_s)
+    AND FC_IsFiniteLReal(rValue := rRateDownPer_s)
+    AND FC_IsFiniteLReal(rValue := rCycleTime_s)
+    AND FC_IsFiniteLReal(rValue := rTolerance);
+
+IF bReset OR NOT bEnable THEN
+    IF bInputsValid THEN
+        rOutput := rInitialValue;
+    END_IF
+    bInitialized := bEnable AND bInputsValid;
     bBusy := FALSE;
     bReached := FALSE;
     bValid := FALSE;
+    IF NOT bEnable OR NOT bInputsValid THEN
+        RETURN;
+    END_IF
+END_IF
+
+bValid := bInputsValid;
+IF NOT bValid THEN
+    (* 参数无效时保持最后连续输出，不向设备发布跳变。 *)
+    bBusy := FALSE;
+    bReached := FALSE;
     RETURN;
 END_IF
 
@@ -48,24 +73,12 @@ IF NOT bInitialized THEN
     bInitialized := TRUE;
 END_IF
 
-bValid := (rCycleTime_s > 0.0)
-    AND (rRateUpPer_s >= 0.0)
-    AND (rRateDownPer_s >= 0.0)
-    AND FC_IsFiniteLReal(rValue := rInitialValue)
-    AND FC_IsFiniteLReal(rValue := rTarget);
-IF NOT bValid THEN
-    (* 参数无效时保持最后连续输出，不向设备发布跳变。 *)
-    bBusy := FALSE;
-    bReached := FALSE;
-    RETURN;
-END_IF
-
 rOutput := FC_LimitRate(
     rCurrent := rOutput,
     rTarget := rTarget,
     rRateUpPer_s := rRateUpPer_s,
     rRateDownPer_s := rRateDownPer_s,
     rCycleTime_s := rCycleTime_s);
-rAbsoluteTolerance := ABS(rTolerance);
+rAbsoluteTolerance := rTolerance;
 bReached := ABS(rTarget - rOutput) <= rAbsoluteTolerance;
 bBusy := NOT bReached;]]></ST></Implementation></POU></TcPlcObject>

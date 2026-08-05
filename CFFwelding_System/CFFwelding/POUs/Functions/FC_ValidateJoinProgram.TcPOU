@@ -17,6 +17,12 @@ VAR
     rCurrentStepBoundary_mm : LREAL;
     (* Z轴绝对软限位跨度，作为累计S_rel程序上限，单位mm。 *)
     rMaximumRelativeTravel_mm : LREAL;
+    (* 第四步的局部副本。*)
+    stStep4 : ST_CffStepProgram;
+    (* 第四步合格力带保持时间，单位毫秒。*)
+    nQualifiedForceHoldMs : UDINT;
+    (* 第四步主时间判据，单位毫秒。*)
+    nPrimaryStepTimeMs : UDINT;
 END_VAR
 ]]></Declaration><Implementation><ST><![CDATA[FC_ValidateJoinProgram := FALSE;
 rPreviousStepBoundary_mm := 0.0;
@@ -28,8 +34,8 @@ IF NOT stProgram.bValid OR NOT stMachineLimits.bValid OR NOT stProgram.stMonitor
     OR (stProgram.stHeader.nProgramId = 0)
     OR (stProgram.stHeader.nRevision = 0)
     OR (stProgram.stHeader.nElementTypeId = 0)
-    OR (stProgram.stHeader.nForceProfileId = 0)
-    OR (stProgram.stHeader.nRAxisProfileId = 0)
+    OR NOT (stProgram.stHeader.nForceProfileId > 0)
+    OR NOT (stProgram.stHeader.nRAxisProfileId > 0)
     OR (stProgram.stHeader.nToolId = 0)
     OR (stProgram.stHeader.nAnvilId = 0)
     OR (stMachineLimits.fMaxForceN <= 0.0)
@@ -47,6 +53,7 @@ IF NOT stProgram.bValid OR NOT stMachineLimits.bValid OR NOT stProgram.stMonitor
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactForceOnN)
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactForceOffN)
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSearchVelocityMmS)
+    OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSearchStartPositionMm)
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSensorMinimumMm)
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fContactSensorMaximumMm)
     OR NOT FC_IsFiniteLReal(rValue := stProgram.stHeader.fReturnVelocityMmS)
@@ -55,10 +62,12 @@ IF NOT stProgram.bValid OR NOT stMachineLimits.bValid OR NOT stProgram.stMonitor
     OR (stProgram.stHeader.fThicknessToleranceMm < 0.0)
     OR (stProgram.stHeader.fContactForceOffN < 0.0)
     OR (stProgram.stHeader.fContactForceOnN <= stProgram.stHeader.fContactForceOffN)
-    OR (stProgram.stHeader.fContactForceOnN > stMachineLimits.fMaxForceN)
+    OR (stProgram.stHeader.fContactForceOnN >= stMachineLimits.fMaxForceN)
     OR (stProgram.stHeader.nContactDebounceMs = 0)
     OR (stProgram.stHeader.fContactSearchVelocityMmS <= 0.0)
     OR (stProgram.stHeader.fContactSearchVelocityMmS > stMachineLimits.fZMaxVelocityMmS)
+    OR NOT (stProgram.stHeader.fContactSearchStartPositionMm >= stMachineLimits.fZMinPositionMm)
+    OR NOT (stProgram.stHeader.fContactSearchStartPositionMm <= stMachineLimits.fZMaxPositionMm)
     OR (stProgram.stHeader.fContactSensorMaximumMm
         <= stProgram.stHeader.fContactSensorMinimumMm)
     OR (stProgram.stHeader.fReturnVelocityMmS <= 0.0)
@@ -102,8 +111,10 @@ FOR nStepIndex := 1 TO 4 DO
         OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCriterionSRelMaxMm)
         OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCriterionRpmMin)
         OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fCaptureMaxVelocityMmS)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fForceBandToleranceN)
+        OR NOT FC_IsFiniteLReal(rValue := stStep.stProceeding.fRpmStoppedThresholdRpm)
         OR (stStep.fSetForceN < 0.0)
-        OR (stStep.fSetForceN > stMachineLimits.fMaxForceN)
+        OR (stStep.fSetForceN >= stMachineLimits.fMaxForceN)
         OR (ABS(stStep.fSetSpeedRpm) > stMachineLimits.fRMaxSpeedRpm)
         OR (stStep.fForceRampNS <= 0.0)
         OR (stStep.nMonitorProfileId = 0)
@@ -178,5 +189,21 @@ FOR nStepIndex := 1 TO 4 DO
     END_IF
     rPreviousStepBoundary_mm := rCurrentStepBoundary_mm;
 END_FOR
+
+(* 第四步只能以时间推进，并在压实前完成受控的合格力带保持。*)
+stStep4 := stProgram.astSteps[4];
+nQualifiedForceHoldMs := stStep4.stProceeding.nQualifiedForceHoldMs;
+nPrimaryStepTimeMs := stStep4.stProceeding.nPrimaryStepTimeMs;
+IF NOT (stStep4.stProceeding.ePrimaryCriterion = STEP_CRIT_STEP_TIME)
+    OR NOT (nQualifiedForceHoldMs > 0)
+    OR NOT (nQualifiedForceHoldMs <= nPrimaryStepTimeMs)
+    OR NOT (stStep4.stProceeding.fForceBandToleranceN > 0.0)
+    OR NOT (stStep4.stProceeding.fForceBandToleranceN < stMachineLimits.fMaxForceN)
+    OR NOT (stStep4.stProceeding.fRpmStoppedThresholdRpm >= 0.0)
+    OR NOT (stStep4.stProceeding.fRpmStoppedThresholdRpm < stMachineLimits.fRMaxSpeedRpm)
+    OR NOT (stStep4.stProceeding.eSecondaryAction = SECONDARY_CONTROLLED_EXIT_NOK)
+    OR NOT (stStep4.fSetSpeedRpm = 0.0) THEN
+    RETURN;
+END_IF
 
 FC_ValidateJoinProgram := TRUE;]]></ST></Implementation></POU></TcPlcObject>

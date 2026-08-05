@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffFastConfigSnapshot" Id="{1C3E94F6-DBBC-4719-B133-C485675E7D5B}"><Declaration><![CDATA[TYPE ST_CffFastConfigSnapshot : STRUCT
+    (* 形成该快照的Sequence事务号。 *)
+    nSequenceCommandId : UDINT;
+    (* 冻结的机器周期与Revision。 *)
+    stMachine : ST_MachineConfig;
+    (* 冻结的机器运动和过程硬限值。 *)
+    stLimits : ST_MachineLimits;
+    (* 冻结的External生命周期配置。 *)
+    stZExtSetpoint : ST_ZExtSetpointConfig;
+    (* 冻结的Z轴Force Profile。 *)
+    stZForceControl : ST_ZForceControlProfile;
+    (* 全部成员由同一个已通过Precheck的Start事务形成。 *)
+    bValid : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1"><DUT Name="ST_CffMotionIntent" Id="{9CEBDEC5-6BA7-45E2-98FC-1BBC4A0C3FE9}"><Declaration><![CDATA[TYPE ST_CffMotionIntent : STRUCT
+    (* Sequence Z标准NC源事务号。 *)
+    udiZCommandId : UDINT;
+    (* Sequence Z标准NC候选。 *)
+    stZCommand : ST_ZAxisCommand;
+    (* 请求External生命周期进入Enable。 *)
+    bExternalEnableRequest : BOOL;
+    (* 请求External生命周期完成Disable。 *)
+    bExternalDisableRequest : BOOL;
+    (* Contact Search使用的External速度目标，向下为正，单位mm/s。 *)
+    rExternalTargetVelocity_mm_s : LREAL;
+    (* Sequence当前占用R轴命令通道。 *)
+    bRAxisProcessRequested : BOOL;
+    (* Sequence R轴源事务号。 *)
+    udiRCommandId : UDINT;
+    (* Sequence R轴命令候选。 *)
+    stRCommand : ST_RAxisCommand;
+    (* External已释放且允许Force Process Owner转交。 *)
+    bForceProcessExitComplete : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration></DUT></TcPlcObject>
